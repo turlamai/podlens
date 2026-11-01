@@ -62,7 +62,7 @@ var _hmt = _hmt || [];
       <a href="index.html#features" data-i18n="nav.features">功能</a>
       <a href="guide.html" data-i18n="nav.guide">手册</a>
       <a href="index.html#download" data-i18n="nav.download">下载</a>
-      <a href="https://github.com/turinglambdaai/podlens" data-i18n="nav.github">GitHub</a>
+      <a href="https://github.com/turlamai/podlens" data-i18n="nav.github">GitHub</a>
       <div class="lang-dropdown-wrapper">
         <button class="lang-btn" type="button" onclick="void 0" aria-label="Switch language">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
@@ -82,7 +82,7 @@ var _hmt = _hmt || [];
   <section class="manual-hero">
     <p class="eyebrow" data-i18n="hero.eyebrow">使用手册</p>
     <h1 data-i18n="hero.title">从安装到听懂第一集</h1>
-<aside class="guide-status"><p class="reader-en " lang="en">Free BYOK application. There is no PodLens hosted-AI subscription; your configured providers charge for their usage.</p><p class="reader-zh " lang="zh">免费 BYOK 应用。不提供 PodLens 托管 AI 订阅；模型用量由配置的服务商收费。</p><a class="reader-en" lang="en" href="https://github.com/turinglambdaai/podlens/blob/main/docs/USER-GUIDE.md">Current installation, privacy and recovery</a><a class="reader-zh" lang="zh" href="https://github.com/turinglambdaai/podlens/blob/main/docs/USER-GUIDE.zh-CN.md">当前安装、隐私与恢复</a></aside>
+<aside class="guide-status"><p class="reader-en " lang="en">Free BYOK application. There is no PodLens hosted-AI subscription; your configured providers charge for their usage.</p><p class="reader-zh " lang="zh">免费 BYOK 应用。不提供 PodLens 托管 AI 订阅；模型用量由配置的服务商收费。</p><a class="reader-en" lang="en" href="https://github.com/turlamai/podlens/blob/main/docs/USER-GUIDE.md">Current installation, privacy and recovery</a><a class="reader-zh" lang="zh" href="https://github.com/turlamai/podlens/blob/main/docs/USER-GUIDE.zh-CN.md">当前安装、隐私与恢复</a></aside>
     <p class="sub" data-i18n="hero.sub">五分钟上手、核心功能与常见问题，一页说清。句子短，动词开头，每节独立。</p>
   </section>
 
@@ -104,18 +104,14 @@ var _hmt = _hmt || [];
         <h2 data-i18n="qs.title">五分钟上手</h2>
         <p data-i18n="qs.intro">下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。</p>
         <ol>
-          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turinglambdaai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。</li>
+          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。</li>
           <li data-i18n="qs.s2"><strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。</li>
           <li data-i18n="qs.s3"><strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。</li>
           <li data-i18n="qs.s4"><strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href="#byok">BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。</li>
           <li data-i18n="qs.s5"><strong>听并听懂。</strong>选一集，点播放。想读懂它：点「一键听懂」，下载、转写、翻译、总结一次完成；逐句稿跟随播放高亮，点句子即跳转。</li>
         </ol>
-        <img class="manual-shot" src="screenshots/podlens-main-light.png"
-             alt="PodLens macOS 首次启动的空库状态：三栏布局与左下角操作按钮"
-             data-alt-en="PodLens on macOS at first launch: the empty library, three-pane layout, action buttons at the bottom left"
-             data-alt-zh="PodLens macOS 首次启动的空库状态：三栏布局与左下角操作按钮"
-             loading="lazy">
-        <p class="manual-hint" data-i18n="qs.hint">截图为真实的 macOS 构建（首次启动的空库状态）。添加订阅后，中栏列出单集，右栏是播放与逐句稿。</p>
+        
+        <p class="manual-hint" data-i18n="qs.hint">预期结果：订阅成功后节目出现在媒体库；选择单集可开始播放。配置模型并完成转写后，逐句稿应能跟随播放定位。若没有生成结果，请检查模型配置与处理状态。</p>
       </section>
 
       <!-- =================== 订阅管理 =================== -->
@@ -208,7 +204,7 @@ var _hmt = _hmt || [];
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q6">应用内更新失败了？</h3>
-          <p data-i18n="faq.a6">去 <a href="https://github.com/turinglambdaai/podlens/releases/latest">Releases</a> 页手动下载新版覆盖安装：macOS 重新拖一次 DMG，Windows 重跑 MSI 或替换便携目录。更新走 Ed25519 签名清单校验，失败时不会安装半截的更新。</p>
+          <p data-i18n="faq.a6">去 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 页手动下载新版覆盖安装：macOS 重新拖一次 DMG，Windows 重跑 MSI 或替换便携目录。更新走 Ed25519 签名清单校验，失败时不会安装半截的更新。</p>
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q7">macOS 提示「无法打开」？</h3>
@@ -220,7 +216,7 @@ var _hmt = _hmt || [];
 </main>
 
 <footer class="footer">
-  <p>PodLens · <a href="index.html" data-i18n="footer.home">首页</a> · <a href="https://github.com/turinglambdaai/podlens">GitHub</a> · AGPL-3.0 · <span data-i18n="footer.built">基于 Rivet 构建</span></p>
+  <p>PodLens · <a href="index.html" data-i18n="footer.home">首页</a> · <a href="https://github.com/turlamai/podlens">GitHub</a> · AGPL-3.0 · <span data-i18n="footer.built">基于 Rivet 构建</span></p>
 </footer>
 
 <script>
@@ -235,12 +231,12 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "常见问题", "toc.faq": "FAQ",
     "qs.title": "五分钟上手",
     "qs.intro": "下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。",
-    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turinglambdaai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。",
+    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。",
     "qs.s2": "<strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。",
     "qs.s3": "<strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。",
     "qs.s4": "<strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href='#byok'>BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。",
     "qs.s5": "<strong>听并听懂。</strong>选一集，点播放。想读懂它：点「一键听懂」，下载、转写、翻译、总结一次完成；逐句稿跟随播放高亮，点句子即跳转。",
-    "qs.hint": "截图为真实的 macOS 构建（首次启动的空库状态）。添加订阅后，中栏列出单集，右栏是播放与逐句稿。",
+    "qs.hint": "预期结果：订阅成功后节目出现在媒体库；选择单集可开始播放。配置模型并完成转写后，逐句稿应能跟随播放定位。若没有生成结果，请检查模型配置与处理状态。",
     "sub.title": "订阅管理",
     "sub.p1": "左栏是订阅列表。点 <code>+</code> 添加，粘贴 RSS 地址；「发现」面板内置 16 档经典英文播客（科技 / 安全 / 科学 / 设计 / 商业 / 资讯），也支持全目录搜索（iTunes Search API，无需密钥）。",
     "sub.l1": "自动刷新：每 30 分钟刷新全部订阅，新单集自动出现（macOS 弹系统通知）。",
@@ -276,7 +272,7 @@ var _hmt = _hmt || [];
     "faq.q5": "怎么卸载？",
     "faq.a5": "两步：把应用移到废纸篓（Windows 卸载 MSI 或删掉便携目录），再删除 <code>~/.podlens/</code>。后者包含你的全部数据——不删它，重装后数据还在。",
     "faq.q6": "应用内更新失败了？",
-    "faq.a6": "去 <a href='https://github.com/turinglambdaai/podlens/releases/latest'>Releases</a> 页手动下载新版覆盖安装：macOS 重新拖一次 DMG，Windows 重跑 MSI 或替换便携目录。更新走 Ed25519 签名清单校验，失败时不会安装半截的更新。",
+    "faq.a6": "去 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 页手动下载新版覆盖安装：macOS 重新拖一次 DMG，Windows 重跑 MSI 或替换便携目录。更新走 Ed25519 签名清单校验，失败时不会安装半截的更新。",
     "faq.q7": "macOS 提示「无法打开」？",
     "faq.a7": "构建目前为 ad-hoc 签名（公证在路线图上）。右键应用 → 「打开」→ 再点「打开」，之后不再提示。",
     "footer.home": "首页", "footer.built": "基于 Rivet 构建"
@@ -291,12 +287,12 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "FAQ", "toc.faq": "FAQ",
     "qs.title": "Five-minute start",
     "qs.intro": "Download, open, set a key once, listen. That's the whole tutorial — everything else on this page is optional.",
-    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turinglambdaai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows.",
+    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows.",
     "qs.s2": "<strong>First launch.</strong> The macOS build is unnotarized — right-click the app and choose Open first. There is no account and nothing to sign up for. The library starts empty and the Discover panel opens for you.",
     "qs.s3": "<strong>Add a podcast.</strong> Click <code>+</code> at the bottom left, paste the show's RSS URL, press Enter. Or pick one from the curated catalog in the Discover panel — one tap.",
     "qs.s4": "<strong>Set your key (once).</strong> Press <code>⌘,</code> (macOS) to open Settings and fill in <code>api-base</code> and <code>api-key</code> (see <a href='#byok'>BYOK setup</a> below). Transcription, translation and summary all run through your own LLM API.",
     "qs.s5": "<strong>Listen and understand.</strong> Pick an episode and press play. To read it: click Understand — download, transcribe, translate and summarize in one job; the transcript highlights along with playback and a click seeks.",
-    "qs.hint": "The screenshot is the real macOS build (the empty library at first launch). Once you subscribe, the middle pane lists episodes and the right pane holds playback and the transcript.",
+    "qs.hint": "Expected result: the subscribed show appears in your library and an episode can play. After model setup and successful transcription, transcript lines can follow playback. If no result appears, check provider settings and processing status.",
     "sub.title": "Subscriptions",
     "sub.p1": "The left pane lists your shows. Click <code>+</code> and paste an RSS URL; the Discover panel carries 16 classic English shows (tech / security / science / design / business / news) and full-directory search (iTunes Search API, no key needed).",
     "sub.l1": "Auto refresh: every subscription refreshes every 30 minutes; new episodes appear on their own (macOS posts a system notification).",
@@ -332,7 +328,7 @@ var _hmt = _hmt || [];
     "faq.q5": "How do I uninstall?",
     "faq.a5": "Two steps: move the app to the Trash (on Windows, uninstall the MSI or delete the portable folder), then delete <code>~/.podlens/</code>. That directory holds all your data — keep it and a reinstall picks up where you left off.",
     "faq.q6": "The in-app update failed.",
-    "faq.a6": "Download the new version from the <a href='https://github.com/turinglambdaai/podlens/releases/latest'>Releases</a> page and install over the old one: re-drag the DMG on macOS, re-run the MSI or replace the portable folder on Windows. Updates verify an Ed25519-signed manifest — a failed check never installs a half-downloaded update.",
+    "faq.a6": "Download the new version from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page and install over the old one: re-drag the DMG on macOS, re-run the MSI or replace the portable folder on Windows. Updates verify an Ed25519-signed manifest — a failed check never installs a half-downloaded update.",
     "faq.q7": "macOS says the app can't be opened.",
     "faq.a7": "Builds are ad-hoc signed for now (notarization is on the roadmap). Right-click the app → Open → Open again; the prompt won't come back.",
     "footer.home": "Home", "footer.built": "Built on Rivet"
