@@ -4,7 +4,7 @@
 ;; output and update checks. The root VERSION file and rivet.rktd must carry
 ;; the same version; scripts/check-release-version.sh enforces the alignment
 ;; on every release (until Rivet exposes the deployment identity to the
-;; backend, upstream turinglambdaai/rivet).
+;; backend, upstream turlamai/rivet).
 
 (provide app-version)
 

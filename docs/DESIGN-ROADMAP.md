@@ -226,4 +226,4 @@ agent 用两条 CLI 命令完成「订阅并取回某集的中文要点」。
 
 v0.4.0 切片已进入 main；先完成 BYOK 安全存储迁移与三端发现/播放/转录取消恢复，桌面证据齐备后再评估移动端。
 
-执行场景与完成标准见[本仓审查 issue](https://github.com/turinglambdaai/podlens/issues/13)及家族[交付标准](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md)。未完成的跨平台、硬件或真实支付验证仍是显式门禁；本节不表示这些验证已通过。后续一次认领一个切片，证据回填本文件与 issue。
+执行场景与完成标准见[本仓审查 issue](https://github.com/turlamai/podlens/issues/13)及家族[交付标准](https://github.com/turlamai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md)。未完成的跨平台、硬件或真实支付验证仍是显式门禁；本节不表示这些验证已通过。后续一次认领一个切片，证据回填本文件与 issue。

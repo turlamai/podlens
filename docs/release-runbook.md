@@ -8,7 +8,7 @@ explains the trust model.
 - Ed25519 update key pair: `scripts/update-keys.sh` (stored outside the repo)
 - GitHub secret `UPDATE_ED25519_PRIVATE_KEY` = the PEM contents:
   ```bash
-  gh secret set UPDATE_ED25519_PRIVATE_KEY < ~/.podlens/update-signing-key.pem -R turinglambdaai/podlens
+  gh secret set UPDATE_ED25519_PRIVATE_KEY < ~/.podlens/update-signing-key.pem -R turlamai/podlens
   ```
 - (later, for signed/notarized installers) Apple Developer ID + notarytool
   profile, Windows Authenticode certificate — release.yml picks these up

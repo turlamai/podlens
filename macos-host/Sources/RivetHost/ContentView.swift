@@ -1359,7 +1359,7 @@ struct SettingsSheet: View {
                 Link(L("aboutWebsite"),
                      destination: URL(string: "https://podlens.jrtx.site")!)
                 Link(L("aboutReportIssue"),
-                     destination: URL(string: "https://github.com/turinglambdaai/podlens/issues")!)
+                     destination: URL(string: "https://github.com/turlamai/podlens/issues")!)
             }
             .font(.caption)
         }
