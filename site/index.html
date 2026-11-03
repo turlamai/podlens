@@ -138,11 +138,11 @@ html:lang(en) .reader-zh,html:lang(zh) .reader-en{display:none!important}@media(
   <section id="download" class="section">
     <h2 data-i18n="download.title">下载</h2>
     <div class="dl-grid">
-      <a class="dl-card" id="dl-macos" href="https://github.com/turlamai/podlens/releases/latest/download/podlens-macos-arm64.dmg" data-dl-arm64="podlens-macos-arm64.dmg" data-dl-x64="podlens-macos-x64.dmg">
+      <a class="dl-card" id="dl-macos" href="https://github.com/turlamai/podlens/releases/latest" data-release-suffix="macos-arm64.dmg" data-dl-arm64="podlens-macos-arm64.dmg" data-dl-x64="podlens-macos-x64.dmg">
         <h3>macOS</h3>
         <p data-i18n="dl.mac">14+ · Apple Silicon & Intel · DMG</p>
       </a>
-      <a class="dl-card" id="dl-windows" href="https://github.com/turlamai/podlens/releases/latest/download/podlens-windows-x64.msi">
+      <a class="dl-card" id="dl-windows" href="https://github.com/turlamai/podlens/releases/latest" data-release-suffix="windows-x64.msi">
         <h3>Windows</h3>
         <p data-i18n="dl.win">10+ · x64 · MSI 安装器 / 便携 zip</p>
       </a>
@@ -273,38 +273,50 @@ html:lang(en) .reader-zh,html:lang(zh) .reader-en{display:none!important}@media(
 })();
 </script>
 <script>
-  // family direct-download standard: point the hero CTA and the matching
-  // card at the stable, version-less release asset for this platform
+  // Select the platform, then resolve the exact immutable tagged asset.
+  // GitHub's Release page remains the no-network fallback.
   (function () {
-    var BASE = "https://github.com/turlamai/podlens/releases/latest/download/";
+    var page = "https://github.com/turlamai/podlens/releases/latest";
     var ua = navigator.userAgent || "";
-    var platform = /Windows/i.test(ua) ? "windows"
-                 : (/Mac|iPhone|iPad/i.test(ua) ? "macos" : null);
-    if (!platform) return;
-    var file;
-    if (platform === "windows") {
-      file = "podlens-windows-x64.msi";
-    } else {
-      file = "podlens-macos-arm64.dmg";
-      // macOS UAs hide the architecture; best-effort WebGL probe — Apple
-      // Silicon reports an "Apple GPU" renderer, Intel Macs name Intel/AMD
+    var platform = /Windows/i.test(ua) ? "windows" : (/Mac|iPhone|iPad/i.test(ua) ? "macos" : null);
+    var arch = "arm64";
+    if (platform === "macos") {
       try {
         var gl = document.createElement("canvas").getContext("webgl");
         var ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
-        var renderer = (ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || "";
-        if (!/apple/i.test(String(renderer)) && /intel|amd|nvidia|radeon|geforce/i.test(String(renderer))) {
-          file = "podlens-macos-x64.dmg";
-        }
-      } catch (e) {}
+        var gpu = (ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || "";
+        if (!/apple/i.test(String(gpu)) && /intel|amd|nvidia|radeon|geforce/i.test(String(gpu))) arch = "x64";
+      } catch (_) {}
     }
-    var url = BASE + file;
-    var hero = document.getElementById("hero-download");
-    if (hero) hero.href = url;
-    var card = document.getElementById(platform === "windows" ? "dl-windows" : "dl-macos");
-    if (card) {
-      if (platform === "macos") card.href = url; // arch-correct DMG
-      card.classList.add("dl-card-current");
+    var release = null;
+    function resolve() {
+      var mac = document.getElementById("dl-macos");
+      var win = document.getElementById("dl-windows");
+      if (mac) mac.dataset.releaseSuffix = "macos-" + arch + ".dmg";
+      var hero = document.getElementById("hero-download");
+      if (hero) hero.dataset.releaseSuffix = platform === "windows" ? "windows-x64.msi" : "macos-" + arch + ".dmg";
+      var links = document.querySelectorAll("a[data-release-suffix]");
+      links.forEach(function (a) {
+        a.href = page;
+        if (!release || release.draft || release.prerelease ||
+            !/^v[0-9]+\.[0-9]+\.[0-9]+$/.test(release.tag_name)) return;
+        var name = "podlens-" + release.tag_name.slice(1) + "-" + a.dataset.releaseSuffix;
+        var exact = "https://github.com/turlamai/podlens/releases/download/" + release.tag_name + "/" + name;
+        if ((release.assets || []).some(function (item) {
+          return item.name === name && item.size > 0 && item.browser_download_url === exact;
+        })) a.href = exact;
+      });
+      if (platform) {
+        var active = document.getElementById(platform === "windows" ? "dl-windows" : "dl-macos");
+        if (active) active.classList.add("dl-card-current");
+      }
     }
+    resolve();
+    fetch("https://api.github.com/repos/turlamai/podlens/releases/latest",
+          {headers: {"Accept": "application/vnd.github+json"}})
+      .then(function (r) { if (!r.ok) throw new Error("release lookup"); return r.json(); })
+      .then(function (data) { release = data; resolve(); })
+      .catch(function () { /* Link to release page. */ });
   })();
 </script>
 <script>

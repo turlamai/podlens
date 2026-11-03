@@ -244,30 +244,6 @@ jobs:
           find dist -mindepth 2 -maxdepth 2 -type f -exec mv {} dist/ \;
           find dist -mindepth 1 -maxdepth 1 -type d -empty -delete
           ls -la dist/
-      # Family direct-download standard: the site and update feed point at
-      # stable, version-less asset names, so a release re-uploads its
-      # installers under these aliases next to the versioned originals.
-      # Runs before the manifest step — that script looks up the exact
-      # versioned file names, so the aliases cannot confuse it.
-      - name: Stable alias names
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cd dist
-          cp "podlens-${VERSION}-macos-arm64.dmg" podlens-macos-arm64.dmg
-          cp "podlens-${VERSION}-macos-x64.dmg" podlens-macos-x64.dmg
-          cp "podlens-${VERSION}-macos-arm64.zip" podlens-macos-arm64.zip
-          cp "podlens-${VERSION}-macos-x64.zip" podlens-macos-x64.zip
-          cp "podlens-${VERSION}-windows-x64.msi" podlens-windows-x64.msi
-          cp "podlens-${VERSION}-windows-x64.zip" podlens-windows-x64.zip
-          # rivet names the linux installers with their distro arch strings;
-          # the aliases normalize them to the family's x64/arm64.
-          cp "podlens-${VERSION}-linux-amd64.deb" podlens-linux-x64.deb
-          cp "podlens-${VERSION}-linux-arm64.deb" podlens-linux-arm64.deb
-          cp "podlens-${VERSION}-linux-x86_64.AppImage" podlens-linux-x64.AppImage
-          cp "podlens-${VERSION}-linux-aarch64.AppImage" podlens-linux-arm64.AppImage
-          cp "podlens-${VERSION}-linux-x64.tar.gz" podlens-linux-x64.tar.gz
-          cp "podlens-${VERSION}-linux-arm64.tar.gz" podlens-linux-arm64.tar.gz
-          ls -la
       - name: Generate + sign update manifest
         env:
           UPDATE_ED25519_PRIVATE_KEY: ${{ secrets.UPDATE_ED25519_PRIVATE_KEY }}
@@ -291,25 +267,54 @@ jobs:
             echo "::error::Missing signed update-manifest.json; refusing to publish"
             exit 1
           }
-      - name: SHA256SUMS
+      - name: Audit and stage public packages and license metadata
         run: |
-          cd dist
-          # strip stray CR from Windows-authored sums before checking
-          cat *.sha256 | tr -d '\r' > SHA256SUMS
+          set -euo pipefail
+          VERSION="$(printf '%s' "$GITHUB_REF_NAME" | cut -c2-)"
+          mkdir -p public
+          for suffix in \
+            macos-arm64.dmg macos-arm64.zip macos-x64.dmg macos-x64.zip \
+            windows-x64.msi windows-x64.zip \
+            linux-arm64.tar.gz linux-arm64.zip linux-x64.tar.gz linux-x64.zip \
+            linux-amd64.deb linux-arm64.deb \
+            linux-aarch64.AppImage linux-x86_64.AppImage \
+            linux-arm64.sbom.cdx.json linux-x64.sbom.cdx.json \
+            linux-arm64-THIRD_PARTY_NOTICES.txt linux-x64-THIRD_PARTY_NOTICES.txt; do
+            name="podlens-$VERSION-$suffix"
+            test -s "dist/$name" || { echo "::error::Missing or empty $name"; exit 1; }
+            cp "dist/$name" "public/$name"
+          done
+          for arch in aarch64 x86_64; do
+            rpm="$(find dist -maxdepth 1 -type f -name "podlens-$VERSION-*-linux-$arch.rpm" -print -quit)"
+            test -s "$rpm" || { echo "::error::Missing $arch RPM"; exit 1; }
+            cp "$rpm" public/
+          done
+          cp dist/update-manifest.json public/
+          test -s public/update-manifest.json
+          cd public
+          shasum -a 256 podlens-* | LC_ALL=C sort -k2 > SHA256SUMS
           shasum -a 256 --check SHA256SUMS
+          test "$(grep -c '^' SHA256SUMS)" -eq 20
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" -R turlamai/podlens >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" dist/* --clobber -R turlamai/podlens
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" -R turlamai/podlens >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" public/* --clobber -R turlamai/podlens
           else
-            gh release create "${{ github.ref_name }}" dist/* \
+            gh release create "$GITHUB_REF_NAME" public/* \
               -R turlamai/podlens \
-              --title "PodLens ${{ github.ref_name }}" \
+              --title "PodLens $GITHUB_REF_NAME" \
               --generate-notes
           fi
-      - name: Attest build provenance
+          gh release view "$GITHUB_REF_NAME" -R turlamai/podlens --json assets --jq '.assets[].name' |
+            while IFS= read -r name; do
+              if [ ! -f "public/$name" ]; then
+                gh release delete-asset "$GITHUB_REF_NAME" "$name" --yes -R turlamai/podlens
+              fi
+            done
+      - name: Attest public build provenance
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: dist/*
+          subject-path: public/*
