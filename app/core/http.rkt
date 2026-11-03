@@ -24,7 +24,7 @@
          content-length-or-#f
          status-code)
 
-(define http-user-agent "PodLens/1.0 (+https://github.com/turinglambdaai/podlens)")
+(define http-user-agent "PodLens/1.0 (+https://github.com/turlamai/podlens)")
 
 ;; ---- URL splitting (no net/url dependency; feeds are plain http(s)) ------
 

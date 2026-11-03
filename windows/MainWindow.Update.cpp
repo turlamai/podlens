@@ -27,7 +27,7 @@ namespace {
 namespace muxc = winrt::Microsoft::UI::Xaml::Controls;
 
 constexpr wchar_t kReleasesUrl[] =
-    L"https://github.com/turinglambdaai/podlens/releases";
+    L"https://github.com/turlamai/podlens/releases";
 
 std::int64_t epoch_seconds() {
   FILETIME now{};

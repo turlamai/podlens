@@ -32,6 +32,6 @@ Before claiming an unrestricted release, remove any conflicting legacy product g
 
 Complete delivery/maintenance gates in #13 first. Free pricing does not reduce signed-update, recovery or privacy requirements.
 
-Execution entry: [issue #13](https://github.com/turinglambdaai/podlens/issues/13). Complete this bounded slice before expanding commercial features.
+Execution entry: [issue #13](https://github.com/turlamai/podlens/issues/13). Complete this bounded slice before expanding commercial features.
 
-Portfolio role and shared boundaries: [PORTFOLIO](https://github.com/turinglambdaai/turinglambdaai.github.io/blob/master/PORTFOLIO.md).
+Portfolio role and shared boundaries: [PORTFOLIO](https://github.com/turlamai/turinglambdaai.github.io/blob/master/PORTFOLIO.md).

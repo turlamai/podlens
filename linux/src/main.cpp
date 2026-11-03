@@ -3207,7 +3207,7 @@ void on_about_activated(GSimpleAction*, GVariant*, gpointer) {
   gtk_about_dialog_set_website_label(GTK_ABOUT_DIALOG(dialog),
                                      tr("about.website"));
   static char const* kIssueLinks[] = {
-      "github.com/turinglambdaai/podlens/issues", nullptr};
+      "github.com/turlamai/podlens/issues", nullptr};
   gtk_about_dialog_add_credit_section(GTK_ABOUT_DIALOG(dialog),
                                       tr("about.issues"), kIssueLinks);
   gtk_window_set_transient_for(GTK_WINDOW(dialog), g_state.window);
@@ -3344,7 +3344,7 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                     gtk_widget_set_has_tooltip(website, FALSE);
                     gtk_box_append(GTK_BOX(about), website);
                     auto* issue = gtk_link_button_new_with_label(
-                        "https://github.com/turinglambdaai/podlens/issues",
+                        "https://github.com/turlamai/podlens/issues",
                         "Report an Issue");
                     gtk_widget_set_has_tooltip(issue, FALSE);
                     gtk_box_append(GTK_BOX(about), issue);

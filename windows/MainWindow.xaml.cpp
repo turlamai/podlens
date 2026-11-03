@@ -3159,7 +3159,7 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
   issue.Content(winrt::box_value(
       winrt::hstring(std::wstring(podlens::Tr("about.issue")))));
   issue.NavigateUri(winrt::Windows::Foundation::Uri{
-      L"https://github.com/turinglambdaai/podlens/issues"});
+      L"https://github.com/turlamai/podlens/issues"});
   issue.Padding({0, 0, 0, 0});
   about.Children().Append(issue);
   panel.Children().Append(about);
