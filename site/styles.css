@@ -73,7 +73,7 @@ a { color: inherit; text-decoration: none; }
 .section.alt > * { max-width: 992px; margin-left: auto; margin-right: auto; }
 .section h2 { font-size: 30px; letter-spacing: -0.02em; margin-bottom: 34px; text-align: center; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
 .card {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 26px 24px;
@@ -82,7 +82,7 @@ a { color: inherit; text-decoration: none; }
 .card h3 { font-size: 17px; margin-bottom: 8px; }
 .card p { font-size: 14.5px; color: var(--muted); }
 
-.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px; }
 .step {
   background: var(--bg); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 26px 24px;
@@ -94,7 +94,7 @@ a { color: inherit; text-decoration: none; }
 .step h3 { font-size: 16px; margin-bottom: 6px; }
 .step p { font-size: 14px; color: var(--muted); }
 
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 18px; }
 .shots figure { margin: 0; }
 .shots img {
   width: 100%; display: block;
@@ -105,7 +105,7 @@ a { color: inherit; text-decoration: none; }
 
 .note { margin-top: 26px; text-align: center; font-size: 13.5px; color: var(--muted); }
 
-.dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; max-width: 640px; margin: 0 auto; }
+.dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px; max-width: 640px; margin: 0 auto; }
 .dl-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 28px; text-align: center; transition: border-color 0.12s ease;
@@ -141,3 +141,10 @@ a { color: inherit; text-decoration: none; }
   transition: color .15s, background .15s;
 }
 .theme-btn:hover { color: var(--accent); background: var(--accent-soft); }
+
+/* Mobile: keep every navigation action reachable without widening the page. */
+@media (max-width: 700px) {
+  .nav-inner { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .nav-links { width: 100%; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 13px; }
+  .hero-actions { flex-wrap: wrap; }
+}
