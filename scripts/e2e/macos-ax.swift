@@ -199,6 +199,8 @@ do {
     try press(settingsMenuItem, "Settings menu item")
     let field: AXUIElement = try waitFor("chat-model settings field") {
         findIdentifier(application, "SettingsChatModelField")
+            ?? findField(application, label: "Translation and summary model")
+            ?? findField(application, label: "翻译与总结模型")
     }
     try replaceText(field, with: "acceptance-model", pid: pid)
     _ = try waitFor("chat-model edit committed to the native field") {
