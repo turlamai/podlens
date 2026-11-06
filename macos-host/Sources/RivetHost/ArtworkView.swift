@@ -134,14 +134,18 @@ struct ArtworkBackdrop: View {
     var body: some View {
         ZStack {
             if let image {
+                // No Core Image blur here: the Intel acceptance runner has
+                // no usable Metal device, and a blurred image crashes
+                // SwiftUI at launch. A low-opacity enlarged crop reads as
+                // ambient color without that dependency.
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .blur(radius: 46)
-                    .opacity(opacity)
+                    .saturation(0.85)
+                    .opacity(opacity * 0.62)
                     .overlay {
                         LinearGradient(
-                            colors: [Palette.canvas.opacity(0.15), Palette.canvas.opacity(0.92)],
+                            colors: [Palette.canvas.opacity(0.35), Palette.canvas.opacity(0.96)],
                             startPoint: .top,
                             endPoint: .bottom
                         )

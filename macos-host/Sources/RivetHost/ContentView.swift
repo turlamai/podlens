@@ -142,7 +142,7 @@ struct ToastView: View {
         }
         .padding(.horizontal, Space.sm)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
+        .background(Palette.surface, in: Capsule())
         .overlay { Capsule().strokeBorder(Palette.hairline, lineWidth: 0.7) }
         .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
     }
@@ -300,7 +300,7 @@ struct SidebarView: View {
             }
             .padding(.horizontal, Space.xs)
             .padding(.vertical, 6)
-            .background(.bar)
+            .background(Palette.surface)
             .hairlineTop()
         }
     }
@@ -610,8 +610,7 @@ struct UpNextCard: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
-                .background(.ultraThinMaterial, in: Capsule())
-                .environment(\.colorScheme, .dark)
+                .background(Color.black.opacity(0.34), in: Capsule())
             }
             .padding(Space.sm)
         }

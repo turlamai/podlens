@@ -85,7 +85,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, Space.lg)
             .padding(.vertical, Space.sm)
-            .background(.bar)
+            .background(Palette.surface)
         }
         .frame(width: 660, height: 640)
         .background(Palette.canvas)

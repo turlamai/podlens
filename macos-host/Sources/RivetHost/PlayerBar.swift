@@ -26,7 +26,7 @@ struct PlayerBar: View {
         }
         .padding(.horizontal, Space.md)
         .padding(.vertical, 9)
-        .background(.bar)
+        .background(Palette.surface)
         .hairlineTop()
     }
 
