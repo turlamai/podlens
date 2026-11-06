@@ -18,7 +18,10 @@ racket "$repo/scripts/e2e/seed-listening-fixture.rkt"
 swiftc "$repo/scripts/e2e/macos-ax.swift" -o "$driver" \
   -framework AppKit -framework ApplicationServices
 
-HOME="$home" "$app" >"$output/application.log" 2>&1 &
+# The acceptance journey saves the chat model, which lives on the
+# Intelligence tab of the native Settings window. Open that tab directly so
+# the AX driver does not have to operate an NSTabView.
+HOME="$home" PODLENS_SETTINGS_TAB=intelligence "$app" >"$output/application.log" 2>&1 &
 app_pid=$!
 
 stop_bounded() {
