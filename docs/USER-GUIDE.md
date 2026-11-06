@@ -35,7 +35,7 @@ RSS, directory search and audio downloads contact their respective hosts. Transc
 
 ## Known limits
 
-Long-job cancellation is implemented in the shared core and exposed on macOS; the Windows and Linux hosts expose Focus Listening and transcript seeking but not the cancel button yet. Windows MSI updates use a new installer rather than silently replacing the installation. The 0.6 reading-first visual redesign is the macOS reference; Windows and Linux keep their previous visual language until their next UI slice.
+Long-job cancellation is available on macOS, Windows and Linux. Windows MSI updates use a new installer rather than silently replacing the installation. The 0.7 release aligns Windows and Linux with the reading-first information architecture, three reading modes, cancel action and storage transparency; controls remain native WinUI and GTK, and the in-app language switch is macOS-only for now. Windows 125–200% display scaling still needs a dedicated visual pass.
 
 ## Updates and removal
 

@@ -83,6 +83,36 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.0 - 2026-11-06
+
+### Added
+- **Windows and Linux catch up with the 0.6 reading experience.** Both
+  hosts now share the macOS information architecture: a large page header,
+  warm canvas/surface tokens, the three reading modes (Bilingual /
+  Translation / Original), human setting labels, and a security-status note
+  that names the OS vault or the explicit 0600 fallback. Windows uses WinUI
+  controls and Linux uses GTK widgets; only hierarchy, terminology and
+  behaviour are aligned.
+- **Cancellable jobs on both hosts.** The episode action row gains a
+  progress bar and Cancel; `job-cancel` stops at the next checkpoint and
+  already-finished translation batches remain on disk. Windows reports the
+  stage/percentage in the status line, Linux reuses its progress row.
+- **Windows evidence at the declared floor.** The packaged acceptance now
+  captures Focus Listening and the restored library at 1024×768 with the new
+  header, brand buttons and reading modes.
+
+### Changed
+- Windows Focus Listening removes the whole NavigationView header instead
+  of leaving an empty band, and Focus/Follow are brand-tinted buttons rather
+  than system-blue toggle states.
+- Windows/Linux Settings identify fields by human labels while keeping the
+  raw key as the control's automation name, so the existing packaged
+  journeys and screen-reader paths keep working.
+
+### Fixed
+- Windows empty-state copy points at the one-click Understand path instead
+  of the removed per-stage buttons.
+
 ## 0.6.0 - 2026-11-06
 
 ### Added
