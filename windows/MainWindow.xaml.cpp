@@ -3249,14 +3249,14 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
     }
     wchar_t note_buffer[512];
     if (!configured) {
-      swprintf_s(note_buffer, _countof(note_buffer), L"%s",
+      swprintf_s(note_buffer, 512, L"%s",
                  std::wstring(podlens::Tr("settings.storage_none")).c_str());
     } else if (secure) {
-      swprintf_s(note_buffer, _countof(note_buffer),
+      swprintf_s(note_buffer, 512,
                  std::wstring(podlens::Tr("settings.storage_secure")).c_str(),
                  to_wide(label).c_str());
     } else {
-      swprintf_s(note_buffer, _countof(note_buffer),
+      swprintf_s(note_buffer, 512,
                  std::wstring(podlens::Tr("settings.storage_file")).c_str(),
                  to_wide(label).c_str());
     }
