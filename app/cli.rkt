@@ -19,6 +19,7 @@
          racket/string
          "core/catalog.rkt"
          "core/config.rkt"
+         "core/secrets.rkt"
          "core/feed.rkt"
          "core/i18n.rkt"
          "core/itunes.rkt"
@@ -597,29 +598,44 @@
         (displayln (tr (lang) 'refreshed total)))
     0))
 
+;; Never print the BYOK credential — config output is routinely pasted into
+;; issues and shell transcripts. The vault still resolves it internally.
+(define (public-setting key value)
+  (if (equal? key "api-key")
+      (if (and (string? value) (non-empty-string? (string-trim value)))
+          secret-value-mask
+          "")
+      value))
+
 (define (cmd-config args)
   (define c (config!))
   (match args
     [(list)
+     (define rows
+       (for/list ([k (in-list (config-keys))])
+         (cons k (public-setting k (config-get c k)))))
      (if (stdout-json?)
          (emit-ok
           (hasheq 'config
-                  (for/hasheq ([k (in-list (config-keys))])
-                    (values (string->symbol k) (config-get c k)))))
+                  (for/hasheq ([row (in-list rows)])
+                    (values (string->symbol (car row)) (cdr row)))))
          (begin
-           (for ([k (in-list (config-keys))])
-             (displayln (format "~a = ~a" k (config-get c k))))
+           (for ([row (in-list rows)])
+             (displayln (format "~a = ~a" (car row) (cdr row))))
            0))]
     [(list key)
      (cond
        [(not (member key (config-keys))) (usage! (tr (lang) 'unknown-key key))]
-       [(stdout-json?) (emit-ok (hasheq (string->symbol key) (config-get c key)))]
-       [else (displayln (config-get c key)) 0])]
+       [else
+        (define v (public-setting key (config-get c key)))
+        (if (stdout-json?)
+            (emit-ok (hasheq (string->symbol key) v))
+            (begin (displayln v) 0))])]
     [(list key value)
      (with-handlers ([exn:fail? (lambda (e) (fail! 2 (exn-message e)))])
        (unless (member key (config-keys))
          (error 'config (tr (lang) 'unknown-key key)))
-       (define v (config-set! c key value))
+       (define v (public-setting key (format "~a" (config-set! c key value))))
        (if (stdout-json?)
            (emit-ok (hasheq (string->symbol key) v))
            (displayln (tr (lang) 'config-set key (format "~a" v))))
@@ -648,16 +664,26 @@
       (delete-file probe)
       #t))
   (define api-ok? (config-api-configured? (config!)))
+  (define secret-backend (config-secret-backend (config!)))
   (define ffmpeg-ok? (has-ffmpeg?))
   (if (stdout-json?)
       (emit-ok
        (hasheq 'dataDir (path->string (data-dir))
                'dataWritable data-ok?
                'apiConfigured api-ok?
+               'secretBackend (symbol->string secret-backend)
+               'secretSecure (and (secret-backend-secure? secret-backend) #t)
                'ffmpeg ffmpeg-ok?))
       (begin
         (displayln (format "data-dir:   ~a — ~a" (path->string (data-dir)) (tr (lang) 'doctor-data)))
         (displayln (format "api:        ~a" (if api-ok? (tr (lang) 'doctor-api) (tr (lang) 'doctor-no-api))))
+        (displayln (format "api store:  ~a~a"
+                           (secret-backend-label secret-backend)
+                           (if (secret-backend-secure? secret-backend)
+                               ""
+                               (if (equal? secret-backend 'file)
+                                   " (file fallback; OS vault unavailable)"
+                                   ""))))
         (displayln (format "ffmpeg:     ~a" (if ffmpeg-ok? (tr (lang) 'doctor-ffmpeg) (tr (lang) 'doctor-no-ffmpeg))))))
   (if data-ok? 0 1))
 

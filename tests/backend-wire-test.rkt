@@ -6,6 +6,8 @@
 
 (define scratch (make-temporary-file "podlens-wire-~a" 'directory))
 (putenv "PODLENS_DATA_DIR" (path->string scratch))
+;; Never touch a real OS vault in tests.
+(putenv "PODLENS_SECRET_BACKEND" "file")
 (define test-directory
   (or (current-load-relative-directory) (current-directory)))
 (define backend-path
@@ -145,6 +147,42 @@
    (check-equal? saved #t)
    (define config (call-with-input-file (build-path scratch "config.json") read-json))
    (check-equal? (hash-ref config 'chat-model) "acceptance-model")
+
+   ;; The credential never crosses the wire and never lands in config.json.
+   (define-values (saved-key key-error)
+     (call-rpc "settings-set" "api-key" "sk-wire-secret"))
+   (check-false key-error)
+   (check-equal? saved-key #t)
+   (define-values (masked-rows masked-error) (call-rpc "settings-list"))
+   (check-false masked-error)
+   (define key-row (for/first ([row (in-list masked-rows)]
+                               #:when (equal? (car row) "api-key"))
+                     row))
+   (check-not-false key-row)
+   (check-equal? (list-ref key-row 1) "••••••••")
+   (define config-after-key
+     (call-with-input-file (build-path scratch "config.json") read-json))
+   (check-false (hash-has-key? config-after-key 'api-key))
+   (check-true (hash-has-key? config-after-key 'api-key-ref))
+
+   ;; Echoing the mask back (old host save loops) is a no-op, not a write.
+   (define-values (mask-echo mask-echo-error)
+     (call-rpc "settings-set" "api-key" "••••••••"))
+   (check-false mask-echo-error)
+   (check-equal? mask-echo #t)
+   (define config-after-echo
+     (call-with-input-file (build-path scratch "config.json") read-json))
+   (check-true (hash-has-key? config-after-echo 'api-key-ref))
+
+   (define-values (security-json security-error) (call-rpc "security-status"))
+   (check-false security-error)
+   (define security (string->jsexpr security-json))
+   (check-true (hash-ref security 'configured))
+   (check-equal? (hash-ref security 'backend) "file")
+
+   (define-values (cancelled cancel-error) (call-rpc "job-cancel" "no-such-job"))
+   (check-false cancel-error)
+   (check-equal? cancelled #f)
 
    ;; ---- preview: feed-peek + preview-audio ---------------------------------
    ;; Peeking and previewing must leave the library untouched: feed-list

@@ -19,6 +19,11 @@
          "paths.rkt"
          "util.rkt")
 
+;; Raised from the progress sink when the owning job was cancelled. It is an
+;; exn:fail? so existing with-handlers still run, but the pipeline marks the
+;; stage "cancelled" instead of "error" and re-raises.
+(struct job-cancelled exn:fail (job-id) #:transparent)
+
 (provide cfg-snapshot
          ensure-audio!
          ensure-preview-audio!
@@ -30,6 +35,8 @@
          make-job-manager
          job-start!
          job-get
+         job-cancel!
+         job-cancelled?
          jobs-active?
          has-ffmpeg?
          asr-limit-bytes)
@@ -127,7 +134,11 @@
   (define id (hash-ref episode 'id))
   (episode-set-status! id 'transcript-status "running")
   (with-handlers
-      ([exn:fail?
+      ([job-cancelled?
+        (lambda (e)
+          (episode-set-status! id 'transcript-status "cancelled" (exn-message e))
+          (raise e))]
+       [exn:fail?
         (lambda (e)
           (episode-set-status! id 'transcript-status "error" (exn-message e))
           (raise e))])
@@ -199,7 +210,11 @@
     (error 'run-translate! "no transcript for this episode yet — transcribe it first"))
   (episode-set-status! id 'transcript-status "running")
   (with-handlers
-      ([exn:fail?
+      ([job-cancelled?
+        (lambda (e)
+          (episode-set-status! id 'transcript-status "cancelled" (exn-message e))
+          (raise e))]
+       [exn:fail?
         (lambda (e)
           (episode-set-status! id 'transcript-status "error" (exn-message e))
           (raise e))])
@@ -256,7 +271,11 @@
     (error 'run-summarize! "no transcript for this episode yet — transcribe it first"))
   (episode-set-status! id 'summary-status "running")
   (with-handlers
-      ([exn:fail?
+      ([job-cancelled?
+        (lambda (e)
+          (episode-set-status! id 'summary-status "cancelled" (exn-message e))
+          (raise e))]
+       [exn:fail?
         (lambda (e)
           (episode-set-status! id 'summary-status "error" (exn-message e))
           (raise e))])
@@ -353,6 +372,26 @@
 (define (make-job-manager emit!)
   (job-manager (make-semaphore 1) (make-hasheq) emit!))
 
+(define (job-cancel-requested? mgr id)
+  (with-lock (job-manager-sem mgr)
+    (lambda ()
+      (define j (hash-ref (job-manager-jobs mgr) id #f))
+      (and j (hash-ref j 'cancel #f) #t))))
+
+;; Ask a running job to stop at its next progress checkpoint. The network
+;; call already in flight finishes (a provider request cannot be aborted
+;; mid-stream), but no further batch is billed.
+(define (job-cancel! mgr id)
+  (with-lock (job-manager-sem mgr)
+    (lambda ()
+      (define j (hash-ref (job-manager-jobs mgr) id #f))
+      (and j
+           (equal? (hash-ref j 'status) "running")
+           (not (hash-ref j 'cancel #f))
+           (begin
+             (hash-set! j 'cancel #t)
+             #t)))))
+
 (define (job-set! mgr id patch)
   (with-lock (job-manager-sem mgr)
     (lambda ()
@@ -384,6 +423,7 @@
                                          (cons 'episode-id episode-id)
                                          (cons 'status "running")
                                          (cons 'pct 0)
+                                         (cons 'cancel #f)
                                          (cons 'message "")
                                          (cons 'started (now-epoch))))])
               (hash-set! (job-manager-jobs mgr) id j)
@@ -392,18 +432,31 @@
     (error 'job-start! "another job is already running for this episode"))
   (define id started)
   (define (progress pct [message ""])
+    (when (job-cancel-requested? mgr id)
+      (raise (job-cancelled "cancelled" (current-continuation-marks) id)))
     (job-set! mgr id (hasheq 'pct pct 'message message))
     ((job-manager-emit! mgr) id kind pct message))
   (thread
    (lambda ()
      (with-handlers
-         ([exn:fail?
+         ([job-cancelled?
+           (lambda (e)
+             (job-set! mgr id (hasheq 'status "cancelled" 'message "cancelled"))
+             ((job-manager-emit! mgr) id kind 0 "cancelled"))]
+          [exn:fail?
            (lambda (e)
              (job-set! mgr id (hasheq 'status "error" 'message (exn-message e)))
              ((job-manager-emit! mgr) id kind 100 (exn-message e)))])
        (thunk progress)
-       (job-set! mgr id (hasheq 'status "done" 'pct 100))
-       ((job-manager-emit! mgr) id kind 100 ""))))
+       ;; A cancel request that landed after the final progress sink but
+       ;; before the thunk returned still wins over "done".
+       (if (job-cancel-requested? mgr id)
+           (begin
+             (job-set! mgr id (hasheq 'status "cancelled" 'message "cancelled"))
+             ((job-manager-emit! mgr) id kind 0 "cancelled"))
+           (begin
+             (job-set! mgr id (hasheq 'status "done" 'pct 100))
+             ((job-manager-emit! mgr) id kind 100 ""))))))
   id)
 
 ;; status as jsexpr: {id kind episode-id status pct message}

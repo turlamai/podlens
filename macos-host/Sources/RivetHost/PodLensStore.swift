@@ -13,6 +13,38 @@ enum SidebarItem: Hashable {
     case feed(Feed)
 }
 
+/// How the reading surface pairs the original with its translation. Replaces
+/// the old on/off toggle: translation-only is a real listening mode for
+/// language learners, not a hidden variant of bilingual.
+enum TranscriptMode: String, CaseIterable, Identifiable {
+    case bilingual
+    case translation
+    case original
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .bilingual: return L("modeBilingual")
+        case .translation: return L("modeTranslation")
+        case .original: return L("modeOriginal")
+        }
+    }
+}
+
+struct ProviderProbe {
+    let ok: Bool
+    let message: String
+    let modelAvailable: Bool?
+}
+
+struct SecurityInfo {
+    let backend: String
+    let label: String
+    let secure: Bool
+    let configured: Bool
+}
+
 /// An episode across feeds — the shape home/library lanes consume
 /// (episode-recent RPC row: episode columns prefixed with feed context).
 struct RecentEpisode: Identifiable, Hashable {
@@ -98,6 +130,7 @@ final class PodLensStore: ObservableObject {
 
     struct Job: Identifiable {
         let id: String
+        let episodeId: String
         let kind: String
         var pct: Int
         var message: String
@@ -150,10 +183,37 @@ final class PodLensStore: ObservableObject {
     @Published var chapters: [Chapter] = []
     @Published var estimate: Estimate?
     @Published var jobs: [String: Job] = [:]
-    @Published var statusLine = ""
+    @Published var statusLine = "" {
+        didSet {
+            guard statusLine != oldValue, !statusLine.isEmpty else { return }
+            showToast(statusLine)
+        }
+    }
     @Published var bootStatus = ""
-    @Published var bilingual = true // on: original + translation, off: original only
+    @Published var transcriptMode: TranscriptMode = .bilingual
+    @Published var followsTranscript = true
+    @Published var scrollRequest = 0
+    @Published var focusMode = false
+    @Published var columnVisibility: NavigationSplitViewVisibility = .all
+    @Published var toastMessage: String?
+    @Published var settingsRows: [[String]] = []
+    @Published var security: SecurityInfo?
+    @Published var settingsSaving = false
+    @Published var settingsError: String?
+    @Published var addFeedBusy = false
+    @Published var addFeedError: String?
+
     var translationAvailable: Bool { segments.contains { !$0.translation.isEmpty } }
+
+    /// The two-value shorthand older call sites used; translation mode is
+    /// never collapsed back to original implicitly.
+    var bilingual: Bool {
+        get { transcriptMode != .original }
+        set {
+            if !newValue { transcriptMode = .original }
+            else if transcriptMode == .original { transcriptMode = .bilingual }
+        }
+    }
     @Published var updateOutcome: Result<UpdateService.CheckResult, Error>?
     @Published var playing = false
     @Published var currentTime: Double = 0
@@ -168,6 +228,7 @@ final class PodLensStore: ObservableObject {
     private var api: RivetAPI?
     var apiForSettings: RivetAPI? { api }
     private var didAutoOpenDiscover = false
+    private var toastGeneration = 0
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
@@ -186,6 +247,30 @@ final class PodLensStore: ObservableObject {
         self.api = api
         setupSystemMediaControls()
         scheduleAutoRefresh()
+    }
+
+    // MARK: transient status
+
+    /// Status lines are ambient: a small floating pill, not a permanent row
+    /// competing with the library. Errors linger longer than confirmations.
+    private func showToast(_ message: String) {
+        toastGeneration += 1
+        let generation = toastGeneration
+        withAnimation(Motion.standard) { toastMessage = message }
+        let isError = message.localizedCaseInsensitiveContains("fail")
+            || message.contains("失败")
+            || message.contains("错误")
+        let nanoseconds: UInt64 = isError ? 6_000_000_000 : 3_200_000_000
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard self.toastGeneration == generation else { return }
+            withAnimation(Motion.standard) { self.toastMessage = nil }
+        }
+    }
+
+    func dismissToast() {
+        toastGeneration += 1
+        withAnimation(Motion.standard) { toastMessage = nil }
     }
 
     func handleEvent(_ event: RivetEvent) {
@@ -450,31 +535,43 @@ final class PodLensStore: ObservableObject {
     }
 
     func addFeed(url: String) {
-        guard let api, !url.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let trimmed = url.trimmingCharacters(in: .whitespaces)
-        Task {
-            do {
-                _ = try await api.feed_add(url: url)
-                await MainActor.run {
-                    // reflect subscription in the catalog/search rows
-                    self.catalog = self.catalog.map { entry in
-                        entry.url == trimmed ? CatalogEntry(id: entry.id, category: entry.category,
-                                                            title: entry.title, description: entry.description,
-                                                            url: entry.url, homepage: entry.homepage, added: true,
-                                                            artworkURL: entry.artworkURL) : entry
-                    }
-                    self.searchResults = self.searchResults.map { entry in
-                        entry.url == trimmed ? CatalogEntry(id: entry.id, category: entry.category,
-                                                            title: entry.title, description: entry.description,
-                                                            url: entry.url, homepage: entry.homepage, added: true,
-                                                            artworkURL: entry.artworkURL) : entry
-                    }
-                }
-                await loadFeeds()
-            } catch {
-                statusLine = L("fetchFailed") + " \(error)"
-            }
+        Task { _ = await self.addFeedNow(url: url) }
+    }
+
+    /// Subscribe and report the failure to the caller so a sheet can stay
+    /// open with the URL intact instead of dismissing into a hidden error.
+    @discardableResult
+    func addFeedNow(url: String) async -> String? {
+        guard let api else { return L("backendNotReady") }
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return L("feedURLRequired") }
+        addFeedBusy = true
+        addFeedError = nil
+        defer { addFeedBusy = false }
+        do {
+            _ = try await api.feed_add(url: trimmed)
+            markAdded(trimmed)
+            await loadFeeds()
+            statusLine = L("feedAdded")
+            return nil
+        } catch {
+            let message = "\(error)"
+            addFeedError = message
+            statusLine = L("fetchFailed") + message
+            return message
         }
+    }
+
+    private func markAdded(_ url: String) {
+        func update(_ entry: CatalogEntry) -> CatalogEntry {
+            guard entry.url == url else { return entry }
+            return CatalogEntry(id: entry.id, category: entry.category, title: entry.title,
+                                description: entry.description, url: entry.url,
+                                homepage: entry.homepage, added: true,
+                                artworkURL: entry.artworkURL)
+        }
+        catalog = catalog.map(update)
+        searchResults = searchResults.map(update)
     }
 
     func removeFeed(_ feed: Feed) {
@@ -502,13 +599,13 @@ final class PodLensStore: ObservableObject {
 
     // MARK: episode actions
 
-    func selectEpisode(_ episode: Episode) {
+    func selectEpisode(_ episode: Episode, autoplay: Bool = true) {
         selectedEpisode = episode
         loadTranscript(episode)
         loadSummary(episode)
         loadChapters(episode)
         loadEstimate(episode)
-        startPlayback(for: episode)
+        startPlayback(for: episode, autoplay: autoplay)
     }
 
     func withEpisode(_ id: String, _ body: @escaping (RivetAPI) async throws -> Void) {
@@ -531,30 +628,59 @@ final class PodLensStore: ObservableObject {
             default: jobId = try await api.episode_summarize(id: episode.id)
             }
             await MainActor.run {
-                self.jobs[jobId] = Job(id: jobId, kind: kind, pct: 0, message: "", status: "running")
+                self.jobs[jobId] = Job(id: jobId, episodeId: episode.id, kind: kind,
+                                       pct: 0, message: "", status: "running")
             }
-            // completion watch: poll until the job leaves "running"
+            // Completion watch: poll until the job leaves "running".
+            var finalStatus = "running"
+            var finalMessage = ""
             while true {
-                try? await Task.sleep(nanoseconds: 800_000_000)
+                try? await Task.sleep(nanoseconds: 700_000_000)
                 let statusJSON = (try? await api.job_status(job_id: jobId)) ?? ""
                 guard let data = statusJSON.data(using: .utf8),
                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let st = obj["status"] as? String else { continue }
+                finalStatus = st
+                if let message = obj["message"] as? String { finalMessage = message }
                 if st != "running" { break }
                 await MainActor.run {
                     self.jobs[jobId]?.status = st
                     self.jobs[jobId]?.pct = obj["pct"] as? Int ?? 0
+                    if let message = obj["message"] as? String { self.jobs[jobId]?.message = message }
                 }
             }
             await MainActor.run {
-                if let feedId = self.selectedFeed?.id { self.loadEpisodes(feedId: feedId) }
+                self.jobs[jobId] = nil
+                if finalStatus == "cancelled" {
+                    self.statusLine = L("jobCancelled")
+                } else if finalStatus == "error" {
+                    self.statusLine = L("jobFailed") + (finalMessage.isEmpty ? "" : " " + finalMessage)
+                }
+                if let feedId = self.selectedFeed?.id {
+                    Task { await self.loadEpisodesNow(feedId: feedId) }
+                }
+                Task { await self.loadRecentEpisodes() }
                 if self.selectedEpisode?.id == episode.id {
-                    if kind == "transcribe" || kind == "translate" {
-                        self.loadTranscript(episode)
-                    }
-                    if kind == "summarize" { self.loadSummary(episode) }
+                    self.loadTranscript(episode)
+                    self.loadSummary(episode)
+                    self.loadEstimate(episode)
                 }
             }
+        }
+    }
+
+    /// Running job for an episode, if any — drives the inline progress row.
+    func runningJob(for episodeId: String) -> Job? {
+        jobs.values.first { $0.episodeId == episodeId && $0.status == "running" }
+    }
+
+    /// Cooperative cancel. The stage in flight finishes its current provider
+    /// request; no further billed batch is sent.
+    func cancelJob(for episodeId: String) {
+        guard let api, let job = runningJob(for: episodeId) else { return }
+        Task {
+            _ = try? await api.job_cancel(job_id: job.id)
+            statusLine = L("cancelling")
         }
     }
 
@@ -571,6 +697,7 @@ final class PodLensStore: ObservableObject {
                         text: row[2], translation: row[3])
             }
             segments = segs
+            lastFollowedSegment = nil
         } catch {
             statusLine = L("fetchFailed") + " \(error)"
         }
@@ -649,6 +776,9 @@ final class PodLensStore: ObservableObject {
             _ = try? await api.episode_set_done(id: episode.id, done: done ? "1" : "0")
             await MainActor.run {
                 if let feedId = self?.selectedFeed?.id { self?.loadEpisodes(feedId: feedId) }
+                if self?.selectedEpisode?.id == episode.id {
+                    self?.selectedEpisode = self?.episodes.first { $0.id == episode.id } ?? episode
+                }
                 Task { await self?.loadFeeds() }
             }
         }
@@ -774,14 +904,16 @@ final class PodLensStore: ObservableObject {
             if episode.positionSec > 5 {
                 player.seek(to: CMTime(seconds: episode.positionSec, preferredTimescale: 600))
             }
+            let metadataDuration = Double(episode.durationSec) ?? 0
+            duration = (item.duration.seconds.isFinite && item.duration.seconds > 0)
+                ? item.duration.seconds : metadataDuration
+            currentTime = episode.positionSec
             if autoplay {
                 player.playImmediately(atRate: rate)
                 playing = true
             } else {
                 player.pause()
                 playing = false
-                duration = item.duration.seconds.isFinite ? item.duration.seconds : 0
-                currentTime = episode.positionSec
             }
             saveTicks = 0
             lastFollowedSegment = nil
@@ -792,6 +924,12 @@ final class PodLensStore: ObservableObject {
             updateNowPlayingInfo()
             loadNowPlayingArtwork()
         } else {
+            // No cached audio yet: reset the transport to this episode while
+            // the download runs, so the bar never shows the previous
+            // episode's clock.
+            currentTime = episode.positionSec
+            duration = Double(episode.durationSec) ?? 0
+            playing = false
             statusLine = L("downloading")
             startJob("download", episode: episode)
         }
@@ -938,6 +1076,93 @@ final class PodLensStore: ObservableObject {
         if idx == lastFollowedSegment { return nil }
         lastFollowedSegment = idx
         return idx
+    }
+
+    /// Ask the reader to scroll back to the playing sentence; the view
+    /// watches this counter so a command or toolbar button works even when
+    /// no playback tick is due.
+    func requestScrollToCurrent() {
+        lastFollowedSegment = nil
+        scrollRequest += 1
+    }
+
+
+    // MARK: settings
+
+    func loadSettings() async {
+        guard let api else { return }
+        do {
+            settingsRows = try await api.settings_list()
+            settingsError = nil
+        } catch {
+            settingsError = "\(error)"
+        }
+        await refreshSecurity()
+    }
+
+    func refreshSecurity() async {
+        guard let api else { return }
+        guard let json = try? await api.security_status(),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+        security = SecurityInfo(
+            backend: obj["backend"] as? String ?? "file",
+            label: obj["label"] as? String ?? "",
+            secure: obj["secure"] as? Bool ?? false,
+            configured: obj["configured"] as? Bool ?? false)
+    }
+
+    /// Persist every edited row plus the optional new API key. Returns an
+    /// error message for the form; nil means saved.
+    func saveSettings(_ values: [String: String], apiKey: String?, clearKey: Bool) async -> String? {
+        guard let api else { return L("backendNotReady") }
+        settingsSaving = true
+        defer { settingsSaving = false }
+        do {
+            for key in values.keys.sorted() where key != "api-key" {
+                _ = try await api.settings_set(key: key, value: values[key] ?? "")
+            }
+            if clearKey {
+                _ = try await api.settings_set(key: "api-key", value: "")
+            } else if let apiKey, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                _ = try await api.settings_set(key: "api-key", value: apiKey)
+            }
+            await loadSettings()
+            settingsError = nil
+            statusLine = L("settingsSaved")
+            return nil
+        } catch {
+            settingsError = "\(error)"
+            return "\(error)"
+        }
+    }
+
+    func testProvider() async -> ProviderProbe {
+        guard let api else {
+            return ProviderProbe(ok: false, message: L("backendNotReady"), modelAvailable: nil)
+        }
+        do {
+            let json = try await api.ai_test()
+            guard let data = json.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return ProviderProbe(ok: false, message: L("connectionTestUnreadable"), modelAvailable: nil)
+            }
+            return ProviderProbe(ok: obj["ok"] as? Bool ?? false,
+                                 message: obj["message"] as? String ?? "",
+                                 modelAvailable: obj["modelAvailable"] as? Bool)
+        } catch {
+            return ProviderProbe(ok: false, message: "\(error)", modelAvailable: nil)
+        }
+    }
+
+    func settingValue(_ key: String) -> String {
+        settingsRows.first { $0.count > 1 && $0[0] == key }?[1] ?? ""
+    }
+
+    func settingDescription(_ key: String) -> String {
+        settingsRows.first { $0.count > 2 && $0[0] == key }?[2] ?? ""
     }
 
     // MARK: auto refresh + notifications

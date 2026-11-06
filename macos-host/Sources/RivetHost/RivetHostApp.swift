@@ -22,17 +22,23 @@ struct PodLensApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .tint(DesignTokens.accent)
+                .id(model.language)
+                .tint(Palette.accent)
                 .environmentObject(model)
-                .frame(minWidth: 980, minHeight: 620)
+                .frame(minWidth: 1000, minHeight: 640)
                 .task { model.start() }
         }
+        .defaultSize(width: 1180, height: 780)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button(L("addFeed")) {
+                    NotificationCenter.default.post(name: .podlensAddFeed, object: nil)
+                }
+                .keyboardShortcut("n")
+            }
             CommandGroup(after: .newItem) {
                 Button(L("menuRefreshAll")) { model.store.refreshAll() }
-                    .keyboardShortcut("r", modifiers: [.command])
-                Button(L("menuSettings")) { model.showSettings = true }
-                    .keyboardShortcut(",")
+                    .keyboardShortcut("r")
             }
             // Family menu convention: Check for Updates… lives in the App
             // menu directly below the system About item.
@@ -40,8 +46,55 @@ struct PodLensApp: App {
                 Button(L("menuCheckUpdates")) { model.checkForUpdates(manual: true) }
                     .keyboardShortcut("u")
             }
+            CommandMenu(L("menuGo")) {
+                Button(L("homeTab")) { model.store.sidebarItem = .home }
+                    .keyboardShortcut("1")
+                Button(L("discover")) { model.store.sidebarItem = .discover }
+                    .keyboardShortcut("2")
+                Button(L("showsTab")) { model.store.sidebarItem = .shows }
+                    .keyboardShortcut("3")
+                Button(L("recentlyUpdated")) { model.store.sidebarItem = .recent }
+                    .keyboardShortcut("4")
+                Button(L("downloadedTab")) { model.store.sidebarItem = .downloaded }
+                    .keyboardShortcut("5")
+            }
+            CommandMenu(L("menuPlayback")) {
+                Button(model.store.playing ? L("pause") : L("play")) {
+                    model.store.togglePlay()
+                }
+                .keyboardShortcut(.space, modifiers: [])
+                .disabled(model.store.selectedEpisode == nil)
+
+                Divider()
+
+                Button(L("skipBack")) { model.store.skip(by: -15) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.command])
+                Button(L("skipForward")) { model.store.skip(by: 30) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.command])
+
+                Menu(L("speed")) {
+                    ForEach(PodLensStore.playbackRates, id: \.self) { rate in
+                        Button(String(format: "%g×", rate)) { model.store.setRate(rate) }
+                    }
+                }
+
+                Button(L("focusEnter")) {
+                    NotificationCenter.default.post(
+                        name: .podlensFocusListening, object: nil,
+                        userInfo: ["focus": !model.store.focusMode])
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
         }
         .windowStyle(.automatic)
+        .windowResizability(.contentMinSize)
+
+        Settings {
+            SettingsView()
+                .environmentObject(model)
+                .environmentObject(model.store)
+                .tint(Palette.accent)
+        }
     }
 }
 
@@ -52,6 +105,7 @@ final class AppModel: ObservableObject {
         didSet { store.bootStatus = bootStatus }
     }
     @Published var showSettings = false
+    @Published var language = currentLanguage()
 
     var pendingUpdateManifest: UpdateService.Manifest? {
         if case .success(.available(let m)) = store.updateOutcome {
@@ -68,6 +122,20 @@ final class AppModel: ObservableObject {
     let store = PodLensStore()
 
     private var backend: EmbeddedRacketBackend?
+
+    init() {
+        if let lang = ProcessInfo.processInfo.environment["PODLENS_LANG"],
+           !lang.trimmingCharacters(in: .whitespaces).isEmpty {
+            setLanguage(lang)
+            language = lang
+        }
+    }
+
+    func applyLanguage(_ lang: String) {
+        guard lang != language else { return }
+        setLanguage(lang)
+        language = lang
+    }
 
     func start() {
         guard backend == nil else { return }
@@ -103,12 +171,14 @@ final class AppModel: ObservableObject {
         store.bind(api: api)
         ready = true
         bootStatus = L("ready")
-        // Structured, sequential boot: home data lands before the resume
-        // and update checks, and no unstructured tasks race the RPCs.
+        // Structured, sequential boot: credentials and home data land before
+        // the resume and update checks, and no unstructured tasks race the RPCs.
+        await store.refreshSecurity()
         await store.loadFeeds()
         await store.loadCatalog()
         await store.resumeLast()
         silentUpdateCheck()
+        SnapshotService.runIfRequested(store: store, model: self)
     }
 
     func checkForUpdates(manual: Bool) {

@@ -70,15 +70,17 @@ PodLens is built on [Rivet](https://github.com/turlamai/rivet): one shared Racke
 
 ## What's inside
 
-- **One-click Understand**: download → transcribe → translate → summarize as a single job — finished stages are skipped on re-run, and a cost estimate (sentences/characters) shows before you start
+- **One-click Understand**: download → transcribe → translate → summarize as a single job — finished stages are skipped on re-run, a confirmation shows the text volume before anything is billed, and a running job can be cancelled at its next checkpoint
 - Subscribe to RSS podcast feeds (RSS 2.0 + iTunes tags), refresh with new-episode detection, auto-refresh every 30 minutes with new-episode notifications (macOS)
 - Playback: 1.0–3.0× speed, ±15/30 s skip, sleep timer, chapter jumps (Podcasting 2.0 `podcast:chapters`), continuous playback into the next episode, resume-on-launch, media keys + Control Center (macOS) / SMTC (Windows) / MPRIS (Linux)
-- Sentence-level transcript with follow-along highlighting (tap a line to seek); sentence-aligned translation in bilingual / translation-only / original-only views
-- Structured summaries (TL;DR, key points, quotes, topics) plus show notes from the feed
+- **Reading-first detail**: a serif transcript set like a reading surface, follow-along highlighting, keyboard-operable sentences, and bilingual / translation-only / original-only modes
+- **Focus Listening** hides the library and episode lists without interrupting playback, preserving the episode, position and reading context; the same control restores the library in place
+- Structured summaries (TL;DR, key points, quotes, topics) plus show notes from the feed, led by a designed summary card
 - Library basics: mark played/unplayed, unplayed badges per show, per-episode job progress
 - Discover panel: curated catalog of classic English shows plus full-directory search (iTunes Search API, no key needed, results carry Apple's authoritative feed URLs) — nothing is ever auto-subscribed
 - Try before you subscribe: a one-click audition on every Discover card peeks the feed, caches the newest episode's audio and plays it outside your library (`feed-peek` / `preview-audio`; CLI: `peek`, `preview`)
 - Bring-your-own-key: OpenAI, DeepSeek, Groq, SiliconFlow, Ollama, any OpenAI-compatible endpoint
+- **Credential hygiene**: the key lives in the OS vault (macOS Keychain / Windows DPAPI / Linux Secret Service) with an owner-only file fallback, never in config.json or CLI output; Settings can test the saved connection without billing tokens
 - Agent-friendly CLI over the same core (`add`, `episodes`, `pipeline`,
   `estimate`, `transcribe`, `translate`, `summarize`, `show`, `export`,
   `find`, `done`, `search`, `peek`, `preview`, `--json`, exit codes 0/1/2)
@@ -91,11 +93,11 @@ PodLens is built on [Rivet](https://github.com/turlamai/rivet): one shared Racke
 Open Settings and fill in:
 
 - `api-base` — e.g. `https://api.openai.com/v1` (or DeepSeek/Groq/Ollama base)
-- `api-key` — your key, stored locally in `~/.podlens/config.json`, never synced
+- `api-key` — your key, stored in the operating-system vault (not in `config.json`), never synced; use **Test connection** before the first AI job
 
 ### 2. Listen
 
-Add a podcast RSS URL, pick an episode, press **转写 → 翻译 → 总结** (transcribe → translate → summarize). Or from a terminal:
+Add a podcast RSS URL, pick an episode, press **Understand** (一键听懂). Or from a terminal:
 
 ```bash
 git clone https://github.com/turlamai/podlens && cd podlens

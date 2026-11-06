@@ -2,12 +2,16 @@
 
 ;; Config validation and persistence against a temp data dir.
 
-(require rackunit
+(require json
+         rackunit
          racket/file
+         racket/string
          (file "../app/core/config.rkt")
          (file "../app/core/paths.rkt"))
 
 (putenv "PODLENS_DATA_DIR" (path->string (make-temporary-file "podlens-test~a" 'directory)))
+;; Never touch a real OS vault in tests.
+(putenv "PODLENS_SECRET_BACKEND" "file")
 
 (define mgr (make-config-manager))
 
@@ -47,3 +51,41 @@
   (check-false (config-api-configured? mgr))
   (config-set! mgr 'api-key "sk-test")
   (check-true (config-api-configured? mgr)))
+
+(test-case "the API key never lands in config.json"
+  (config-set! mgr 'api-key "sk-very-secret")
+  (define raw (file->string (config-path)))
+  (check-false (string-contains? raw "sk-very-secret"))
+  (check-true (string-contains? raw "api-key-ref"))
+  (check-equal? (config-get mgr 'api-key) "sk-very-secret")
+  ;; hosts read the mask, not the credential
+  (check-equal? (config-set! mgr 'api-key "sk-next") "••••••••")
+  (check-equal? (config-get mgr 'api-key) "sk-next"))
+
+(test-case "legacy plaintext keys migrate on first open"
+  (define dir (path->string (make-temporary-file "podlens-migrate~a" 'directory)))
+  (define config-file (build-path dir "config.json"))
+  (call-with-output-file config-file
+    (lambda (out) (write-json (hasheq 'api-key "sk-legacy" 'chat-model "gpt-4o-mini") out))
+    #:exists 'replace)
+  (parameterize ([current-directory (current-directory)])
+    (define old-data (getenv "PODLENS_DATA_DIR"))
+    (putenv "PODLENS_DATA_DIR" dir)
+    (dynamic-wind
+      void
+      (lambda ()
+        (define migrated (make-config-manager config-file))
+        (check-equal? (config-get migrated 'api-key) "sk-legacy")
+        (define raw (file->string config-file))
+        (check-false (string-contains? raw "sk-legacy"))
+        (check-true (string-contains? raw "api-key-ref")))
+      (lambda () (putenv "PODLENS_DATA_DIR" old-data)))))
+
+(test-case "removing the key really removes it"
+  (config-set! mgr 'api-key "sk-remove-me")
+  (config-set! mgr 'api-key "")
+  (check-false (config-api-configured? mgr))
+  (check-equal? (config-get mgr 'api-key) "")
+  (define raw (file->string (config-path)))
+  (check-false (string-contains? raw "api-key-ref"))
+  (check-false (string-contains? raw "sk-remove-me")))

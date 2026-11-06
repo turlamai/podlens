@@ -1,354 +1,580 @@
-import AVFoundation
+import AppKit
 import SwiftUI
 
 typealias Episode = PodLensStore.Episode
 typealias Feed = PodLensStore.Feed
 typealias Segment = PodLensStore.Segment
 
+// MARK: - Root
+
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showAddFeed = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        main
-            .environmentObject(model.store)
-            .sheet(isPresented: $showAddFeed) {
-                AddFeedSheet()
-                    .environmentObject(model.store)
+        Group {
+            if model.ready {
+                MainWindow()
+            } else {
+                BootView()
             }
-            .sheet(isPresented: model.showSettingsBinding) {
-                SettingsSheet()
-                    .environmentObject(model.store)
-            }
-            .sheet(isPresented: Binding(
-                get: { model.store.updateOutcome != nil },
-                set: { if !$0 { model.store.updateOutcome = nil } })) {
-                UpdateSheet()
-                    .environmentObject(model.store)
-            }
+        }
+        .environmentObject(model.store)
+        .sheet(isPresented: $showAddFeed) {
+            AddFeedSheet()
+                .environmentObject(model.store)
+        }
+        .sheet(isPresented: model.showSettingsBinding) {
+            // Fallback for the in-window Settings command; the real path is
+            // the native Settings scene (⌘,), which this window-level sheet
+            // mirrors for older hosts.
+            SettingsView()
+                .environmentObject(model.store)
+                .environmentObject(model)
+        }
+        .sheet(isPresented: Binding(
+            get: { model.store.updateOutcome != nil },
+            set: { if !$0 { model.store.updateOutcome = nil } })) {
+            UpdateSheet()
+                .environmentObject(model)
+                .environmentObject(model.store)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .podlensAddFeed)) { _ in
+            showAddFeed = true
+        }
+    }
+}
+
+extension Notification.Name {
+    static let podlensAddFeed = Notification.Name("podlens.addFeed")
+    static let podlensFocusListening = Notification.Name("podlens.focusListening")
+}
+
+/// The window shell. One navigation model for every page: library on the
+/// left, the selected lane in the middle, one reading surface on the right.
+struct MainWindow: View {
+    @EnvironmentObject private var store: PodLensStore
+
+    /// Focus mode is a first-class layout state, not a split-view gesture:
+    /// the two leading panes animate to zero width so the reading surface —
+    /// and its scroll position, selection and player — never reload.
+    private var focusBinding: Binding<NavigationSplitViewVisibility> {
+        Binding(get: { store.focusMode ? .detailOnly : .all },
+                set: { store.focusMode = $0 == .detailOnly })
     }
 
-    private var main: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showAddFeed: $showAddFeed)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 230)
-        } content: {
-            ContentColumn()
-                .navigationSplitViewColumnWidth(min: 460, ideal: 540)
-        } detail: {
-            DetailView(columnVisibility: $columnVisibility)
-        }
-        // The player rides the whole window (Apple Podcasts style), so the
-        // transcript reader stays usable while browsing any page.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+    var body: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                let sidebarWidth: CGFloat = store.focusMode
+                    ? 0
+                    : min(236, max(212, geometry.size.width * 0.185))
+                let contentWidth: CGFloat = store.focusMode
+                    ? 0
+                    : min(500, max(430, geometry.size.width * 0.38))
+
+                HStack(spacing: 0) {
+                    SidebarView()
+                        .frame(width: sidebarWidth)
+                        .opacity(store.focusMode ? 0 : 1)
+                        .clipped()
+                        .allowsHitTesting(!store.focusMode)
+
+                    Divider()
+                        .opacity(store.focusMode ? 0 : 1)
+                        .frame(width: store.focusMode ? 0 : 0.7)
+
+                    ContentColumn()
+                        .frame(width: contentWidth)
+                        .opacity(store.focusMode ? 0 : 1)
+                        .clipped()
+                        .allowsHitTesting(!store.focusMode)
+
+                    Divider()
+                        .opacity(store.focusMode ? 0 : 1)
+                        .frame(width: store.focusMode ? 0 : 0.7)
+
+                    DetailView(columnVisibility: focusBinding)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+
             PlayerBar()
         }
-    }
-}
-
-extension UpdateService.Manifest: @retroactive Identifiable {
-    public var id: String { version }
-}
-
-// MARK: shared formatting
-
-func formatDuration(_ seconds: Double) -> String {
-    guard seconds > 0 else { return "" }
-    let total = Int(seconds)
-    if total >= 3600 {
-        return String(format: L("hoursMinutesShort"), total / 3600, (total % 3600) / 60)
-    }
-    return String(format: L("minutesShort"), total / 60)
-}
-
-/// Podcasts-style short date ("10月16日" / "Oct 16") from the feed's
-/// RFC-822 timestamp; anything unparsable passes through untouched.
-func formatPubDate(_ raw: String) -> String {
-    let parser = DateFormatter()
-    parser.locale = Locale(identifier: "en_US_POSIX")
-    for format in ["E, d MMM yyyy HH:mm:ss Z", "E, d MMM yyyy HH:mm:ss zzz",
-                   "yyyy-MM-dd HH:mm:ss Z", "E, d MMM yyyy"] {
-        parser.dateFormat = format
-        if let date = parser.date(from: raw) {
-            let out = DateFormatter()
-            out.locale = currentLanguage() == "zh"
-                ? Locale(identifier: "zh_CN")
-                : Locale(identifier: "en_US_POSIX")
-            out.dateFormat = currentLanguage() == "zh" ? "M月d日" : "MMM d"
-            return out.string(from: date)
+        .background(Palette.canvas)
+        .animation(Motion.gentle, value: store.focusMode)
+        .overlay(alignment: .bottom) {
+            if let message = store.toastMessage {
+                ToastView(message: message) { store.dismissToast() }
+                    .padding(.bottom, 104)
+                    .padding(.horizontal, Space.lg)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(10)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .podlensFocusListening)) { note in
+            let requested = note.userInfo?["focus"] as? Bool ?? !store.focusMode
+            withAnimation(Motion.gentle) { store.focusMode = requested }
         }
     }
-    return raw
 }
 
-/// Status chips shared by every episode row: the Understand pipeline
-/// surfaces (transcript / translation / summary) plus download and
-/// played state — icons with tooltips, never text noise.
-struct EpisodeStatusChips: View {
-    var downloaded = false
-    var transcriptStatus = "none"
-    var summaryStatus = "none"
-    var hasTranslation = false
-    var done = false
+struct ToastView: View {
+    let message: String
+    let dismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            if done {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .help(L("done"))
+        HStack(spacing: Space.xs) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.accent)
+            Text(message)
+                .font(Typeface.callout)
+                .foregroundStyle(Palette.ink)
+                .lineLimit(2)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
             }
-            if downloaded {
-                Image(systemName: "arrow.down.circle.fill")
-                    .foregroundStyle(.secondary)
-                    .help(L("tooltipDownloaded"))
-            }
-            if transcriptStatus == "done" {
-                Image(systemName: "text.bubble")
-                    .foregroundStyle(Color.accentColor)
-                    .help(L("tooltipTranscript"))
-            }
-            if transcriptStatus == "running" {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .foregroundStyle(Color.accentColor)
-                    .help(L("transcribing"))
-            }
-            if hasTranslation {
-                Image(systemName: "globe")
-                    .foregroundStyle(Color.accentColor)
-                    .help(L("tooltipTranslated"))
-            }
-            if summaryStatus == "done" {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(Color.accentColor)
-                    .help(L("tooltipSummarized"))
-            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Palette.inkTertiary)
+            .accessibilityLabel(L("dismiss"))
         }
-        .font(.caption)
+        .padding(.horizontal, Space.sm)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .overlay { Capsule().strokeBorder(Palette.hairline, lineWidth: 0.7) }
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
     }
 }
 
-/// Playback progress under rows whose episode is mid-way.
-struct EpisodeProgressLine: View {
-    let position: Double
-    let duration: Double
-
-    var body: some View {
-        if position > 5, duration > 0 {
-            ProgressView(value: min(position, duration), total: duration)
-                .progressViewStyle(.linear)
-                .tint(DesignTokens.accent)
-        }
-    }
-}
-
-// MARK: content column routing
-
-struct ContentColumn: View {
+struct BootView: View {
     @EnvironmentObject private var store: PodLensStore
 
     var body: some View {
-        switch store.sidebarItem {
-        case .home: HomeView()
-        case .discover: DiscoverPage()
-        case .shows: ShowsGridPage()
-        case .recent: RecentEpisodesPage()
-        case .downloaded: DownloadedPage()
-        case .feed: FeedEpisodesPage()
+        VStack(spacing: Space.md) {
+            BrandMark(size: 52)
+            Text("PodLens")
+                .font(Typeface.display)
+                .foregroundStyle(Palette.ink)
+            HStack(spacing: Space.xs) {
+                ProgressView().controlSize(.small)
+                Text(store.bootStatus.isEmpty ? L("booting") : store.bootStatus)
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.canvas)
     }
 }
 
-// MARK: sidebar
+struct BrandMark: View {
+    var size: CGFloat = 28
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(LinearGradient(colors: [Palette.accent, Palette.accentDeep],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+            Image(systemName: "waveform")
+                .font(.system(size: size * 0.48, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Sidebar
 
 struct SidebarView: View {
     @EnvironmentObject private var store: PodLensStore
-    @Binding var showAddFeed: Bool
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        List(selection: Binding(
-            get: { store.sidebarItem },
-            set: { item in
-                store.sidebarItem = item
-                if case .feed(let feed) = item {
-                    store.selectFeed(feed)
+        VStack(spacing: 0) {
+            list
+            footer
+        }
+        .navigationTitle("PodLens")
+    }
+
+    private var list: some View {
+        List {
+            Section {
+                SidebarNavRow(icon: "house", title: L("homeTab"),
+                              selected: store.sidebarItem == .home) {
+                    select(.home)
                 }
-            })) {
-            Label(L("homeTab"), systemImage: "house")
-                .tag(SidebarItem.home)
-            Label(L("discover"), systemImage: "sparkles.rectangle.stack")
-                .tag(SidebarItem.discover)
+                SidebarNavRow(icon: "sparkles.rectangle.stack", title: L("discover"),
+                              selected: store.sidebarItem == .discover) {
+                    select(.discover)
+                }
+            }
 
             Section(L("librarySection")) {
-                Label(L("recentlyUpdated"), systemImage: "clock")
-                    .tag(SidebarItem.recent)
-                Label(L("showsTab"), systemImage: "square.grid.2x2")
-                    .tag(SidebarItem.shows)
-                Label(L("downloadedTab"), systemImage: "arrow.down.circle")
-                    .tag(SidebarItem.downloaded)
+                SidebarNavRow(icon: "clock", title: L("recentlyUpdated"),
+                              selected: store.sidebarItem == .recent) {
+                    select(.recent)
+                }
+                SidebarNavRow(icon: "square.grid.2x2", title: L("showsTab"),
+                              selected: store.sidebarItem == .shows) {
+                    select(.shows)
+                }
+                SidebarNavRow(icon: "arrow.down.circle", title: L("downloadedTab"),
+                              selected: store.sidebarItem == .downloaded) {
+                    select(.downloaded)
+                }
             }
 
             Section(L("subscriptionsSection")) {
                 ForEach(store.feeds) { feed in
-                    HStack(spacing: 10) {
-                        ArtworkView(url: feed.artworkURL)
-                            .frame(width: 34, height: 34)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(feed.title).lineLimit(1)
-                            HStack(spacing: 4) {
-                                Text("\(feed.episodeCount)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                if feed.unplayed > 0 {
-                                    Text("\(feed.unplayed)")
-                                        .font(.caption2.bold())
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 1)
-                                        .background(Color.accentColor)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                        }
+                    SidebarNavRow(icon: "dot.radiowaves.left.and.right",
+                                  title: feed.title,
+                                  subtitle: feed.latestTitle,
+                                  artworkURL: feed.artworkURL,
+                                  badge: feed.unplayed,
+                                  selected: store.sidebarItem == .feed(feed)) {
+                        select(.feed(feed))
                     }
-                    .tag(SidebarItem.feed(feed))
                     .contextMenu {
                         Button(L("removeFeed"), role: .destructive) {
                             store.removeFeed(feed)
                         }
                     }
                 }
+                Button {
+                    NotificationCenter.default.post(name: .podlensAddFeed, object: nil)
+                } label: {
+                    Label(L("addFeed"), systemImage: "plus")
+                        .font(Typeface.callout)
+                        .foregroundStyle(Palette.accent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 3, leading: 14, bottom: 3, trailing: 10))
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            HStack {
+        .navigationTitle("PodLens")
+    }
+
+    private func select(_ item: SidebarItem) {
+        store.sidebarItem = item
+        if case .feed(let feed) = item { store.selectFeed(feed) }
+    }
+
+    private var footer: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Space.xxs) {
                 Button {
-                    showAddFeed = true
+                    NotificationCenter.default.post(name: .podlensAddFeed, object: nil)
                 } label: {
                     Image(systemName: "plus.circle")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(RoundIconButtonStyle())
                 .help(L("addFeed"))
+                .accessibilityLabel(L("addFeed"))
 
                 Button {
                     store.refreshAll()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(RoundIconButtonStyle())
                 .help(L("menuRefreshAll"))
-
-                if case .feed(let feed) = store.sidebarItem {
-                    Button {
-                        store.removeFeed(feed)
-                    } label: {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(L("removeFeed"))
-                }
+                .accessibilityLabel(L("menuRefreshAll"))
 
                 Spacer()
-                Text(store.statusLine)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(RoundIconButtonStyle())
+                .help(L("menuSettings"))
+                .accessibilityLabel(L("menuSettings"))
             }
-            .padding(8)
+            .padding(.horizontal, Space.xs)
+            .padding(.vertical, 6)
+            .background(.bar)
+            .hairlineTop()
         }
     }
 }
 
-// MARK: home (Podcasts-style lanes)
+struct SidebarNavRow: View {
+    let icon: String
+    let title: String
+    var subtitle: String? = nil
+    var artworkURL: String? = nil
+    var badge: Int = 0
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                if let artworkURL {
+                    ArtworkView(url: artworkURL, seed: title, cornerRadius: 5)
+                        .frame(width: 26, height: 26)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(selected ? Palette.accent : Palette.inkSecondary)
+                        .frame(width: 18)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(Typeface.callout.weight(selected ? .semibold : .regular))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(Typeface.micro)
+                            .foregroundStyle(Palette.inkTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+
+                Spacer(minLength: 2)
+                CountBadge(count: badge, emphasized: selected)
+                    .layoutPriority(0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                selected ? Palette.highlight
+                    : (hovering ? Palette.surfaceRaised.opacity(0.6) : Color.clear),
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0))
+        .listRowBackground(Color.clear)
+        .onHover { hovering = $0 }
+        .animation(Motion.quick, value: hovering)
+    }
+}
+
+// MARK: - Content routing
+
+struct ContentColumn: View {
+    @EnvironmentObject private var store: PodLensStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let title = pageTitle {
+                Text(title)
+                    .font(Typeface.hero)
+                    .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, Space.lg)
+                    .padding(.top, Space.md)
+                    .padding(.bottom, Space.xxs)
+                    .lineLimit(1)
+            }
+            Group {
+                switch store.sidebarItem {
+                case .home: HomeView()
+                case .discover: DiscoverView()
+                case .shows: ShowsGridPage()
+                case .recent: RecentEpisodesPage()
+                case .downloaded: DownloadedPage()
+                case .feed: FeedEpisodesPage()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .background(Palette.canvas)
+    }
+
+    private var pageTitle: String? {
+        switch store.sidebarItem {
+        case .home: return L("homeTab")
+        case .discover: return L("discover")
+        case .shows: return L("showsTab")
+        case .recent: return L("recentlyUpdated")
+        case .downloaded: return L("downloadedTab")
+        case .feed: return nil // the feed header owns the title
+        }
+    }
+}
+
+// MARK: - Home
 
 struct HomeView: View {
     @EnvironmentObject private var store: PodLensStore
 
     var body: some View {
         if store.feeds.isEmpty {
-            emptyLibrary
-                .navigationTitle(L("homeTab"))
+            EmptyStateView(
+                icon: "sparkles.rectangle.stack",
+                title: L("welcomeTitle"),
+                message: L("emptyHome"),
+                actionTitle: L("goToDiscover"),
+                action: { store.sidebarItem = .discover })
+            .navigationTitle(L("homeTab"))
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 26) {
-                    LaneHeader(title: L("upNextLane"))
-                    UpNextLane()
-                    LaneHeader(title: L("myShowsLane"), destination: .shows)
-                    ShowsGrid(shows: store.homeShows)
-                    LaneHeader(title: L("latestEpisodesLane"), destination: .recent)
-                    VStack(spacing: 0) {
-                        ForEach(Array(store.recentEpisodes.prefix(6))) { item in
-                            RecentEpisodeRow(item: item, showFeed: true)
+                LazyVStack(alignment: .leading, spacing: Space.xl) {
+                    if let next = store.upNext.first {
+                        ContinueCard(item: next)
+                    }
+
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        LaneTitle(title: L("upNextLane"))
+                        UpNextLane()
+                    }
+
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        LaneTitle(title: L("myShowsLane"),
+                                  actionTitle: L("seeAll"),
+                                  action: { store.sidebarItem = .shows })
+                        ShowsGrid(shows: store.homeShows)
+                    }
+
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        LaneTitle(title: L("latestEpisodesLane"),
+                                  actionTitle: L("seeAll"),
+                                  action: { store.sidebarItem = .recent })
+                        VStack(spacing: 0) {
+                            ForEach(Array(store.recentEpisodes.prefix(6))) { item in
+                                EpisodeRow(data: EpisodeRowData(recent: item, showFeed: true),
+                                           selected: store.selectedEpisode?.id == item.id,
+                                           onOpen: { store.selectRecent(item, autoplay: false) },
+                                           onPlay: { store.selectRecent(item) })
+                                Divider().overlay(Palette.hairline)
+                            }
                         }
+                        .cardSurface(padding: Space.xxs)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                .padding(.horizontal, Space.lg)
+                .padding(.top, Space.md)
+                .padding(.bottom, Space.xxl)
+                .frame(maxWidth: 920, alignment: .leading)
             }
             .navigationTitle(L("homeTab"))
         }
     }
-
-    private var emptyLibrary: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "sparkles.rectangle.stack")
-                .font(.system(size: 44))
-                .foregroundStyle(.tertiary)
-            Text(L("emptyHome"))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Button(L("goToDiscover")) {
-                store.sidebarItem = .discover
-            }
-            .buttonStyle(.borderedProminent)
-                .font(.caption2.monospaced())
-                .foregroundStyle(.red)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 }
 
-/// Lane title with the Podcasts "see all" chevron when a library page
-/// holds the full list.
-struct LaneHeader: View {
+struct ContinueCard: View {
     @EnvironmentObject private var store: PodLensStore
-    let title: String
-    var destination: SidebarItem?
+    let item: RecentEpisode
+    @State private var hovering = false
 
     var body: some View {
-        HStack {
-            Text(title).font(.title3.bold())
-            if let destination {
-                Button {
-                    store.sidebarItem = destination
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.secondary)
+        HStack(spacing: Space.lg) {
+            ArtworkView(url: item.artworkURL, seed: item.feedTitle, cornerRadius: Radius.artwork)
+                .frame(width: 128, height: 128)
+                .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
+
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text(item.positionSec > 5 ? L("continueListening") : L("startListening"))
+                    .font(Typeface.micro.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .foregroundStyle(Palette.accent)
+
+                Text(item.title)
+                    .font(Typeface.title)
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                MetaLine(parts: [item.feedTitle, formatPubDate(item.pubDisplay),
+                                 formatDuration(item.duration)])
+
+                if let fraction = progressFraction(position: item.positionSec, duration: item.duration) {
+                    HStack(spacing: Space.xs) {
+                        ProgressLine(fraction: fraction)
+                            .frame(width: 132)
+                        Text(formatRemaining(item.duration - item.positionSec))
+                            .font(Typeface.mono(10))
+                            .foregroundStyle(Palette.inkTertiary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .padding(.top, 2)
                 }
-                .buttonStyle(.borderless)
-                .help(L("seeAll"))
+
+                HStack(spacing: Space.xs) {
+                    Button {
+                        store.selectRecent(item)
+                    } label: {
+                        Label(store.playing && store.selectedEpisode?.id == item.id
+                              ? L("pause") : L("play"),
+                              systemImage: store.playing && store.selectedEpisode?.id == item.id
+                              ? "pause.fill" : "play.fill")
+                    }
+                    .buttonStyle(ProminentButtonStyle())
+
+                    Button {
+                        store.selectRecent(item, autoplay: false)
+                    } label: {
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                    .buttonStyle(QuietButtonStyle())
+                    .help(L("openEpisode"))
+                    .accessibilityLabel(L("openEpisode"))
+                }
+                .padding(.top, Space.xxs)
             }
+
+            Spacer(minLength: 0)
         }
+        .padding(Space.md)
+        .background(Palette.highlight.opacity(0.55),
+                    in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous)
+                .strokeBorder(Palette.accent.opacity(hovering ? 0.35 : 0.16), lineWidth: 0.8)
+        }
+        .animation(Motion.quick, value: hovering)
+        .onHover { hovering = $0 }
+        .contentShape(Rectangle())
+        .onTapGesture { store.selectRecent(item, autoplay: false) }
     }
 }
 
-/// The 待播清单 lane: large cover cards, in-progress episodes first, then
-/// each show's newest unplayed episode — Apple Podcasts' Up Next for a
-/// library that has no explicit queue.
+struct ProgressLine: View {
+    let fraction: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette.hairline)
+                Capsule().fill(Palette.accent)
+                    .frame(width: max(3, geometry.size.width * min(max(fraction, 0), 1)))
+            }
+        }
+        .frame(height: 3)
+        .accessibilityHidden(true)
+    }
+}
+
 struct UpNextLane: View {
     @EnvironmentObject private var store: PodLensStore
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 14) {
+            LazyHStack(spacing: Space.sm) {
                 ForEach(store.upNext) { item in
                     UpNextCard(item: item)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, Space.xxs)
         }
     }
 }
@@ -356,94 +582,82 @@ struct UpNextLane: View {
 struct UpNextCard: View {
     @EnvironmentObject private var store: PodLensStore
     let item: RecentEpisode
-
-    private var meta: String {
-        let lane = item.positionSec > 5 ? L("metaContinue") : L("metaNewEpisode")
-        return item.pubDisplay.isEmpty ? lane : "\(lane) · \(formatPubDate(item.pubDisplay))"
-    }
+    @State private var hovering = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            ArtworkView(url: item.artworkURL, cornerRadius: 14)
-            LinearGradient(colors: [.clear, .black.opacity(0.78)],
+            ArtworkBackdrop(url: item.artworkURL, seed: item.feedTitle, opacity: 0.9)
+                .frame(width: 236, height: 132)
+                .clipped()
+            LinearGradient(colors: [.clear, .black.opacity(0.72)],
                            startPoint: .center, endPoint: .bottom)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(meta)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.85))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(item.feedTitle)
+                    .font(Typeface.micro.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
                 Text(item.title)
-                    .font(.subheadline.bold())
+                    .font(Typeface.callout.weight(.semibold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                HStack(spacing: 8) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "play.fill")
-                        Text(formatDuration(item.duration))
-                    }
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-
-                    Spacer()
-
-                    Menu {
-                        sectionActions
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill").font(.system(size: 9))
+                    Text(formatDuration(item.duration))
                 }
+                .font(Typeface.micro.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: Capsule())
+                .environment(\.colorScheme, .dark)
             }
-            .padding(12)
+            .padding(Space.sm)
         }
-        .frame(width: 280, height: 280)
+        .frame(width: 236, height: 132)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .strokeBorder(.white.opacity(hovering ? 0.35 : 0.12), lineWidth: 0.8)
+        }
         .contentShape(Rectangle())
-        .onTapGesture {
-            store.selectRecent(item)
-        }
-    }
-
-    @ViewBuilder
-    private var sectionActions: some View {
-        Button(L("pipeline")) {
-            store.selectRecent(item)
-            if let e = store.selectedEpisode {
-                store.startJob("pipeline", episode: e)
-            }
-        }
-        Button(item.downloaded ? L("removeAudio") : L("download")) {
-            if item.downloaded {
-                store.withEpisode(item.id) { api in
-                    _ = try? await api.episode_remove_audio(id: item.id)
-                }
-            } else {
-                store.withEpisode(item.id) { api in
-                    _ = try? await api.episode_download(id: item.id)
+        .onTapGesture { store.selectRecent(item, autoplay: false) }
+        .onHover { hovering = $0 }
+        .animation(Motion.quick, value: hovering)
+        .scaleEffect(hovering ? 1.015 : 1)
+        .contextMenu {
+            Button(L("pipeline")) {
+                store.selectRecent(item, autoplay: false)
+                if let episode = store.selectedEpisode {
+                    store.startJob("pipeline", episode: episode)
                 }
             }
-        }
-        Button(item.done ? L("markUnplayed") : L("markPlayed")) {
-            store.setRecentDone(item, done: !item.done)
+            Button(item.downloaded ? L("removeAudio") : L("download")) {
+                if item.downloaded {
+                    store.withEpisode(item.id) { api in
+                        _ = try? await api.episode_remove_audio(id: item.id)
+                    }
+                } else {
+                    store.withEpisode(item.id) { api in
+                        _ = try? await api.episode_download(id: item.id)
+                    }
+                }
+            }
+            Button(item.done ? L("markUnplayed") : L("markPlayed")) {
+                store.setRecentDone(item, done: !item.done)
+            }
         }
     }
 }
 
-/// Cover-tile grid for subscriptions (home lane + library Shows page).
 struct ShowsGrid: View {
     @EnvironmentObject private var store: PodLensStore
     let shows: [Feed]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 16)], spacing: 16) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: Space.sm)],
+                  alignment: .leading, spacing: Space.md) {
             ForEach(shows) { feed in
                 ShowTile(feed: feed)
             }
@@ -454,28 +668,25 @@ struct ShowsGrid: View {
 struct ShowTile: View {
     @EnvironmentObject private var store: PodLensStore
     let feed: Feed
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                ArtworkView(url: feed.artworkURL, cornerRadius: 12)
+                ArtworkView(url: feed.artworkURL, seed: feed.title, cornerRadius: Radius.artwork)
+                    .aspectRatio(1, contentMode: .fit)
                 if feed.unplayed > 0 {
-                    Text("\(feed.unplayed)")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor, in: Capsule())
+                    CountBadge(count: feed.unplayed, emphasized: true)
                         .padding(6)
                 }
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(feed.title)
-                    .font(.callout)
+                    .font(Typeface.callout.weight(.medium))
                     .lineLimit(1)
                 Text(String(format: L("episodesCount"), feed.episodeCount))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(Typeface.micro)
+                    .foregroundStyle(Palette.inkSecondary)
             }
         }
         .contentShape(Rectangle())
@@ -483,6 +694,8 @@ struct ShowTile: View {
             store.selectFeed(feed)
             store.sidebarItem = .feed(feed)
         }
+        .onHover { hovering = $0 }
+        .hoverLift(scale: hovering ? 1.02 : 1)
         .contextMenu {
             Button(L("removeFeed"), role: .destructive) {
                 store.removeFeed(feed)
@@ -491,68 +704,7 @@ struct ShowTile: View {
     }
 }
 
-/// Cross-feed episode row shared by home's latest lane and the library
-/// pages. `showFeed` brands the row with the show name.
-struct RecentEpisodeRow: View {
-    @EnvironmentObject private var store: PodLensStore
-    let item: RecentEpisode
-    var showFeed = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ArtworkView(url: item.artworkURL)
-                .frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(2)
-                Text(rowMeta)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                HStack(spacing: 10) {
-                    EpisodeStatusChips(downloaded: item.downloaded,
-                                       transcriptStatus: item.transcriptStatus,
-                                       summaryStatus: item.summaryStatus,
-                                       hasTranslation: item.hasTranslation,
-                                       done: item.done)
-                    if !item.description.isEmpty {
-                        Text(item.description)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
-                EpisodeProgressLine(position: item.positionSec, duration: item.duration)
-            }
-            Spacer(minLength: 8)
-            Button {
-                store.selectRecent(item)
-            } label: {
-                Image(systemName: "play.circle")
-                    .font(.title2)
-            }
-            .buttonStyle(.borderless)
-            .help(L("play"))
-        }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            store.selectRecent(item, autoplay: false)
-        }
-    }
-
-    private var rowMeta: String {
-        var parts: [String] = []
-        if showFeed { parts.append(item.feedTitle) }
-        parts.append(formatPubDate(item.pubDisplay))
-        let d = formatDuration(item.duration)
-        if !d.isEmpty { parts.append(d) }
-        return parts.joined(separator: " · ")
-    }
-}
-
-// MARK: library pages
+// MARK: - Library pages
 
 struct RecentEpisodesPage: View {
     @EnvironmentObject private var store: PodLensStore
@@ -560,15 +712,21 @@ struct RecentEpisodesPage: View {
     var body: some View {
         Group {
             if store.recentEpisodes.isEmpty {
-                emptyHint(L("recentEmpty"))
+                EmptyStateView(icon: "clock", title: L("recentEmptyTitle"),
+                               message: L("recentEmpty"))
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(store.recentEpisodes) { item in
-                            RecentEpisodeRow(item: item, showFeed: true)
+                            EpisodeRow(data: EpisodeRowData(recent: item, showFeed: true),
+                                       selected: store.selectedEpisode?.id == item.id,
+                                       onOpen: { store.selectRecent(item, autoplay: false) },
+                                       onPlay: { store.selectRecent(item) })
+                            Divider().overlay(Palette.hairline)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .cardSurface(padding: Space.xxs)
+                    .padding(Space.lg)
                 }
             }
         }
@@ -582,15 +740,21 @@ struct DownloadedPage: View {
     var body: some View {
         Group {
             if store.downloadedEpisodes.isEmpty {
-                emptyHint(L("downloadedEmpty"))
+                EmptyStateView(icon: "arrow.down.circle", title: L("downloadedEmptyTitle"),
+                               message: L("downloadedEmpty"))
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(store.downloadedEpisodes) { item in
-                            RecentEpisodeRow(item: item, showFeed: true)
+                            EpisodeRow(data: EpisodeRowData(recent: item, showFeed: true),
+                                       selected: store.selectedEpisode?.id == item.id,
+                                       onOpen: { store.selectRecent(item, autoplay: false) },
+                                       onPlay: { store.selectRecent(item) })
+                            Divider().overlay(Palette.hairline)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .cardSurface(padding: Space.xxs)
+                    .padding(Space.lg)
                 }
             }
         }
@@ -598,91 +762,296 @@ struct DownloadedPage: View {
     }
 }
 
-private func emptyHint(_ text: String) -> some View {
-    Text(text)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-}
-
 struct ShowsGridPage: View {
     @EnvironmentObject private var store: PodLensStore
 
     var body: some View {
         ScrollView {
-            ShowsGrid(shows: store.feeds)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+            if store.feeds.isEmpty {
+                EmptyStateView(icon: "square.grid.2x2", title: L("showsEmptyTitle"),
+                               message: L("emptyHome"),
+                               actionTitle: L("goToDiscover"),
+                               action: { store.sidebarItem = .discover })
+                    .frame(minHeight: 320)
+            } else {
+                ShowsGrid(shows: store.feeds)
+                    .padding(Space.lg)
+            }
         }
         .navigationTitle(L("showsTab"))
     }
 }
 
-// MARK: discover page (was a sheet; now the content column)
-
-struct DiscoverPage: View {
+struct FeedEpisodesPage: View {
     @EnvironmentObject private var store: PodLensStore
-    @State private var query = ""
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                TextField(L("searchPlaceholder"), text: $query)
-                    .textFieldStyle(.roundedBorder)
-                    .submitLabel(.search)
-                    .onSubmit { store.searchDirectory(query) }
-                Button {
-                    store.searchDirectory(query)
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
-                .buttonStyle(.borderless)
-                .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty)
+            if let feed = store.selectedFeed {
+                FeedHeader(feed: feed)
+                Divider().overlay(Palette.hairline)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-
-            if store.isSearching {
-                ProgressView(L("searching"))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if store.searchError != nil {
-                Text(L("searchFailed") + " \(store.searchError!)")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !store.searchResults.isEmpty {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(store.searchResults) { entry in
-                            CatalogCard(entry: entry)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
-                }
+            if store.episodes.isEmpty {
+                EmptyStateView(icon: "waveform", title: L("recentEmptyTitle"),
+                               message: L("recentEmpty"))
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 22) {
-                        ForEach(categories, id: \.self) { category in
-                            let items = store.catalog.filter { $0.category == category }
-                            if !items.isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text(categoryLabel(category))
-                                        .font(.headline)
-                                    ForEach(items) { entry in
-                                        CatalogCard(entry: entry)
+                    LazyVStack(spacing: 0) {
+                        ForEach(store.episodes) { episode in
+                            EpisodeRow(
+                                data: EpisodeRowData(episode: episode,
+                                                     artworkURL: store.selectedFeed?.artworkURL ?? ""),
+                                selected: store.selectedEpisode?.id == episode.id,
+                                onOpen: { store.selectEpisode(episode, autoplay: false) },
+                                onPlay: { store.selectEpisode(episode) })
+                                .contextMenu {
+                                    Button(episode.done ? L("markUnplayed") : L("markPlayed")) {
+                                        store.markEpisode(episode, done: !episode.done)
+                                    }
+                                    if episode.downloaded {
+                                        Button(L("removeAudio"), role: .destructive) {
+                                            store.withEpisode(episode.id) { api in
+                                                _ = try? await api.episode_remove_audio(id: episode.id)
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                            Divider().overlay(Palette.hairline)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
+                    .padding(.horizontal, Space.md)
+                    .padding(.bottom, Space.lg)
                 }
             }
         }
-        .navigationTitle(L("discover"))
-        .task { await store.loadCatalog() }
+        .background(Palette.canvas)
+        .navigationTitle(store.selectedFeed?.title ?? L("episodes"))
     }
+}
+
+struct FeedHeader: View {
+    @EnvironmentObject private var store: PodLensStore
+    let feed: Feed
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Space.sm) {
+            ArtworkView(url: feed.artworkURL, seed: feed.title, cornerRadius: Radius.artwork)
+                .frame(width: 78, height: 78)
+                .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(feed.title)
+                    .font(Typeface.title)
+                    .lineLimit(2)
+                Text(feed.author)
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
+                    .lineLimit(1)
+                HStack(spacing: Space.xs) {
+                    Text(String(format: L("episodesCount"), feed.episodeCount))
+                    if feed.unplayed > 0 {
+                        StatusDot()
+                        Text(String(format: L("unplayedCount"), feed.unplayed))
+                            .foregroundStyle(Palette.accent)
+                    }
+                }
+                .font(Typeface.micro)
+                .foregroundStyle(Palette.inkSecondary)
+            }
+            Spacer()
+            Menu {
+                Button(L("menuRefreshAll")) { store.refreshAll() }
+                Divider()
+                Button(L("removeFeed"), role: .destructive) { store.removeFeed(feed) }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help(L("more"))
+        }
+        .padding(.horizontal, Space.md)
+        .padding(.vertical, Space.sm)
+    }
+}
+
+// MARK: - Episode row
+
+struct EpisodeRowData {
+    let id: String
+    let title: String
+    let showTitle: String
+    let artworkURL: String
+    let pubDisplay: String
+    let duration: Double
+    let position: Double
+    let downloaded: Bool
+    let transcriptStatus: String
+    let summaryStatus: String
+    let hasTranslation: Bool
+    let done: Bool
+    let description: String
+
+    init(episode: Episode, artworkURL: String) {
+        id = episode.id
+        title = episode.title
+        showTitle = ""
+        self.artworkURL = artworkURL
+        pubDisplay = episode.pubDisplay
+        duration = Double(episode.durationSec) ?? 0
+        position = episode.positionSec
+        downloaded = episode.downloaded
+        transcriptStatus = episode.transcriptStatus
+        summaryStatus = episode.summaryStatus
+        hasTranslation = episode.hasTranslation
+        done = episode.done
+        description = episode.description
+    }
+
+    init(recent: RecentEpisode, showFeed: Bool) {
+        id = recent.id
+        title = recent.title
+        showTitle = showFeed ? recent.feedTitle : ""
+        artworkURL = recent.artworkURL
+        pubDisplay = recent.pubDisplay
+        duration = recent.duration
+        position = recent.positionSec
+        downloaded = recent.downloaded
+        transcriptStatus = recent.transcriptStatus
+        summaryStatus = recent.summaryStatus
+        hasTranslation = recent.hasTranslation
+        done = recent.done
+        description = recent.description
+    }
+}
+
+struct EpisodeRow: View {
+    let data: EpisodeRowData
+    var selected = false
+    let onOpen: () -> Void
+    let onPlay: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Space.sm) {
+            ArtworkView(url: data.artworkURL, seed: data.title, cornerRadius: 7)
+                .frame(width: 52, height: 52)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(data.title)
+                    .font(Typeface.body.weight(.semibold))
+                    .foregroundStyle(data.done ? Palette.inkSecondary : Palette.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                MetaLine(parts: [data.showTitle,
+                                 formatPubDate(data.pubDisplay),
+                                 formatDuration(data.duration)])
+
+                if !data.description.isEmpty {
+                    Text(data.description)
+                        .font(Typeface.micro)
+                        .foregroundStyle(Palette.inkTertiary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                EpisodeStatusChips(downloaded: data.downloaded,
+                                   transcriptStatus: data.transcriptStatus,
+                                   summaryStatus: data.summaryStatus,
+                                   hasTranslation: data.hasTranslation,
+                                   done: data.done)
+
+                if let fraction = progressFraction(position: data.position, duration: data.duration) {
+                    ProgressLine(fraction: fraction)
+                        .frame(height: 2.5)
+                        .padding(.top, 3)
+                }
+            }
+
+            Spacer(minLength: Space.xs)
+
+            Button(action: onPlay) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(hovering || selected ? .white : Palette.accent)
+                    .frame(width: 27, height: 27)
+                    .background(
+                        hovering || selected ? Palette.accent : Palette.highlight,
+                        in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(L("play"))
+            .accessibilityLabel(L("play"))
+            .padding(.top, 10)
+        }
+        .padding(.horizontal, Space.sm)
+        .padding(.vertical, 9)
+        .background(
+            selected ? Palette.highlight.opacity(0.9)
+                : (hovering ? Palette.surface : Color.clear),
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onOpen)
+        .onHover { hovering = $0 }
+        .animation(Motion.quick, value: hovering)
+    }
+}
+
+// MARK: - Status chips / progress
+
+struct EpisodeStatusChips: View {
+    var downloaded = false
+    var transcriptStatus = "none"
+    var summaryStatus = "none"
+    var hasTranslation = false
+    var done = false
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if done {
+                chip("checkmark.circle.fill", color: Palette.positive, help: L("done"))
+            }
+            if transcriptStatus == "running" {
+                chip("waveform", color: Palette.accent, help: L("transcribing"))
+            } else if transcriptStatus == "cancelled" {
+                chip("pause.circle", color: Palette.warning, help: L("jobCancelled"))
+            } else if transcriptStatus == "error" {
+                chip("exclamationmark.triangle.fill", color: Palette.danger, help: L("jobFailed"))
+            } else if transcriptStatus == "done" {
+                chip("text.bubble", color: Palette.accent, help: L("tooltipTranscript"))
+            }
+            if hasTranslation {
+                chip("character.bubble", color: currentTranslationColor, help: L("tooltipTranslated"))
+            }
+            if summaryStatus == "done" {
+                chip("sparkles", color: Palette.accent, help: L("tooltipSummarized"))
+            }
+            if downloaded {
+                chip("arrow.down.circle.fill", color: Palette.inkTertiary, help: L("tooltipDownloaded"))
+            }
+        }
+        .font(.system(size: 10, weight: .medium))
+    }
+
+    private var currentTranslationColor: Color {
+        hasTranslation ? Palette.accent : Palette.inkTertiary
+    }
+
+    private func chip(_ icon: String, color: Color, help: String) -> some View {
+        Image(systemName: icon)
+            .foregroundStyle(color)
+            .help(help)
+            .accessibilityLabel(help)
+    }
+}
+
+// MARK: - Discover
+
+struct DiscoverView: View {
+    @EnvironmentObject private var store: PodLensStore
+    @State private var query = ""
+    @State private var category = "all"
+    @FocusState private var searchFocused: Bool
 
     private var categories: [String] {
         var seen: [String] = []
@@ -690,6 +1059,141 @@ struct DiscoverPage: View {
             seen.append(entry.category)
         }
         return seen
+    }
+
+    private var filteredCatalog: [PodLensStore.CatalogEntry] {
+        category == "all" ? store.catalog : store.catalog.filter { $0.category == category }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            searchBar
+            Divider().overlay(Palette.hairline)
+
+            if store.isSearching {
+                VStack(spacing: Space.xs) {
+                    ProgressView()
+                    Text(L("searching")).font(Typeface.callout).foregroundStyle(Palette.inkSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = store.searchError {
+                EmptyStateView(icon: "wifi.exclamationmark", title: L("searchFailed"),
+                               message: error)
+            } else if !store.searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Space.xxs) {
+                        LaneTitle(title: L("searchResults"))
+                            .padding(.bottom, Space.xs)
+                        ForEach(store.searchResults) { entry in
+                            CatalogRow(entry: entry)
+                        }
+                    }
+                    .padding(Space.lg)
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Space.md) {
+                        Text(L("discoverNote"))
+                            .font(Typeface.callout)
+                            .foregroundStyle(Palette.inkSecondary)
+                            .frame(maxWidth: 520, alignment: .leading)
+
+                        categoryChips
+
+                        ForEach(categories.filter { category == "all" || $0 == category }, id: \.self) { name in
+                            let items = store.catalog.filter { $0.category == name }
+                            if !items.isEmpty {
+                                VStack(alignment: .leading, spacing: Space.xs) {
+                                    Text(categoryLabel(name))
+                                        .font(Typeface.headline)
+                                        .foregroundStyle(Palette.ink)
+                                    ForEach(items) { entry in
+                                        CatalogRow(entry: entry)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(Space.lg)
+                }
+            }
+        }
+        .navigationTitle(L("discover"))
+        .task { await store.loadCatalog() }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: Space.xs) {
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Palette.inkTertiary)
+                TextField(L("searchPlaceholder"), text: $query)
+                    .textFieldStyle(.plain)
+                    .font(Typeface.body)
+                    .focused($searchFocused)
+                    .onSubmit { runSearch() }
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                        store.searchResults = []
+                        store.searchError = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.inkTertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L("clearSearch"))
+                }
+            }
+            .padding(.horizontal, Space.sm)
+            .padding(.vertical, 7)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                    .strokeBorder(searchFocused ? Palette.accent.opacity(0.5) : Palette.hairline,
+                                  lineWidth: searchFocused ? 1 : 0.7)
+            }
+
+            Button(L("search")) { runSearch() }
+                .buttonStyle(QuietButtonStyle())
+                .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(.horizontal, Space.lg)
+        .padding(.vertical, Space.sm)
+    }
+
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                chip(title: L("allCategories"), value: "all")
+                ForEach(categories, id: \.self) { name in
+                    chip(title: categoryLabel(name), value: name)
+                }
+            }
+        }
+    }
+
+    private func chip(title: String, value: String) -> some View {
+        Button {
+            withAnimation(Motion.quick) { category = value }
+        } label: {
+            Text(title)
+                .font(Typeface.callout)
+                .foregroundStyle(category == value ? .white : Palette.inkSecondary)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(category == value ? Palette.accent : Palette.surfaceRaised, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func runSearch() {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        searchFocused = false
+        store.searchDirectory(trimmed)
     }
 
     private func categoryLabel(_ category: String) -> String {
@@ -705,754 +1209,234 @@ struct DiscoverPage: View {
     }
 }
 
-struct CatalogCard: View {
+struct CatalogRow: View {
     @EnvironmentObject private var store: PodLensStore
     let entry: PodLensStore.CatalogEntry
+    @State private var hovering = false
+
+    private var previewing: Bool {
+        store.previewLoading && store.previewEpisode?.enclosureURL == entry.url
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            ArtworkView(url: entry.artworkURL, cornerRadius: 8)
-                .frame(width: 56, height: 56)
+        HStack(spacing: Space.sm) {
+            ArtworkView(url: entry.artworkURL, seed: entry.title, cornerRadius: 8)
+                .frame(width: 62, height: 62)
             VStack(alignment: .leading, spacing: 3) {
-                Text(entry.title).font(.callout.bold())
+                Text(entry.title)
+                    .font(Typeface.body.weight(.semibold))
+                    .lineLimit(2)
                 Text(entry.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
                     .lineLimit(2)
             }
-            Spacer()
+            Spacer(minLength: Space.xs)
             if entry.added {
-                Text(L("subscribed"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.gray.opacity(0.15))
-                    .clipShape(Capsule())
+                Label(L("subscribed"), systemImage: "checkmark")
+                    .font(Typeface.caption.weight(.medium))
+                    .foregroundStyle(Palette.positive)
             } else {
                 Button {
                     store.previewFromCatalog(entry)
                 } label: {
-                    Label(L("preview"), systemImage: "headphones")
+                    if previewing {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "headphones")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(QuietButtonStyle())
+                .help(L("preview"))
+                .accessibilityLabel(L("preview"))
                 .disabled(store.previewLoading)
-                Button(L("subscribe")) {
-                    store.addFromCatalog(entry)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+
+                Button(L("subscribe")) { store.addFromCatalog(entry) }
+                    .buttonStyle(QuietButtonStyle(promotes: true))
+                    .fixedSize()
             }
         }
-        .padding(10)
-        .background(Color.primary.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, Space.sm)
+        .padding(.vertical, 9)
+        .background(hovering ? Palette.surface : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onHover { hovering = $0 }
+        .animation(Motion.quick, value: hovering)
     }
 }
 
-// MARK: add feed
+// MARK: - Add feed
 
 struct AddFeedSheet: View {
     @EnvironmentObject private var store: PodLensStore
     @Environment(\.dismiss) private var dismiss
     @State private var url = ""
+    @FocusState private var urlFocused: Bool
 
-    var body: some View {
-        VStack(spacing: 16) {
-            Text(L("addFeed")).font(.headline)
-            TextField(L("feedURL"), text: $url)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 420)
-            HStack {
-                Button(L("cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(L("add")) {
-                    store.addFeed(url: url)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding(24)
+    private var isValid: Bool {
+        !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-}
-
-// MARK: episodes (one feed)
-
-struct FeedEpisodesPage: View {
-    @EnvironmentObject private var store: PodLensStore
 
     var body: some View {
-        Group {
-            if store.episodes.isEmpty {
-                Text(L("recentEmpty")).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: Binding(get: { store.selectedEpisode },
-                                        set: { if let e = $0 { store.selectEpisode(e) } })) {
-                    ForEach(store.episodes) { episode in
-                        FeedEpisodeRow(episode: episode,
-                                       artworkURL: store.selectedFeed?.artworkURL ?? "")
-                            .tag(episode)
-                            .contextMenu {
-                                Button(episode.done ? L("markUnplayed") : L("markPlayed")) {
-                                    store.markEpisode(episode, done: !episode.done)
-                                }
-                            }
-                    }
+        VStack(alignment: .leading, spacing: Space.md) {
+            HStack(spacing: Space.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Palette.highlight)
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Palette.accent)
                 }
-                .listStyle(.inset)
-            }
-        }
-        .navigationTitle(store.selectedFeed?.title ?? L("episodes"))
-    }
-}
-
-struct FeedEpisodeRow: View {
-    @EnvironmentObject private var store: PodLensStore
-    let episode: Episode
-    let artworkURL: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ArtworkView(url: artworkURL)
-                .frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(episode.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(2)
-                HStack(spacing: 6) {
-                    Text(formatPubDate(episode.pubDisplay))
-                    let d = formatDuration(Double(episode.durationSec) ?? 0)
-                    if !d.isEmpty { Text(d) }
+                .frame(width: 42, height: 42)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("addFeed"))
+                        .font(Typeface.title)
+                    Text(L("addFeedSubtitle"))
+                        .font(Typeface.callout)
+                        .foregroundStyle(Palette.inkSecondary)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                if !episode.description.isEmpty {
-                    Text(episode.description)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(2)
-                }
-                HStack(spacing: 10) {
-                    EpisodeStatusChips(downloaded: episode.downloaded,
-                                       transcriptStatus: episode.transcriptStatus,
-                                       summaryStatus: episode.summaryStatus,
-                                       hasTranslation: episode.hasTranslation,
-                                       done: episode.done)
-                }
-                EpisodeProgressLine(position: episode.positionSec,
-                                    duration: Double(episode.durationSec) ?? 0)
             }
-            Spacer(minLength: 8)
-            Button {
-                store.selectEpisode(episode)
-            } label: {
-                Image(systemName: "play.circle")
-                    .font(.title2)
-            }
-            .buttonStyle(.borderless)
-            .help(L("play"))
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-// MARK: detail (episode header + transcript + summary)
-
-struct DetailView: View {
-    @EnvironmentObject private var store: PodLensStore
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if let episode = store.selectedEpisode {
-                EpisodeHeader(episode: episode, columnVisibility: $columnVisibility)
-                TranscriptView()
-            } else {
-                Text(L("selectEpisode"))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-    }
-}
-
-struct EpisodeHeader: View {
-    @EnvironmentObject private var store: PodLensStore
-    let episode: Episode
-    @Binding var columnVisibility: NavigationSplitViewVisibility
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            ArtworkView(url: store.selectedFeed?.artworkURL ?? "", cornerRadius: 10)
-                .frame(width: 96, height: 96)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(episode.title)
-                    .font(.title3.bold())
-                    .lineLimit(2)
-                Text(headerMeta)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                TextField(L("feedURL"), text: $url)
+                    .textFieldStyle(.plain)
+                    .font(Typeface.body)
+                    .focused($urlFocused)
+                    .padding(.horizontal, Space.sm)
+                    .padding(.vertical, 8)
+                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                            .strokeBorder(urlFocused ? Palette.accent.opacity(0.55) : Palette.hairline,
+                                          lineWidth: urlFocused ? 1 : 0.7)
+                    }
+                    .onSubmit { submit() }
 
-                HStack(spacing: 8) {
+                HStack(spacing: Space.xs) {
                     Button {
-                        store.startJob("pipeline", episode: episode)
-                    } label: {
-                        Label(L("pipeline"), systemImage: "wand.and.stars")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .fixedSize()
-                    .help(estimateHint)
-
-                    Menu {
-                        Button(episode.done ? L("markUnplayed") : L("markPlayed")) {
-                            store.markEpisode(episode, done: !episode.done)
-                        }
-                        if episode.downloaded {
-                            Button(L("removeAudio"), role: .destructive) {
-                                store.withEpisode(episode.id) { api in
-                                    _ = try? await api.episode_remove_audio(id: episode.id)
-                                }
-                            }
+                        if let string = NSPasteboard.general.string(forType: .string) {
+                            url = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                            urlFocused = true
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label(L("pasteFromClipboard"), systemImage: "doc.on.clipboard")
                     }
-                    .menuStyle(.button)
-                    .help(L("more"))
+                    .buttonStyle(.plain)
+                    .font(Typeface.caption)
+                    .foregroundStyle(Palette.accent)
 
-                    Button {
-                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
-                    } label: {
-                        Image(systemName: columnVisibility == .detailOnly
-                            ? "arrow.down.right.and.arrow.up.left"
-                            : "arrow.up.left.and.arrow.down.right")
-                    }
-                    .accessibilityIdentifier("FocusListeningButton")
-                    // icon-only on screen, but the accessibility tree keeps
-                    // the state text — the acceptance journey reads it
-                    .accessibilityLabel(columnVisibility == .detailOnly
-                        ? L("focusExit") : L("focusEnter"))
-                    .help(columnVisibility == .detailOnly ? L("focusExitHint") : L("focusEnterHint"))
-
-                    if let job = activeJob {
-                        ProgressView(value: Double(job.pct), total: 100) {
-                            Text("\(job.message.isEmpty ? L("transcribing") : job.message) \(job.pct)%")
-                                .font(.caption2)
-                        }
-                        .frame(width: 180)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-    }
-
-    private var headerMeta: String {
-        var parts: [String] = []
-        if let feed = store.selectedFeed { parts.append(feed.title) }
-        parts.append(episode.pubDisplay)
-        let d = formatDuration(Double(episode.durationSec) ?? 0)
-        if !d.isEmpty { parts.append(d) }
-        if episode.downloaded { parts.append(L("tooltipDownloaded")) }
-        return parts.joined(separator: " · ")
-    }
-
-    private var activeJob: PodLensStore.Job? {
-        store.jobs.values.first { $0.status == "running" && $0.pct > 0 }
-    }
-
-    private var estimateHint: String {
-        guard let est = store.estimate else { return L("pipeline") }
-        if est.summarized { return L("pipelineNothingTodo") }
-        if est.transcriptKnown, let chars = est.chars {
-            return String(format: L("pipelineCostKnown"), chars)
-        }
-        return L("pipelineCostUnknown")
-    }
-}
-
-struct TranscriptView: View {
-    @EnvironmentObject private var store: PodLensStore
-    @State private var followPlayback = true
-    @FocusState private var focusedSegment: Int?
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            List {
-                if let s = store.summary {
-                    summarySection(s)
-                }
-                if store.segments.isEmpty {
-                    Text(store.summary == nil ? L("noTranscript") : L("noTranscriptButSummary"))
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(store.segments) { seg in
-                    let active = store.currentSegmentIndex() == seg.id
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(formatTime(seg.start))
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.tertiary)
-                        Text(seg.text)
-                            .font(.system(size: active ? 15 : 14))
-                            .foregroundStyle(active ? Color.primary : Color.primary.opacity(0.75))
-                            .background(active ? DesignTokens.accentSoft : .clear)
-                        if store.bilingual && !seg.translation.isEmpty {
-                            Text(seg.translation)
-                                .font(.system(size: 14))
-                                .foregroundStyle(active ? Color.accentColor : .secondary)
-                        }
-                    }
-                    .id(seg.id)
-                    .contentShape(Rectangle())
-                    .focusable()
-                    .focused($focusedSegment, equals: seg.id)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("TranscriptSegment-\(seg.id)")
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityHint(L("transcriptSeekHint"))
-                    .accessibilityAction {
-                        followPlayback = true
-                        store.seek(to: seg.start)
-                    }
-                    .onTapGesture {
-                        followPlayback = true
-                        store.seek(to: seg.start)
-                    }
-                    .onKeyPress(.return) {
-                        followPlayback = true
-                        store.seek(to: seg.start)
-                        return .handled
-                    }
-                    .onKeyPress(.space) {
-                        followPlayback = true
-                        store.seek(to: seg.start)
-                        return .handled
-                    }
-                }
-            }
-            .onChange(of: store.currentTime) { _, _ in
-                // follow only when the active sentence changes, so the
-                // half-second ticks don't drag the list under the reader
-                if followPlayback, let idx = store.segmentToFollow() {
-                    proxy.scrollTo(idx, anchor: .center)
-                }
-            }
-            .safeAreaInset(edge: .top) {
-                HStack {
-                    Toggle(isOn: $store.bilingual) {
-                        Label(L("bilingual"), systemImage: "text.justify.leading")
-                    }
-                    .toggleStyle(.button)
-                    .disabled(store.segments.isEmpty || !store.translationAvailable)
-                    .help(L("bilingualHint"))
-                    Spacer()
-                    Toggle(isOn: $followPlayback) {
-                        Label(L("followTranscript"), systemImage: "location.fill")
-                    }
-                    .toggleStyle(.button)
-                    .accessibilityIdentifier("FollowTranscriptButton")
-                    .help(L("followTranscriptHint"))
-                    Button {
-                        followPlayback = true
-                        if let idx = store.currentSegmentIndex() {
-                            proxy.scrollTo(idx, anchor: .center)
-                            focusedSegment = idx
-                        }
-                    } label: {
-                        Label(L("returnToCurrent"), systemImage: "scope")
-                    }
-                    .accessibilityIdentifier("ReturnToCurrentButton")
-                    .help(L("returnToCurrentHint"))
-                }
-                .padding([.horizontal, .bottom], 8)
-            }
-        }
-    }
-
-    private func formatTime(_ t: Double) -> String {
-        let m = Int(t) / 60, s = Int(t) % 60
-        return String(format: "%02d:%02d", m, s)
-    }
-}
-
-extension TranscriptView {
-    /// The summary leads the same scroll as the transcript — one reading
-    /// surface, no tab to switch.
-    @ViewBuilder
-    fileprivate func summarySection(_ s: PodLensStore.Summary) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            section(L("tldr")) { Text(s.tldr) }
-            if !s.keyPoints.isEmpty {
-                section(L("keyPoints")) {
-                    ForEach(Array(s.keyPoints.enumerated()), id: \.offset) { _, p in
-                        HStack(alignment: .top) {
-                            Text("•")
-                            Text(p)
-                        }
-                    }
-                }
-            }
-            if !s.quotes.isEmpty {
-                section(L("quotes")) {
-                    ForEach(Array(s.quotes.enumerated()), id: \.offset) { _, q in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("“\(q.0)”").italic()
-                            Text(q.1).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            if !s.topics.isEmpty {
-                section(L("topics")) {
-                    HStack {
-                        ForEach(s.topics, id: \.self) { t in
-                            Text(t)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.accentColor.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
-                }
-            }
-            Divider()
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline).foregroundStyle(Color.accentColor)
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-// MARK: player bar (window-level, Apple Podcasts style)
-
-struct PlayerBar: View {
-    @EnvironmentObject private var store: PodLensStore
-
-    private var hasEpisode: Bool { store.selectedEpisode != nil }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            nowPlaying
-
-            chapterControls
-
-            Button {
-                store.skip(by: -15)
-            } label: {
-                Image(systemName: "gobackward.15")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut(.leftArrow, modifiers: [.command])
-            .disabled(!hasEpisode)
-            .help(L("skipBack"))
-
-            Button {
-                store.togglePlay()
-            } label: {
-                Image(systemName: store.playing ? "pause.fill" : "play.fill")
-                    .font(.title3)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityIdentifier("PlayPauseButton")
-            .keyboardShortcut(.space, modifiers: [])
-            .disabled(!hasEpisode)
-            .help(store.playing ? L("pause") : L("play"))
-
-            Button {
-                store.skip(by: 30)
-            } label: {
-                Image(systemName: "goforward.30")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut(.rightArrow, modifiers: [.command])
-            .disabled(!hasEpisode)
-            .help(L("skipForward"))
-
-            Text(formatTime(store.currentTime))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(hasEpisode ? .primary : .tertiary)
-                .accessibilityIdentifier("PlayerPosition")
-            Slider(value: Binding(get: { store.currentTime },
-                                  set: { store.seek(to: $0) }),
-                   in: 0...(max(store.duration, 1)))
-                .disabled(!hasEpisode)
-            Text(formatTime(store.duration))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(hasEpisode ? .primary : .tertiary)
-
-            Picker("", selection: Binding(get: { store.rate },
-                                          set: { store.setRate($0) })) {
-                ForEach(PodLensStore.playbackRates, id: \.self) { r in
-                    Text("\(r, specifier: "%g")×").tag(r)
-                }
-            }
-            .frame(width: 72)
-            .disabled(!hasEpisode)
-
-            sleepMenu
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.bar)
-    }
-
-    /// Show + title block on the left; when nothing is selected the bar
-    /// still renders (Podcasts never hides its controls).
-    @ViewBuilder
-    private var nowPlaying: some View {
-        if let episode = store.selectedEpisode {
-            HStack(spacing: 10) {
-                ArtworkView(url: store.selectedFeed?.artworkURL ?? "")
-                    .frame(width: 40, height: 40)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(episode.title)
-                        .font(.caption.bold())
-                        .lineLimit(1)
-                    Text(store.npShow.isEmpty
-                         ? (store.selectedFeed?.title ?? "")
-                         : store.npShow)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    Text(L("addFeedExample"))
+                        .font(Typeface.caption)
+                        .foregroundStyle(Palette.inkTertiary)
                         .lineLimit(1)
                 }
             }
-            .frame(width: 230, alignment: .leading)
-        } else {
-            Text(L("nothingPlaying"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 230, alignment: .leading)
-        }
-    }
 
-    @ViewBuilder
-    private var chapterControls: some View {
-        if !store.chapters.isEmpty {
-            Button {
-                store.skipChapter(-1)
-            } label: {
-                Image(systemName: "backward.end.fill")
-            }
-            .buttonStyle(.borderless)
-            .help(store.currentChapter()?.title ?? L("chapterPrev"))
-
-            Button {
-                store.skipChapter(1)
-            } label: {
-                Image(systemName: "forward.end.fill")
-            }
-            .buttonStyle(.borderless)
-            .help(L("chapterNext"))
-        }
-    }
-
-    @ViewBuilder
-    private var sleepMenu: some View {
-        let remaining = store.sleepMinutesRemaining
-        Menu {
-            Button(L("sleepOff")) { store.cancelSleepTimer() }
-            ForEach([5, 10, 15, 30, 45, 60, 90], id: \.self) { m in
-                Button(String(format: L("sleepMinutes"), m)) {
-                    store.startSleepTimer(minutes: m)
+            if let error = store.addFeedError {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(error)
+                        .textSelection(.enabled)
                 }
+                .font(Typeface.caption)
+                .foregroundStyle(Palette.danger)
+                .padding(Space.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Palette.danger.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
             }
-        } label: {
-            Image(systemName: remaining == nil ? "moon.zzz" : "moon.zzz.fill")
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .disabled(!hasEpisode)
-        .help(remaining.map { String(format: L("sleepActive"), $0) } ?? L("sleep"))
-    }
-
-    private func formatTime(_ t: Double) -> String {
-        guard t.isFinite else { return "00:00" }
-        let m = Int(t) / 60, s = Int(t) % 60
-        return String(format: "%02d:%02d", m, s)
-    }
-}
-
-// MARK: settings
-
-struct SettingsSheet: View {
-    @EnvironmentObject private var store: PodLensStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var rows: [(String, String, String)] = []
-    @State private var lang = currentLanguage()
-    @State private var saved = false
-    @State private var saveError: String?
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Text(L("settings")).font(.headline)
-            Form {
-                ForEach(rows, id: \.0) { row in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(row.0).font(.callout.monospaced())
-                            Text(row.2).font(.caption2).foregroundStyle(.secondary)
-                        }
-                        TextField(row.1, text: Binding(
-                            get: { row.1 },
-                            set: { newValue in
-                                if let idx = rows.firstIndex(where: { $0.0 == row.0 }) {
-                                    rows[idx].1 = newValue
-                                }
-                            }))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 320)
-                            .accessibilityLabel(row.0)
-                    }
-                }
-            }
-            Picker(L("language"), selection: Binding(get: { lang },
-                                                     set: { lang = $0; setLanguage($0) })) {
-                Text("中文").tag("zh")
-                Text("English").tag("en")
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
-
-            Text(L("settingsDesc")).font(.caption2).foregroundStyle(.secondary)
-
-            Divider()
-
-            aboutSection
 
             HStack {
-                if saved { Text(L("settingsSaved")).foregroundStyle(.green) }
-                if let saveError {
-                    Text(saveError).foregroundStyle(.red).lineLimit(2)
-                }
+                Spacer()
                 Button(L("cancel")) { dismiss() }
-                Button(L("settingsSaved")) { save() }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("SettingsSaveButton")
-            }
-        }
-        .padding(24)
-        .task { load() }
-    }
-
-    /// About block: version, license and the support surface (taskly's
-    /// AboutSheet facts) — a bug report starts one click away.
-    private var aboutSection: some View {
-        VStack(spacing: 6) {
-            Text("PodLens v\(version)")
-                .font(.callout.bold())
-            Text(L("aboutLicense"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 20) {
-                Link(L("aboutWebsite"),
-                     destination: URL(string: "https://podlens.jrtx.site")!)
-                Link(L("aboutReportIssue"),
-                     destination: URL(string: "https://github.com/turlamai/podlens/issues")!)
-            }
-            .font(.caption)
-        }
-    }
-
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? RivetGeneratedConfig.version
-    }
-
-    private func load() {
-        Task {
-            guard let api = store.apiForSettings else { return }
-            let list = (try? await api.settings_list()) ?? []
-            rows = list.map { ($0[0], $0[1], $0[2]) }
-        }
-    }
-
-    private func save() {
-        Task {
-            guard let api = store.apiForSettings else { return }
-            do {
-                for row in rows {
-                    _ = try await api.settings_set(key: row.0, value: row.1)
+                    .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+                Button {
+                    submit()
+                } label: {
+                    if store.addFeedBusy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(L("add"))
+                    }
                 }
-                saveError = nil
-                saved = true
-            } catch {
-                saved = false
-                saveError = error.localizedDescription
+                .buttonStyle(ProminentButtonStyle())
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isValid || store.addFeedBusy)
             }
+        }
+        .padding(Space.lg)
+        .frame(width: 500)
+        .background(Palette.canvas)
+        .onAppear {
+            urlFocused = true
+            store.addFeedError = nil
+        }
+    }
+
+    private func submit() {
+        guard isValid, !store.addFeedBusy else { return }
+        Task {
+            if await store.addFeedNow(url: url) == nil { dismiss() }
         }
     }
 }
 
-// MARK: update sheet
+// MARK: - Update sheet
 
-/// Every terminal check outcome reaches this sheet (docs/UPDATE.md): an
-/// available update offers install, an up-to-date answer confirms it, and a
-/// failure shows the error — selectable, so it can travel into a bug report.
-/// Silent launch-time checks only ever assign `.available`, so those never
-/// nag.
+extension UpdateService.Manifest: @retroactive Identifiable {
+    public var id: String { version }
+}
+
 struct UpdateSheet: View {
     @EnvironmentObject private var model: AppModel
-    @EnvironmentObject private var store: PodLensStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(Color.accentColor)
-
-            switch store.updateOutcome {
+        VStack(spacing: Space.md) {
+            BrandMark(size: 44)
+            switch model.store.updateOutcome {
             case .some(.success(.available(let manifest))):
-                Text(L("updateAvailableTitle")).font(.headline)
+                Text(L("updateAvailableTitle")).font(Typeface.title)
                 Text(String(format: L("updateAvailableBody"), manifest.version))
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
                 HStack {
-                    Button(L("updateLater")) { dismiss() }
+                    Button(L("updateLater")) { dismiss() }.buttonStyle(QuietButtonStyle())
                     Button(L("updateRestart")) {
                         dismiss()
                         Task { await model.installUpdate(manifest) }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(ProminentButtonStyle())
                 }
-
             case .some(.success(.upToDate)):
-                Text(L("updateUpToDate")).font(.headline)
+                Text(L("updateUpToDate")).font(Typeface.title)
                 Button(L("dialogOk")) { dismiss() }
+                    .buttonStyle(ProminentButtonStyle())
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-
             case .some(.failure(let error)):
-                Text(String(format: L("updateCheckFailed"), Self.message(error)))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(L("updateCheckFailed"))
+                    .font(Typeface.title)
+                Text(Self.message(error))
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
                     .multilineTextAlignment(.center)
                     .textSelection(.enabled)
-                    .frame(maxWidth: 320)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 340)
                 HStack {
-                    Button(L("cancel")) { dismiss() }
+                    Button(L("cancel")) { dismiss() }.buttonStyle(QuietButtonStyle())
                     Button(L("menuCheckUpdates")) {
                         model.checkForUpdates(manual: true)
                     }
+                    .buttonStyle(ProminentButtonStyle())
                 }
-
             case .none:
                 EmptyView()
             }
         }
-        .padding(28)
-        .frame(width: 360)
+        .padding(Space.xl)
+        .frame(width: 380)
+        .background(Palette.canvas)
     }
 
     private static func message(_ error: Error) -> String {

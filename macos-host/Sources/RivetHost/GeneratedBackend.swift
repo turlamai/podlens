@@ -7,8 +7,8 @@ public enum RivetGeneratedConfig {
     public static let moduleName = "backend"
     public static let entryName = "start"
     public static let displayName = "PodLens"
-    public static let version = "0.4.0"
-    public static let build: Int64 = 3
+    public static let version = "0.6.0"
+    public static let build: Int64 = 7
     public static let identifier = "site.jrtx.podlens"
     public static let releaseChannel = "stable"
 }
@@ -93,10 +93,44 @@ public enum RivetEvent: Sendable {
     }
 }
 
-public struct RivetAPI: Sendable {
-    public let client: RivetClient
-    public init(client: RivetClient) { self.client = client }
+public protocol RivetGeneratedRPCClient: Sendable {
+    func call(_ name: String, arguments: [RivetValue]) async throws -> RivetValue
+}
 
+// Keep generated clients compatible with the last released SwiftPM runtime.
+// Authenticated network clients can use RivetAPI(call: deviceClient.call).
+public extension RivetGeneratedRPCClient {
+    func getState(_ name: String) async throws -> RivetValue {
+        try await call("$state/get", arguments: [.string(name)])
+    }
+
+    @discardableResult
+    func setState(_ name: String, value: RivetValue) async throws -> RivetValue {
+        try await call("$state/set", arguments: [.string(name), value])
+    }
+}
+
+extension RivetClient: RivetGeneratedRPCClient {}
+
+private struct RivetGeneratedClosureClient: RivetGeneratedRPCClient {
+    let invoke: @Sendable (String, [RivetValue]) async throws -> RivetValue
+
+    func call(_ name: String, arguments: [RivetValue]) async throws -> RivetValue {
+        try await invoke(name, arguments)
+    }
+}
+
+public struct RivetAPI: Sendable {
+    public let client: any RivetGeneratedRPCClient
+    public init(client: any RivetGeneratedRPCClient) { self.client = client }
+    public init(call: @escaping @Sendable (String, [RivetValue]) async throws -> RivetValue) {
+        self.client = RivetGeneratedClosureClient(invoke: call)
+    }
+
+    public func ai_test() async throws -> String {
+        let rivetResult = try await client.call("ai-test", arguments: [])
+        return try decode_String(rivetResult)
+    }
     public func catalog_list() async throws -> [[String]] {
         let rivetResult = try await client.call("catalog-list", arguments: [])
         return try decode__List_List_String_(rivetResult)
@@ -185,6 +219,10 @@ public struct RivetAPI: Sendable {
         let rivetResult = try await client.call("health", arguments: [])
         return try decode_String(rivetResult)
     }
+    public func job_cancel(job_id: String) async throws -> Bool {
+        let rivetResult = try await client.call("job-cancel", arguments: [encode_String(job_id)])
+        return try decode_Bool(rivetResult)
+    }
     public func job_status(job_id: String) async throws -> String {
         let rivetResult = try await client.call("job-status", arguments: [encode_String(job_id)])
         return try decode_String(rivetResult)
@@ -204,6 +242,10 @@ public struct RivetAPI: Sendable {
     public func resume_last() async throws -> [String] {
         let rivetResult = try await client.call("resume-last", arguments: [])
         return try decode__List_String_(rivetResult)
+    }
+    public func security_status() async throws -> String {
+        let rivetResult = try await client.call("security-status", arguments: [])
+        return try decode_String(rivetResult)
     }
     public func settings_list() async throws -> [[String]] {
         let rivetResult = try await client.call("settings-list", arguments: [])

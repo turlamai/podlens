@@ -18,6 +18,7 @@
 (provide chat-completion
          chat-completion-json
          transcribe-file
+         probe-provider
          api-config-error)
 
 (define (auth-headers cfg)
@@ -165,3 +166,44 @@
                 (format "~a" e)))
           (bytes->string/utf-8 resp))))
   (error who "~a: ~a" code msg))
+
+;; ---- connection probe -----------------------------------------------------
+
+;; Cheap "is this BYOK configuration usable?" check for Settings. Lists
+;; /models (no tokens billed) and reports whether the configured chat model
+;; is present. Never raises: a failure is a result the UI can explain.
+;; -> jsexpr {ok message status? models? modelAvailable?}
+(define (probe-provider cfg)
+  (define config-error (api-config-error cfg))
+  (if config-error
+      (hasheq 'ok #f 'message config-error)
+      (with-handlers ([exn:fail?
+                       (lambda (e)
+                         (hasheq 'ok #f
+                                 'message (format "could not reach the provider: ~a"
+                                                  (exn-message e))))])
+        (define-values (code _headers body)
+          (http-get-bytes (endpoint cfg "/models") (auth-headers cfg)))
+        (define text (bytes->string/utf-8 body))
+        (cond
+          [(= code 200)
+           (define models
+             (with-handlers ([exn:fail? (lambda (_) '())])
+               (define parsed (string->jsexpr text))
+               (for/list ([m (in-list (hash-ref parsed 'data '()))])
+                 (hash-ref m 'id ""))))
+           (define wanted (hash-ref cfg 'chat-model ""))
+           (define present?
+             (and (non-empty-string? wanted) (and (member wanted models) #t)))
+           (hasheq 'ok #t
+                   'message (if present?
+                                "connection ok; configured model is available"
+                                "connection ok; model list retrieved")
+                   'models (length models)
+                   'modelAvailable present?)]
+          [(member code '(401 403))
+           (hasheq 'ok #f 'status code
+                   'message "the provider rejected this API key")]
+          [else
+           (hasheq 'ok #f 'status code
+                   'message (format "provider answered HTTP ~a" code))]))))
