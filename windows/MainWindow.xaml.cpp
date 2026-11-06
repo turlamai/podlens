@@ -593,7 +593,7 @@ void MainWindow::UpdatePageHeader() {
   if (focus_listening_) {
     Nav().Header(winrt::Windows::Foundation::IInspectable{nullptr});
   } else {
-    Nav().Header(box_value(PageHeaderTitle()));
+    Nav().Header(box_value(PageHeaderHost()));
   }
   StyleBrandButton(FocusModeButton(), focus_listening_, /*strong=*/true);
 }
@@ -3136,7 +3136,7 @@ void MainWindow::FocusMode_Click(
   if (focus_listening_) {
     Nav().Header(winrt::Windows::Foundation::IInspectable{nullptr});
   } else {
-    Nav().Header(box_value(PageHeaderTitle()));
+    Nav().Header(box_value(PageHeaderHost()));
   }
   StyleBrandButton(FocusModeButton(), focus_listening_, /*strong=*/true);
   FocusModeButton().Content(box_value(winrt::hstring(std::wstring(

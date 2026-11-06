@@ -31,9 +31,11 @@
                         ItemInvoked="Nav_ItemInvoked">
 
             <NavigationView.Header>
-                <TextBlock x:Name="PageHeaderTitle" FontSize="26" FontWeight="Bold"
-                           HorizontalAlignment="Left" TextAlignment="Left"
-                           Margin="20,8,20,2" />
+                <Grid x:Name="PageHeaderHost" HorizontalAlignment="Stretch">
+                    <TextBlock x:Name="PageHeaderTitle" FontSize="26" FontWeight="Bold"
+                               HorizontalAlignment="Left" TextAlignment="Left"
+                               Margin="20,8,20,2" />
+                </Grid>
             </NavigationView.Header>
 
             <NavigationView.PaneHeader>
