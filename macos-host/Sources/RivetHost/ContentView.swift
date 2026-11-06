@@ -102,7 +102,6 @@ struct MainWindow: View {
             PlayerBar()
         }
         .background(Palette.canvas)
-        .animation(Motion.gentle, value: store.focusMode)
         .overlay(alignment: .bottom) {
             if let message = store.toastMessage {
                 ToastView(message: message) { store.dismissToast() }
@@ -113,8 +112,11 @@ struct MainWindow: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .podlensFocusListening)) { note in
+            // Focus is an instant layout change. Animating the two pane
+            // widths makes headless Intel compositing fall into Metal and
+            // abort the app; state preservation matters more than the fade.
             let requested = note.userInfo?["focus"] as? Bool ?? !store.focusMode
-            withAnimation(Motion.gentle) { store.focusMode = requested }
+            store.focusMode = requested
         }
     }
 }

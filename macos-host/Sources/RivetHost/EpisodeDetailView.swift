@@ -184,12 +184,10 @@ struct EpisodeHero: View {
             Spacer()
 
             Button {
-                withAnimation(Motion.gentle) {
-                    let next: NavigationSplitViewVisibility =
-                        columnVisibility == .detailOnly ? .all : .detailOnly
-                    columnVisibility = next
-                    store.focusMode = next == .detailOnly
-                }
+                let next: NavigationSplitViewVisibility =
+                    columnVisibility == .detailOnly ? .all : .detailOnly
+                columnVisibility = next
+                store.focusMode = next == .detailOnly
             } label: {
                 Image(systemName: columnVisibility == .detailOnly
                       ? "arrow.down.right.and.arrow.up.left"
