@@ -278,8 +278,8 @@ try {
     }
     Activate-Control $current
     [void](Wait-Until 'follow transcript resumed' {
-        $state = $follow.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-        if ($state.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) {
+        $status = Find-ById $window 'StatusLine'
+        if ($status -and $status.Current.Name -match 'Following the current sentence|已恢复跟随当前句') {
             return $true
         }
         return $false
