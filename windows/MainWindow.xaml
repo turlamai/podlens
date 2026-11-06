@@ -32,6 +32,7 @@
 
             <NavigationView.Header>
                 <TextBlock x:Name="PageHeaderTitle" FontSize="26" FontWeight="Bold"
+                           HorizontalAlignment="Left" TextAlignment="Left"
                            Margin="20,8,20,2" />
             </NavigationView.Header>
 
@@ -225,16 +226,16 @@
                                     </MenuFlyout>
                                 </Button.Flyout>
                             </Button>
-                            <ToggleButton x:Name="FocusModeButton" Padding="10,4"
-                                          Click="FocusMode_Click" />
+                            <Button x:Name="FocusModeButton" Padding="10,4"
+                                    Click="FocusMode_Click" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4"
                                     VerticalAlignment="Center" Margin="0,0,0,6">
                             <ComboBox x:Name="ReadingModeSelector" MinWidth="132"
                                       SelectionChanged="ReadingMode_SelectionChanged" />
-                            <ToggleButton x:Name="FollowTranscriptButton" Margin="12,0,0,0"
-                                          IsChecked="True" Click="FollowTranscript_Click" />
+                            <Button x:Name="FollowTranscriptButton" Margin="12,0,0,0"
+                                    Click="FollowTranscript_Click" />
                             <Button x:Name="ReturnToCurrentButton"
                                     Click="ReturnToCurrent_Click" />
                         </StackPanel>

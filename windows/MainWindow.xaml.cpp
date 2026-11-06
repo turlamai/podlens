@@ -265,6 +265,25 @@ std::wstring FormatSeconds(double seconds) {
 
 muxc::Border MakeChip(std::wstring const& text);
 
+// Brand-tinted action buttons: WinUI's default ToggleButton checked state
+// uses the system accent (blue), which breaks the terracotta identity.
+// Regular Buttons with an explicit state style keep the brand intact.
+template <typename ButtonT>
+void StyleBrandButton(ButtonT const& button, bool active, bool strong = false) {
+  auto const resources = Microsoft::UI::Xaml::Application::Current().Resources();
+  auto const brush = [&resources](wchar_t const* key) {
+    return resources.Lookup(box_value(winrt::hstring(key)))
+        .as<Microsoft::UI::Xaml::Media::Brush>();
+  };
+  button.Background(brush(active
+      ? (strong ? L"AppAccentBrush" : L"AppAccentSoftBrush")
+      : L"AppSurfaceRaisedBrush"));
+  button.Foreground(brush(active
+      ? (strong ? L"AppOnAccentBrush" : L"AppAccentBrush")
+      : L"AppInkSoftBrush"));
+  button.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0});
+}
+
 // WinRT TimeSpans tick in 100 ns units; playback math speaks in seconds.
 double TimeSpanSeconds(winrt::Windows::Foundation::TimeSpan const& span) {
   return static_cast<double>(span.count()) / 1e7;
@@ -371,6 +390,8 @@ MainWindow::MainWindow() {
   muxc::ToolTipService::SetToolTip(
       ReturnToCurrentButton(),
       box_value(winrt::hstring(std::wstring(podlens::Tr("transcript.current_hint")))));
+  StyleBrandButton(FocusModeButton(), false);
+  StyleBrandButton(FollowTranscriptButton(), true);
 
   // The player is constructed up front: every call on a null projected
   // MediaPlayer throws, so deferring construction made playback itself
@@ -569,8 +590,12 @@ void MainWindow::UpdatePageHeader() {
     }
   }
   PageHeaderTitle().Text(winrt::hstring(title));
-  PageHeaderTitle().Visibility(focus_listening_ ? Visibility::Collapsed
-                                                : Visibility::Visible);
+  if (focus_listening_) {
+    Nav().Header(winrt::Windows::Foundation::IInspectable{nullptr});
+  } else {
+    Nav().Header(box_value(PageHeaderTitle()));
+  }
+  StyleBrandButton(FocusModeButton(), focus_listening_, /*strong=*/true);
 }
 
 void MainWindow::UpdateDetailVisibility() {
@@ -1070,7 +1095,7 @@ void MainWindow::RenderTranscript() {
           auto const& seg = window->transcript_[static_cast<size_t>(index)];
           double const start = std::wcstod(to_wide(seg[0]).c_str(), nullptr);
           window->follow_transcript_ = true;
-          window->FollowTranscriptButton().IsChecked(true);
+          StyleBrandButton(window->FollowTranscriptButton(), true);
           window->SeekTo(start);
         }
       }
@@ -3100,7 +3125,7 @@ void MainWindow::PlayerAccel_Invoked(
 void MainWindow::FocusMode_Click(
     winrt::Windows::Foundation::IInspectable const&,
     Microsoft::UI::Xaml::RoutedEventArgs const&) {
-  focus_listening_ = FocusModeButton().IsChecked().Value();
+  focus_listening_ = !focus_listening_;
   PageColumn().Visibility(focus_listening_ ? Visibility::Collapsed : Visibility::Visible);
   ContentDivider().Visibility(focus_listening_ ? Visibility::Collapsed : Visibility::Visible);
   muxc::Grid::SetColumn(DetailColumn(), focus_listening_ ? 0 : 2);
@@ -3108,8 +3133,12 @@ void MainWindow::FocusMode_Click(
   Nav().PaneDisplayMode(focus_listening_
       ? muxc::NavigationViewPaneDisplayMode::LeftMinimal
       : muxc::NavigationViewPaneDisplayMode::Left);
-  PageHeaderTitle().Visibility(focus_listening_ ? Visibility::Collapsed
-                                                : Visibility::Visible);
+  if (focus_listening_) {
+    Nav().Header(winrt::Windows::Foundation::IInspectable{nullptr});
+  } else {
+    Nav().Header(box_value(PageHeaderTitle()));
+  }
+  StyleBrandButton(FocusModeButton(), focus_listening_, /*strong=*/true);
   FocusModeButton().Content(box_value(winrt::hstring(std::wstring(
       podlens::Tr(focus_listening_ ? "focus.exit" : "focus.enter")))));
   muxc::ToolTipService::SetToolTip(
@@ -3120,7 +3149,8 @@ void MainWindow::FocusMode_Click(
 void MainWindow::FollowTranscript_Click(
     winrt::Windows::Foundation::IInspectable const&,
     Microsoft::UI::Xaml::RoutedEventArgs const&) {
-  follow_transcript_ = FollowTranscriptButton().IsChecked().Value();
+  follow_transcript_ = !follow_transcript_;
+  StyleBrandButton(FollowTranscriptButton(), follow_transcript_);
   if (follow_transcript_) ScrollToCurrentTranscript();
 }
 
@@ -3128,7 +3158,7 @@ void MainWindow::ReturnToCurrent_Click(
     winrt::Windows::Foundation::IInspectable const&,
     Microsoft::UI::Xaml::RoutedEventArgs const&) {
   follow_transcript_ = true;
-  FollowTranscriptButton().IsChecked(true);
+  StyleBrandButton(FollowTranscriptButton(), true);
   ScrollToCurrentTranscript();
 }
 
