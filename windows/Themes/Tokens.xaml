@@ -14,17 +14,31 @@
             <Color x:Key="AppAccentColor">#C15F3C</Color>
             <SolidColorBrush x:Key="AppAccentBrush" Color="#C15F3C" />
             <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#F7E5DD" />
+            <SolidColorBrush x:Key="AppCanvasBrush" Color="#FAF7F2" />
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="AppSurfaceRaisedBrush" Color="#F4EFE8" />
             <SolidColorBrush x:Key="AppCardBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppLineBrush" Color="#E8E2D9" />
+            <SolidColorBrush x:Key="AppInkBrush" Color="#1F1D1A" />
+            <SolidColorBrush x:Key="AppOnAccentBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppInkSoftBrush" Color="#6B6660" />
+            <SolidColorBrush x:Key="AppPositiveBrush" Color="#2E7D4F" />
+            <SolidColorBrush x:Key="AppDangerBrush" Color="#B3261E" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
-            <Color x:Key="AppAccentColor">#D97C5C</Color>
-            <SolidColorBrush x:Key="AppAccentBrush" Color="#D97C5C" />
+            <Color x:Key="AppAccentColor">#E08A66</Color>
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#E08A66" />
             <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#3B2A22" />
-            <SolidColorBrush x:Key="AppCardBrush" Color="#2B2B2B" />
-            <SolidColorBrush x:Key="AppLineBrush" Color="#3D3D3D" />
+            <SolidColorBrush x:Key="AppCanvasBrush" Color="#171614" />
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="#232120" />
+            <SolidColorBrush x:Key="AppSurfaceRaisedBrush" Color="#2C2926" />
+            <SolidColorBrush x:Key="AppCardBrush" Color="#232120" />
+            <SolidColorBrush x:Key="AppLineBrush" Color="#3A3733" />
+            <SolidColorBrush x:Key="AppInkBrush" Color="#F0EDE8" />
+            <SolidColorBrush x:Key="AppOnAccentBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppInkSoftBrush" Color="#A8A29B" />
+            <SolidColorBrush x:Key="AppPositiveBrush" Color="#6FD08C" />
+            <SolidColorBrush x:Key="AppDangerBrush" Color="#F27A72" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 

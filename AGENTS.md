@@ -88,10 +88,11 @@ scripts/update-keys.sh
 
 ## 诚实缺口（不要在文档里夸口）
 
-- 0.6.0 的阅读优先视觉重构、原生设置窗口、取消按钮与系统安全存储
-  以 macOS 为实现基准；Windows / Linux 仍保留此前的视觉语言和设置
-  对话框。它们通过同一共享契约获得密钥迁移、掩码和取消 RPC，但
-  取消按钮与 0.6 视觉尚未接到两端 UI。
+- 0.7.0 起 Windows/Linux 已对齐 0.6 的信息架构、三种阅读模式、取消
+  按钮、设置存储提示和品牌 tokens；控件仍是 WinUI / GTK 原生，不做
+  像素复制。运行时语言切换仍只在 macOS；Windows 用编译期 `kUiLang`，
+  Linux 用 `PODLENS_LANG`。
+- Windows 125–200% 显示缩放截图矩阵仍未执行；1024×768 打包验收已覆盖。
 - BYOK key 在 macOS 走 Keychain（`security -i`，密钥不进 argv）、Windows
   走 DPAPI、Linux 走 secret-tool；都不可用时才降到 0600 文件，并在
   设置页明确标注。CLI 与日志只显示掩码。
@@ -119,7 +120,7 @@ scripts/update-keys.sh
 ## 产品交付与下一步（2026-10-23）
 
 - 家族[交付标准](https://github.com/turlamai/turlamai.github.io/blob/master/docs/PRODUCT-STANDARD.md)与[组合策略](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md)是共用政策；本仓具体行为以 `docs/DESIGN-ROADMAP.md` 为准，不复制五库依赖图。
-- 当前执行入口：0.6.0 已完成 BYOK 安全存储迁移、作业取消、阅读模式/专注聆听和 macOS 视觉重构；后续切片见 `docs/DESIGN-ROADMAP.md` 的 M6 与诚实缺口。
+- 当前执行入口：0.7.0 已完成 Windows/Linux 的阅读模式、取消、设置存储提示与品牌 tokens 对齐；后续切片见 `docs/DESIGN-ROADMAP.md` 的 M6 与诚实缺口。
 - 开工先检查干净工作树与远端，以 fast-forward-only 更新并记录 SHA；共享文件一次一个写入者，保留其他 checkout 的未提交工作。
 - 每次只完成一个可验收切片，记录 owned files、依赖 pin、命令/平台/产物证据和回滚。已实现、已发布、实机验收分别陈述；不修改 requirements 或复用旧证据来制造通过。
 

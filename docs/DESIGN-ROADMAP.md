@@ -105,8 +105,9 @@ tokens 表（§4）管颜色与字号，「像不像 Apple」不是标准；标�
 - **动效克制**：0.14s ease-out 用于按压/悬停，spring 0.34 用于模式切换；
   不做持续动画。
 
-Windows/Linux 在同一契约上获得密钥迁移、掩码、作业取消 RPC，但 0.6
-的视觉系统仍是 macOS 基准；两端视觉收敛排在 M6 的剩余项。
+Windows/Linux 在 0.7.0 追平了信息架构、阅读模式、取消与设置存储提示；
+视觉 token 已对齐，但控件形态保留 WinUI / GTK 原生。运行时语言切换仍
+只在 macOS，Windows 用编译期 `kUiLang`、Linux 用 `PODLENS_LANG`。
 
 Windows：桥接为 XAML 资源字典（`Themes/Tokens.xaml`，深浅色两套）；
 macOS：`DesignTokens.swift` 常量。新增颜色/字号必须先进这张表。
@@ -233,7 +234,8 @@ agent 用两条 CLI 命令完成「订阅并取回某集的中文要点」。
   状态、连接测试、数据目录、更新入口
 - [x] 诚实状态：空状态、失败、取消、未配置 key 都说明下一步，不阻塞播放
 - [x] macOS 1280×800 与 1024×768 快照证据（`docs/screenshots/macos-0.6/`）
-- [ ] Windows / Linux 的 0.6 视觉收敛与取消按钮
+- [x] Windows / Linux 的 0.6 信息架构、阅读模式、取消按钮与设置存储状态
+  （0.7.0；控件仍为 WinUI / GTK 原生，非像素复制）
 - [ ] Windows 125–200% 缩放截图矩阵（受 runner 显示缩放限制，见 #14）
 
 **验收**：1024×768 下播放/跳播/当前句可用且按钮不裁切；专注模式往返
@@ -269,8 +271,8 @@ agent 用两条 CLI 命令完成「订阅并取回某集的中文要点」。
 
 ## 当前交付优先级（2026-11-06）
 
-0.6.0 已完成 BYOK 安全存储迁移、作业取消、阅读模式/专注聆听和 macOS
-视觉重构。下一刀：Windows/Linux 视觉与取消按钮收敛、Windows 缩放
-截图矩阵、M4 移动伴随端（等 Rivet 设备通道）。
+0.7.0 已完成 Windows/Linux 的体验对齐（页面标题、阅读模式、取消、设置
+存储提示、品牌 tokens）。下一刀：Windows 125–200% 缩放截图矩阵、三端
+运行时语言切换、M4 移动伴随端（等 Rivet 设备通道）。
 
 执行场景与完成标准见[本仓审查 issue](https://github.com/turlamai/podlens/issues/13)及家族[交付标准](https://github.com/turlamai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md)。未完成的跨平台、硬件或真实支付验证仍是显式门禁；本节不表示这些验证已通过。后续一次认领一个切片，证据回填本文件与 issue。
