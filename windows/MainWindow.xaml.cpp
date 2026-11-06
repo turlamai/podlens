@@ -959,8 +959,8 @@ void MainWindow::UpdateActionButtons() {
     MenuRemoveAudio().Visibility(Visibility::Collapsed);
     return;
   }
-  bool const transcript_running = episode->transcript_status == "running";
   PipelineButton().IsEnabled(true);
+  StyleBrandButton(PipelineButton(), true, /*strong=*/true);
   MenuMark().IsEnabled(true);
   // Delete Audio only makes sense while local audio exists (Linux parity)
   MenuRemoveAudio().Visibility(episode->downloaded ? Visibility::Visible
@@ -3161,6 +3161,7 @@ void MainWindow::ReturnToCurrent_Click(
     Microsoft::UI::Xaml::RoutedEventArgs const&) {
   follow_transcript_ = true;
   StyleBrandButton(FollowTranscriptButton(), true);
+  SetStatus(true, std::wstring(podlens::Tr("status.follow_on")));
   ScrollToCurrentTranscript();
 }
 
