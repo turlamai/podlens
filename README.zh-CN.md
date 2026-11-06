@@ -67,15 +67,17 @@ PodLens 基于 [Rivet](https://github.com/turlamai/rivet) 构建：一个共享�
 
 ## 都有什么
 
-- **一键听懂**：下载 → 转写 → 翻译 → 总结一次排队完成——已完成的阶段重跑时自动跳过，动手前还显示句数/字符数成本估算
+- **一键听懂**：下载 → 转写 → 翻译 → 总结一次排队完成——已完成的阶段重跑时自动跳过，确认页先给出大致文本量，运行中可在下一个检查点取消
 - 订阅 RSS 播客源（RSS 2.0 + iTunes 标签），刷新检测新单集，每 30 分钟自动刷新（macOS 弹新单集系统通知）
 - 播放：1.0–3.0× 倍速、±15/30 秒跳转、睡眠定时器、章节跳转（Podcasting 2.0 `podcast:chapters`）、连续播放接下一集、启动续播、系统媒体键 + Control Center（macOS）/ SMTC（Windows）/ MPRIS（Linux）
-- 逐句转写稿跟随播放高亮（点句子即跳转）；逐句对照翻译，双语 / 只看译文 / 只看原文三种视图
-- 结构化总结（TL;DR、要点、引用、话题），附 feed 自带的节目介绍
+- **阅读优先的详情页**：衬线逐句稿按阅读排版，跟随高亮，句子可用键盘操作；双语 / 只看译文 / 只看原文三种模式
+- **专注聆听**：收起资料库与单集列表而不中断播放，保留单集、进度和阅读位置；同一控件原位恢复资料库
+- 结构化总结卡片（TL;DR、要点、引用、话题），附 feed 自带的节目介绍
 - 媒体库基础：已播/未播标记、每档未播徽章、单集任务进度
 - 「发现」面板：经典英文播客精选目录 + 全目录搜索（iTunes Search API，无需密钥，结果自带 Apple 权威 feed 地址）——绝不自动订阅
 - 先试听再订阅：发现页每张卡片一键试听最新单集——只拉取 feed、缓存试听音频，不入库不订阅（`feed-peek` / `preview-audio`；CLI 对应 `peek`、`preview`）
 - 自带 key（BYOK）：OpenAI、DeepSeek、Groq、SiliconFlow、Ollama，任意 OpenAI 兼容端点
+- **密钥卫生**：key 存放在系统安全存储（macOS Keychain / Windows DPAPI / Linux Secret Service），不可用时回退为仅本人可读文件；不会写入 config.json 或 CLI 输出。设置页可在不消耗 token 的情况下检查连接
 - agent 友好的 CLI，与 GUI 共用同一核心（`add`、`episodes`、`pipeline`、
   `estimate`、`transcribe`、`translate`、`summarize`、`show`、`export`、
   `find`、`done`、`search`、`peek`、`preview`、`--json`、退出码 0/1/2）
@@ -89,11 +91,11 @@ PodLens 基于 [Rivet](https://github.com/turlamai/rivet) 构建：一个共享�
 打开设置，填写：
 
 - `api-base`——如 `https://api.openai.com/v1`（或 DeepSeek/Groq/Ollama 的地址）
-- `api-key`——你的 key，保存在本机 `~/.podlens/config.json`，从不同步
+- `api-key`——你的 key，存放在系统安全存储（不写入 `config.json`），从不同步；首次 AI 任务前先用「检查连接」
 
 ### 2. 开听
 
-添加播客 RSS 地址，选一集，点 **转写 → 翻译 → 总结**。或者在终端：
+添加播客 RSS 地址，选一集，点 **一键听懂**。或者在终端：
 
 ```bash
 git clone https://github.com/turlamai/podlens && cd podlens

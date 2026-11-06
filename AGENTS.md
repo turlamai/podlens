@@ -59,7 +59,7 @@ scripts/update-keys.sh
 
 | 位置 | 内容 |
 |---|---|
-| `app/backend.rkt` | RVT1 契约：21 个 RPC、5 个事件（notify/job-progress/episodes-changed/open-url/update-available）、State `version`。行布局是位置参数字符串，注释在文件头 |
+| `app/backend.rkt` | RVT1 契约：35 个 RPC、5 个事件（notify/job-progress/episodes-changed/open-url/update-available）、State `version`。行布局是位置参数字符串，注释在文件头。0.6 新增 `job-cancel`、`security-status`、`ai-test`；`settings-list` 对 `api-key` 只返回掩码 |
 | `docs/UPDATE.md` | 更新契约：清单 JSON schema、Ed25519 签名对象、资产命名、客户端行为 |
 | `rivet.rktd` | 发布身份唯一真源：version/build/identifier/最低系统版本。**tag 必须等于其中 version** |
 | CHANGELOG.md | 每个 tag 必须有同名小节，release 前置检查会拒绝 |
@@ -68,9 +68,10 @@ scripts/update-keys.sh
 
 ```
 ~/.podlens/            （测试/多实例用 PODLENS_DATA_DIR 覆盖）
-├── config.json        当前设置（含本地 API key；安全存储迁移见产品审查 issue）
+├── config.json        当前设置；API key 只留 api-key-ref/api-key-store
 ├── library.json       订阅 + 单集 + 播放进度（原子写）
 ├── audio/<id>.<ext>   音频缓存（<id> 是 40 位 hex）
+├── secrets/           系统安全存储不可用时的 0600 回退文件
 └── transcripts/<id>.json  逐句稿 + 翻译 + 总结
 ```
 
@@ -87,6 +88,13 @@ scripts/update-keys.sh
 
 ## 诚实缺口（不要在文档里夸口）
 
+- 0.6.0 的阅读优先视觉重构、原生设置窗口、取消按钮与系统安全存储
+  以 macOS 为实现基准；Windows / Linux 仍保留此前的视觉语言和设置
+  对话框。它们通过同一共享契约获得密钥迁移、掩码和取消 RPC，但
+  取消按钮与 0.6 视觉尚未接到两端 UI。
+- BYOK key 在 macOS 走 Keychain（`security -i`，密钥不进 argv）、Windows
+  走 DPAPI、Linux 走 secret-tool；都不可用时才降到 0600 文件，并在
+  设置页明确标注。CLI 与日志只显示掩码。
 - 0.4.0 起三端功能面对齐：发现页全目录搜索、逐句稿跟随高亮与
   双语/译文/原文切换、连续播放、睡眠定时、发现页一键试听、系统媒体
   集成（macOS 控制中心 / Windows SMTC / Linux MPRIS）、zh 界面，每端都有。
@@ -111,7 +119,7 @@ scripts/update-keys.sh
 ## 产品交付与下一步（2026-10-23）
 
 - 家族[交付标准](https://github.com/turlamai/turlamai.github.io/blob/master/docs/PRODUCT-STANDARD.md)与[组合策略](https://github.com/turlamai/turlamai.github.io/blob/master/PORTFOLIO.md)是共用政策；本仓具体行为以 `docs/DESIGN-ROADMAP.md` 为准，不复制五库依赖图。
-- 当前执行入口：[产品审查 issue](https://github.com/turlamai/podlens/issues/13)。v0.4.0 切片已进入 main；先完成 BYOK 安全存储迁移与三端发现/播放/转录取消恢复，桌面证据齐备后再评估移动端。
+- 当前执行入口：0.6.0 已完成 BYOK 安全存储迁移、作业取消、阅读模式/专注聆听和 macOS 视觉重构；后续切片见 `docs/DESIGN-ROADMAP.md` 的 M6 与诚实缺口。
 - 开工先检查干净工作树与远端，以 fast-forward-only 更新并记录 SHA；共享文件一次一个写入者，保留其他 checkout 的未提交工作。
 - 每次只完成一个可验收切片，记录 owned files、依赖 pin、命令/平台/产物证据和回滚。已实现、已发布、实机验收分别陈述；不修改 requirements 或复用旧证据来制造通过。
 

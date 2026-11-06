@@ -39,8 +39,10 @@
          "core/i18n.rkt"
          "core/itunes.rkt"
          "core/library.rkt"
+         "core/openai.rkt"
          "core/paths.rkt"
          "core/pipeline.rkt"
+         "core/secrets.rkt"
          "core/util.rkt"
          "schema.rkt"
          "version.rkt"
@@ -333,16 +335,50 @@
   (define j (job-get (current-jobs) job-id))
   (if j (jsexpr->string j) ""))
 
+;; Cooperative cancel: the stage in flight finishes its current provider
+;; request, then the job stops before the next billed batch.
+(define-rpc (job-cancel [job-id String] : Bool)
+  (and (job-cancel! (current-jobs) job-id) #t))
+
 ;; ---- settings ----------------------------------------------------------------------
 
+;; Settings rows for the host forms. `api-key` is always masked: a host
+;; never needs the credential itself, and an old host that echoes the mask
+;; back on save is a no-op rather than an accidental overwrite.
+(define (settings-row key)
+  (define c (config!)
+        )
+  (cond
+    [(equal? key "api-key")
+     (list key
+           (if (config-api-configured? c) secret-value-mask "")
+           (format "~a — stored in ~a, never synced"
+                   (config-description 'api-key)
+                   (config-secret-storage-label c)))]
+    [else
+     (list key
+           (format "~a" (config-get c key))
+           (config-description key))]))
+
 (define-rpc (settings-list : (List (List String)))
-  (define c (config!))
   (for/list ([key (in-list (config-user-keys))])
-    (list key
-          (format "~a" (config-get c key))
-          (for/or ([d (in-list (config-descriptions))]
-                   #:when (equal? (car d) key))
-            (cadr d)))))
+    (settings-row key)))
+
+;; Where the credential actually lives, so the UI can be honest about a
+;; file fallback instead of calling every store "secure".
+(define-rpc (security-status : String)
+  (define c (config!)
+        )
+  (define backend (config-secret-backend c))
+  (jsexpr->string
+   (hasheq 'backend (symbol->string backend)
+           'label (config-secret-storage-label c)
+           'secure (and (secret-backend-secure? backend) #t)
+           'configured (and (config-api-configured? c) #t))))
+
+;; Settings "Test connection": lists models without billing tokens.
+(define-rpc (ai-test : String)
+  (jsexpr->string (probe-provider (cfg!))))
 
 (define-rpc (settings-set [key String] [value String] : Bool)
   (define c (config!))
@@ -353,8 +389,14 @@
   ;; error pasted under a successful save
   (unless (member key (config-user-keys))
     #t)
-  (config-set! c key value)
-  #t)
+  ;; The mask is a placeholder, not a new credential: an old host that
+  ;; echoes every listed row back must not overwrite the real key with
+  ;; bullets.
+  (if (and (equal? key "api-key") (equal? value secret-value-mask))
+      #t
+      (begin
+        (config-set! c key value)
+        #t)))
 
 ;; ---- updates ---------------------------------------------------------------------------
 ;; Family pattern (docs/UPDATE.md): this backend verifies and downloads the

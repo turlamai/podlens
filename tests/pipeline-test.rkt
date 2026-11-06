@@ -20,6 +20,8 @@
          (file "../app/core/pipeline.rkt"))
 
 (putenv "PODLENS_DATA_DIR" (path->string (make-temporary-file "podlens-test~a" 'directory)))
+;; Never touch a real OS vault in tests.
+(putenv "PODLENS_SECRET_BACKEND" "file")
 (library-load!)
 
 ;; ---- fake server ---------------------------------------------------------
@@ -314,3 +316,43 @@
 
 ;; raco test waits for all threads; the fake server must not outlive the test
 (kill-thread server-thread)
+
+(test-case "cancelling a job stops it at the next checkpoint"
+  (define emitted '())
+  (define jm (make-job-manager
+              (lambda (_id _kind _pct message)
+                (set! emitted (cons message emitted)))))
+  (define job-id
+    (job-start! jm "transcribe" "episode-cancel"
+                (lambda (progress)
+                  (progress 5 "first")
+                  (sleep 0.5)
+                  (progress 50 "should-not-run")
+                  (progress 100 "finished"))))
+  (sleep 0.1)
+  (check-true (job-cancel! jm job-id))
+  ;; already cancelled: a second request is a no-op
+  (check-false (job-cancel! jm job-id))
+  (let loop ([tries 0])
+    (define j (job-get jm job-id))
+    (cond
+      [(and j (equal? (hash-ref j 'status) "running") (< tries 100))
+       (sleep 0.05)
+       (loop (add1 tries))]
+      [else
+       (check-not-false j)
+       (check-equal? (hash-ref j 'status) "cancelled")]))
+  ;; the progress sink after the cancel point never ran
+  (check-false (member "should-not-run" emitted))
+  (check-false (member "finished" emitted)))
+
+(test-case "a finished job cannot be cancelled"
+  (define jm (make-job-manager (lambda (_id _kind _pct _message) (void))))
+  (define job-id (job-start! jm "download" "episode-done" (lambda (progress) (progress 100 "ok"))))
+  (let loop ([tries 0])
+    (when (and (< tries 100)
+               (equal? (hash-ref (job-get jm job-id) 'status) "running"))
+      (sleep 0.02)
+      (loop (add1 tries))))
+  (check-equal? (hash-ref (job-get jm job-id) 'status) "done")
+  (check-false (job-cancel! jm job-id)))

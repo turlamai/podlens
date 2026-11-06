@@ -17,12 +17,17 @@ Use [official Releases](https://github.com/turlamai/podlens/releases), select an
 ## Your first successful session
 
 1. Search Discover or add a podcast RSS URL, then play an episode without starting AI jobs.
-2. Choose providers appropriate for audio transcription and text translation; they may require different model capabilities.
-3. Test a short episode, inspect usage, then check transcript export and playback recovery before processing a large library.
+2. Open Settings → Intelligence, enter an OpenAI-compatible base URL and key, and use **Test connection** to check the saved configuration before spending tokens.
+3. Choose providers appropriate for audio transcription and text translation; they may require different model capabilities.
+4. Press **Understand** on an episode. The confirmation shows the stages already done and the approximate text volume before anything is billed; **Cancel** stops a running job at its next checkpoint.
+5. Read with the transcript toolbar: Bilingual, Translation or Original, plus Follow and Current. **Focus Listening** hides the library and episode lists without interrupting playback, and restores them in place.
+6. Test a short episode, inspect usage, then check transcript export and playback recovery before processing a large library.
 
 ## Data, backup and recovery
 
-Data normally lives in ~/.podlens: config.json, library.json, audio/ and transcripts/. Quit before backup. config.json currently contains the API key in local storage; secure-storage migration is pending. Keep it out of shared backups, or encrypt the backup and rotate an exposed key.
+Data normally lives in ~/.podlens: config.json, library.json, audio/ and transcripts/. Quit before backup.
+
+The API key is not written to config.json. On first launch after upgrading, a plaintext key from an earlier version is moved once into the operating-system vault (macOS Keychain, Windows DPAPI or Linux Secret Service); config.json then keeps only an opaque reference. If no vault is available, the key is stored under `secrets/` in a file readable only by your account and the app says so in Settings. A backup of config.json is therefore not a backup of the key: re-enter the key in Settings after restoring on another machine, or restore the vault entry through your OS. Do not copy `secrets/` into shared backups, and rotate a key that has been exposed.
 
 ## Network, keys and privacy
 
@@ -30,7 +35,7 @@ RSS, directory search and audio downloads contact their respective hosts. Transc
 
 ## Known limits
 
-Cancellation/recovery, secure storage and three-host packaged evidence remain tracked in #13. Windows MSI updates use a new installer rather than silently replacing the installation.
+Long-job cancellation is implemented in the shared core and exposed on macOS; the Windows and Linux hosts expose Focus Listening and transcript seeking but not the cancel button yet. Windows MSI updates use a new installer rather than silently replacing the installation. The 0.6 reading-first visual redesign is the macOS reference; Windows and Linux keep their previous visual language until their next UI slice.
 
 ## Updates and removal
 

@@ -198,7 +198,9 @@ do {
     }
     try press(settingsMenuItem, "Settings menu item")
     let field: AXUIElement = try waitFor("chat-model settings field") {
-        findField(application, label: "chat-model")
+        findIdentifier(application, "SettingsChatModelField")
+            ?? findField(application, label: "Translation and summary model")
+            ?? findField(application, label: "翻译与总结模型")
     }
     try replaceText(field, with: "acceptance-model", pid: pid)
     _ = try waitFor("chat-model edit committed to the native field") {
@@ -217,15 +219,14 @@ do {
     }
 
     try writeJSON(snapshot(application), to: output.appendingPathComponent("accessibility.json"))
-    // AppKit defers application termination while a SwiftUI modal sheet is
-    // presented. Dismiss the settings sheet through its native button before
-    // exercising the application menu's Quit command.
-    let closeSettings: AXUIElement = try waitFor("settings cancel button") {
-        findButton(application, titles: ["Cancel", "取消"])
+    // Settings is a native window, so close it through its own button
+    // before exercising the application menu's Quit command.
+    let closeSettings: AXUIElement = try waitFor("settings close button") {
+        findButton(application, titles: ["Close", "关闭"])
     }
-    try press(closeSettings, "settings cancel")
-    _ = try waitFor("settings sheet dismissal") {
-        findField(application, label: "chat-model") == nil ? true : nil
+    try press(closeSettings, "settings close")
+    _ = try waitFor("settings window dismissal") {
+        findIdentifier(application, "SettingsChatModelField") == nil ? true : nil
     }
     let quitMenuItem: AXUIElement = try waitFor("Quit PodLens menu item") {
         findMenuItem(application, titles: ["Quit PodLens", "退出 PodLens"])
@@ -242,7 +243,7 @@ do {
             "press:Settings menu item",
             "set:chat-model",
             "press:Saved",
-            "press:Cancel",
+            "press:Close",
             "press:Quit PodLens",
         ],
         "assertions": [
@@ -251,10 +252,10 @@ do {
             "focus mode hid and restored the library without reloading the episode",
             "activating a transcript sentence moved playback to 00:04",
             "Current remained operable after the listener turned follow off",
-            "settings field exposed a stable accessibility label",
+            "settings field exposed a stable accessibility identifier",
             "save mutation crossed RVT1 into the embedded backend",
             "isolated config.json contains acceptance-model",
-            "settings sheet dismissed before native application termination",
+            "settings window dismissed before native application termination",
             "native application accepted termination",
         ],
     ], to: output.appendingPathComponent("interaction-trace.json"))

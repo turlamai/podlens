@@ -5,6 +5,40 @@ All notable changes to PodLens are documented here. Format follows
 
 ## 0.5.0 - 2026-10-30
 
+### Added
+- **A reading-first macOS redesign.** The 0.6 shell is rebuilt around one
+  reading surface: a warm-paper canvas, a brand-tinted sidebar, large page
+  titles, an ambient episode header, a serif transcript with a real reading
+  measure, a designed summary card, a three-zone player bar and native
+  Settings. Focus Listening animates the library and episode columns to zero
+  width without rebuilding the detail view, so the episode, playback position
+  and reading scroll survive the round trip. All controls keep stable
+  accessibility identifiers and 1024×768 layouts are clipped-free.
+- **Secure BYOK storage with one-time migration.** A plaintext `api-key` from
+  ≤0.5.x is moved on first open into the macOS Keychain (via `security -i`,
+  so the secret never enters argv), Windows DPAPI, or the Linux Secret
+  Service. `config.json` keeps only `api-key-ref` / `api-key-store`; when no
+  OS vault exists the key falls back to an owner-only `0600` file and the
+  Settings window says so explicitly. Hosts and the CLI see only a mask;
+  echoing the mask back is a no-op, so an old host cannot overwrite or leak
+  the credential.
+- **Cancellable AI jobs.** `job-cancel` stops a download/transcribe/
+  translate/summarize/pipeline job at its next progress checkpoint; the
+  stage in flight is allowed to finish its current provider request, and no
+  further billed batch is sent. The episode header shows stage, percentage
+  and Cancel; cancelled work persists already-finished translation batches,
+  so a re-run continues instead of re-billing. The new `job-cancel`,
+  `security-status` and `ai-test` RPCs are additive contract changes.
+- **Native Settings and connection check.** Settings is a real macOS
+  Settings window (Library / General / Intelligence / Advanced / About)
+  with human labels, masked credential entry, vault status, data-folder
+  actions and a `/models` probe that validates the saved base URL and key
+  without billing tokens.
+- **Offline, deterministic design evidence.** A snapshot harness renders
+  Home, episode list, reading surface, Discover and every Settings tab into
+  PNGs without Screen Recording permission; `scripts/e2e/seed-showcase.rkt`
+  builds the synthetic bilingual library used for the 0.6 screenshots.
+
 ### Fixed
 - **Real podcast audio downloads.** The audio downloader re-requested the
   first URL on every redirect hop instead of the redirect target, so any
@@ -49,7 +83,7 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
-## [Unreleased]
+## 0.6.0 - 2026-11-06
 
 ### Added
 - **Focus Listening across macOS, Windows and Linux.** An episode can now
