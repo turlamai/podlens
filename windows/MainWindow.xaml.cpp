@@ -3151,6 +3151,8 @@ void MainWindow::FollowTranscript_Click(
     Microsoft::UI::Xaml::RoutedEventArgs const&) {
   follow_transcript_ = !follow_transcript_;
   StyleBrandButton(FollowTranscriptButton(), follow_transcript_);
+  SetStatus(true, std::wstring(podlens::Tr(
+      follow_transcript_ ? "status.follow_on" : "status.follow_off")));
   if (follow_transcript_) ScrollToCurrentTranscript();
 }
 

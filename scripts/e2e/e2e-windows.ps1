@@ -263,12 +263,15 @@ try {
         if ($position -and $position.Current.Name -eq '00:04') { return $true }
         return $false
     })
-    $follow = Wait-Until 'follow transcript toggle' { Find-ById $window 'FollowTranscriptButton' }
+    $follow = Wait-Until 'follow transcript control' { Find-ById $window 'FollowTranscriptButton' }
     Activate-Control $follow
-    $toggle = $follow.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-    if ($toggle.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::Off) {
-        throw 'follow transcript toggle did not turn off'
-    }
+    [void](Wait-Until 'follow transcript off status' {
+        $status = Find-ById $window 'StatusLine'
+        if ($status -and $status.Current.Name -match 'Following is off|跟随已关闭') {
+            return $true
+        }
+        return $false
+    })
     Save-WindowScreenshot $process (Join-Path $output 'listening-focus-1024x768.png')
     $current = Wait-Until 'return to current sentence button' {
         Find-ById $window 'ReturnToCurrentButton'
@@ -347,7 +350,7 @@ try {
             'toggle:FocusModeButton',
             'invoke:PlayPauseButton',
             'keyboard:Enter:TranscriptSegment-2',
-            'toggle:FollowTranscriptButton:off',
+            'press:FollowTranscriptButton:off',
             'capture:listening-focus-1024x768.png',
             'invoke:ReturnToCurrentButton',
             'toggle:FocusModeButton:restore',
