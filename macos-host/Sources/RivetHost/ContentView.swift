@@ -74,21 +74,33 @@ struct MainWindow: View {
                     : min(500, max(430, geometry.size.width * 0.38))
 
                 HStack(spacing: 0) {
-                    SidebarView()
-                        .frame(width: sidebarWidth)
-                        .opacity(store.focusMode ? 0 : 1)
-                        .clipped()
-                        .allowsHitTesting(!store.focusMode)
+                    // Removing the sidebar/content from the hierarchy in
+                    // focus mode (rather than shrinking a live sidebar List
+                    // to zero) avoids driving AppKit's visual-effect layers
+                    // at a degenerate size on machines without Metal.
+                    Group {
+                        if store.focusMode {
+                            Color.clear
+                        } else {
+                            SidebarView()
+                        }
+                    }
+                    .frame(width: sidebarWidth)
+                    .clipped()
 
                     Divider()
                         .opacity(store.focusMode ? 0 : 1)
                         .frame(width: store.focusMode ? 0 : 0.7)
 
-                    ContentColumn()
-                        .frame(width: contentWidth)
-                        .opacity(store.focusMode ? 0 : 1)
-                        .clipped()
-                        .allowsHitTesting(!store.focusMode)
+                    Group {
+                        if store.focusMode {
+                            Color.clear
+                        } else {
+                            ContentColumn()
+                        }
+                    }
+                    .frame(width: contentWidth)
+                    .clipped()
 
                     Divider()
                         .opacity(store.focusMode ? 0 : 1)
