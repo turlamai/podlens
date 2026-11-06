@@ -241,6 +241,20 @@ std::vector<std::pair<std::wstring, std::wstring>> json_array_objects(
   return out;
 }
 
+char const* SettingLabelKey(std::string const& key) {
+  if (key == "api-base") return "settings.field.api_base";
+  if (key == "api-key") return "settings.field.api_key";
+  if (key == "chat-model") return "settings.field.chat_model";
+  if (key == "asr-model") return "settings.field.asr_model";
+  if (key == "target-lang") return "settings.field.target_lang";
+  if (key == "ui-lang") return "settings.field.ui_lang";
+  if (key == "asr-chunk-seconds") return "settings.field.chunk_seconds";
+  if (key == "max-transcript-chars") return "settings.field.max_chars";
+  if (key == "check-updates-enabled") return "settings.field.check_updates";
+  if (key == "search-limit") return "settings.field.search_limit";
+  return nullptr;
+}
+
 std::wstring FormatSeconds(double seconds) {
   if (seconds < 0 || !std::isfinite(seconds)) seconds = 0;
   wchar_t buffer[16];
@@ -295,8 +309,16 @@ MainWindow::MainWindow() {
   EpisodesEmptyTitle().Text(std::wstring(podlens::Tr("empty.episodes_title")));
   EpisodesEmptyHint().Text(std::wstring(podlens::Tr("empty.episodes_hint")));
   MenuRemoveAudio().Text(std::wstring(podlens::Tr("action.remove_audio")));
-  BilingualToggle().Content(box_value(winrt::hstring(
-      std::wstring(podlens::Tr("mode.bilingual")))));
+  for (char const* key : {"mode.bilingual", "mode.translation", "mode.original"}) {
+    ReadingModeSelector().Items().Append(box_value(
+        winrt::hstring(std::wstring(podlens::Tr(key)))));
+  }
+  ReadingModeSelector().SelectedIndex(0);
+  CancelJobButton().Content(box_value(
+      winrt::hstring(std::wstring(podlens::Tr("action.cancel")))));
+  muxc::ToolTipService::SetToolTip(
+      CancelJobButton(), box_value(winrt::hstring(
+          std::wstring(podlens::Tr("action.cancel_hint")))));
   FocusModeButton().Content(box_value(winrt::hstring(
       std::wstring(podlens::Tr("focus.enter")))));
   FollowTranscriptButton().Content(box_value(winrt::hstring(
@@ -528,7 +550,27 @@ void MainWindow::ShowPage(Page page) {
   if (page == Page::Home) RenderHomePage();
   if (page == Page::Shows) RenderShowsPage();
   if (page == Page::Downloaded) RenderDownloadedPage();
+  UpdatePageHeader();
   UpdateDetailVisibility();
+}
+
+void MainWindow::UpdatePageHeader() {
+  std::wstring title;
+  switch (page_) {
+    case Page::Home: title = std::wstring(podlens::Tr("nav.home")); break;
+    case Page::Discover: title = std::wstring(podlens::Tr("nav.discover")); break;
+    case Page::Recent: title = std::wstring(podlens::Tr("library.recent")); break;
+    case Page::Shows: title = std::wstring(podlens::Tr("library.shows")); break;
+    case Page::Downloaded: title = std::wstring(podlens::Tr("library.downloaded")); break;
+    case Page::Episodes: {
+      auto const* feed = FeedById(SelectedFeedId());
+      title = feed ? to_wide(feed->title) : std::wstring(podlens::Tr("episodes.header"));
+      break;
+    }
+  }
+  PageHeaderTitle().Text(winrt::hstring(title));
+  PageHeaderTitle().Visibility(focus_listening_ ? Visibility::Collapsed
+                                                : Visibility::Visible);
 }
 
 void MainWindow::UpdateDetailVisibility() {
@@ -961,6 +1003,8 @@ void MainWindow::RenderTranscript() {
     original.FontSize(15);
     original.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
     original.IsTextSelectionEnabled(true);
+    original.Visibility((reading_mode_ == 1) ? Visibility::Collapsed
+                                             : Visibility::Visible);
 
     muxc::TextBlock translation;
     translation.Text(winrt::hstring(to_wide(seg[3])));
@@ -970,7 +1014,8 @@ void MainWindow::RenderTranscript() {
                                .Resources()
                                .Lookup(box_value(winrt::hstring(L"AppInkSoftBrush")))
                                .as<Microsoft::UI::Xaml::Media::Brush>());
-    translation.Visibility(bilingual_ ? Visibility::Visible : Visibility::Collapsed);
+    translation.Visibility((reading_mode_ == 2) ? Visibility::Collapsed
+                                                : Visibility::Visible);
 
     muxc::StackPanel lines;
     lines.Spacing(3);
@@ -978,6 +1023,7 @@ void MainWindow::RenderTranscript() {
     if (!seg[3].empty()) lines.Children().Append(translation);
     if (lines.Children().Size() == 0) continue;
 
+    if (!seg[2].empty()) original_blocks_.push_back(original);
     if (!seg[3].empty()) translation_blocks_.push_back(translation);
 
     muxc::Grid grid;
@@ -1036,8 +1082,13 @@ void MainWindow::RenderTranscript() {
 }
 
 void MainWindow::ApplyMode() {
+  bool const show_original = reading_mode_ != 1;
+  bool const show_translation = reading_mode_ != 2;
+  for (auto const& block : original_blocks_) {
+    block.Visibility(show_original ? Visibility::Visible : Visibility::Collapsed);
+  }
   for (auto const& block : translation_blocks_) {
-    block.Visibility(bilingual_ ? Visibility::Visible : Visibility::Collapsed);
+    block.Visibility(show_translation ? Visibility::Visible : Visibility::Collapsed);
   }
 }
 
@@ -2232,6 +2283,17 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
       });
       return;
     }
+
+    dispatcher.TryEnqueue([weak, job_id] {
+      if (auto window = weak.get()) {
+        window->active_job_id_ = job_id;
+        window->job_running_ = true;
+        window->CancelJobButton().Visibility(Visibility::Visible);
+        window->JobProgress().Visibility(Visibility::Visible);
+        window->JobProgress().Value(0);
+      }
+    });
+
     // Poll until the job leaves "running". The 100ms cadence is load-bearing
     // on Windows: the embedded Racket place shares one OS thread between the
     // pipe reader (blocking read) and every green thread, so background job
@@ -2239,23 +2301,64 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
     // scheduling window — without this cadence a pipeline job freezes at its
     // first network I/O (issue #21). 100ms keeps the reader's UI latency
     // imperceptible while the job makes steady progress.
+    std::string terminal = "done";
+    std::string terminal_message;
+    int last_pct = -1;
     for (;;) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       if (!weak.get()) return;
       try {
         auto const status_json = weak.get()->api_->job_status(job_id).get();
-        if (status_json.find("\"running\"") == std::string::npos) break;
+        std::regex const status_re("\"status\"\\s*:\\s*\"([^\"]*)\"");
+        std::regex const pct_re("\"pct\"\\s*:\\s*([0-9]+)");
+        std::regex const message_re("\"message\"\\s*:\\s*\"([^\"]*)\"");
+        std::smatch match;
+        std::string status = "running";
+        if (std::regex_search(status_json, match, status_re)) status = match[1].str();
+        int pct = 0;
+        if (std::regex_search(status_json, match, pct_re)) pct = std::stoi(match[1].str());
+        std::string message;
+        if (std::regex_search(status_json, match, message_re)) message = match[1].str();
+        if (status != "running") {
+          terminal = status;
+          terminal_message = message;
+          break;
+        }
+        if (pct != last_pct) {
+          last_pct = pct;
+          dispatcher.TryEnqueue([weak, pct, message] {
+            if (auto window = weak.get()) {
+              window->JobProgress().Value(pct);
+              std::wstring line = std::wstring(podlens::Tr("action.pipeline"));
+              line += L" · " + std::to_wstring(pct) + L"%";
+              if (!message.empty()) line += L" — " + to_wide(message);
+              window->SetStatus(true, line);
+            }
+          });
+        }
       } catch (std::exception const&) {
+        terminal = "error";
         break;
       }
     }
-    dispatcher.TryEnqueue([weak, kind, episode_id] {
+
+    dispatcher.TryEnqueue([weak, kind, episode_id, terminal, terminal_message] {
       if (auto window = weak.get()) {
+        window->active_job_id_.clear();
+        window->job_running_ = false;
+        window->CancelJobButton().Visibility(Visibility::Collapsed);
+        window->JobProgress().Visibility(Visibility::Collapsed);
+        if (terminal == "cancelled") {
+          window->SetStatus(true, std::wstring(podlens::Tr("status.cancelled")));
+        } else if (terminal == "error") {
+          window->SetStatus(false, terminal_message.empty()
+              ? std::wstring(podlens::Tr("status.failed"))
+              : to_wide(terminal_message));
+        }
         window->ReloadRecent();
         window->ReloadEpisodes();
         if (window->selected_episode_id_ == episode_id) {
-          if (kind == "transcribe" || kind == "translate" ||
-              kind == "pipeline") {
+          if (kind == "transcribe" || kind == "translate" || kind == "pipeline") {
             window->LoadTranscript();
           }
           if (kind == "summarize" || kind == "pipeline") {
@@ -2324,10 +2427,37 @@ void MainWindow::EpisodeList_SelectionChanged(
   UpdatePlayerInfo();
 }
 
-void MainWindow::Bilingual_Click(winrt::Windows::Foundation::IInspectable const&,
-                                 Microsoft::UI::Xaml::RoutedEventArgs const&) {
-  bilingual_ = BilingualToggle().IsChecked().Value();
+void MainWindow::ReadingMode_SelectionChanged(
+    winrt::Windows::Foundation::IInspectable const&,
+    Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&) {
+  if (!initialized_) return;
+  int const index = ReadingModeSelector().SelectedIndex();
+  reading_mode_ = (index >= 0 && index <= 2) ? index : 0;
   ApplyMode();
+}
+
+void MainWindow::CancelJob_Click(winrt::Windows::Foundation::IInspectable const&,
+                                 Microsoft::UI::Xaml::RoutedEventArgs const&) {
+  if (!api_ || active_job_id_.empty()) return;
+  auto const job_id = active_job_id_;
+  SetStatus(true, std::wstring(podlens::Tr("status.cancelling")));
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  std::thread([weak, dispatcher, job_id]() mutable {
+    std::string error;
+    if (weak.get()) {
+      try {
+        weak.get()->api_->job_cancel(job_id).get();
+      } catch (std::exception const& e) {
+        error = e.what();
+      }
+    }
+    dispatcher.TryEnqueue([weak, error] {
+      if (auto window = weak.get()) {
+        if (!error.empty()) window->SetStatus(false, to_wide(error));
+      }
+    });
+  }).detach();
 }
 
 void MainWindow::AddFeed_Click(winrt::Windows::Foundation::IInspectable const&,
@@ -2978,6 +3108,8 @@ void MainWindow::FocusMode_Click(
   Nav().PaneDisplayMode(focus_listening_
       ? muxc::NavigationViewPaneDisplayMode::LeftMinimal
       : muxc::NavigationViewPaneDisplayMode::Left);
+  PageHeaderTitle().Visibility(focus_listening_ ? Visibility::Collapsed
+                                                : Visibility::Visible);
   FocusModeButton().Content(box_value(winrt::hstring(std::wstring(
       podlens::Tr(focus_listening_ ? "focus.exit" : "focus.enter")))));
   muxc::ToolTipService::SetToolTip(
@@ -3062,6 +3194,7 @@ void MainWindow::RunSettingsDialog() {
   std::thread([weak, dispatcher]() mutable {
     std::string error;
     std::string version;
+    std::string security;
     std::vector<std::vector<std::string>> rows;
     if (weak.get()) {
       try {
@@ -3074,12 +3207,17 @@ void MainWindow::RunSettingsDialog() {
       } catch (...) {
         // The About block degrades to no version line; settings still show.
       }
+      try {
+        security = weak.get()->api_->security_status().get();
+      } catch (...) {
+        // Older backend: the storage note is simply absent.
+      }
     }
     dispatcher.TryEnqueue(
         [weak, rows = std::move(rows), version = std::move(version),
-         error]() mutable {
+         security = std::move(security), error]() mutable {
           if (auto window = weak.get()) {
-            window->ShowSettingsDialog(rows, version, error);
+            window->ShowSettingsDialog(rows, version, security, error);
           }
         });
   }).detach();
@@ -3087,6 +3225,7 @@ void MainWindow::RunSettingsDialog() {
 
 void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
                                     std::string const& version,
+                                    std::string const& security,
                                     std::string const& error) {
   if (!error.empty()) {
     SetStatus(false, to_wide(error));
@@ -3097,11 +3236,48 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
   std::vector<std::pair<std::string, muxc::TextBox>> fields;
   muxc::StackPanel panel;
   panel.Spacing(12);
+
+  // Where the BYOK credential actually lives. Never render the key itself.
+  if (!security.empty()) {
+    bool const configured = security.find("\"configured\":true") != std::string::npos;
+    bool const secure = security.find("\"secure\":true") != std::string::npos;
+    std::string label;
+    std::smatch label_match;
+    std::regex const label_re("\"label\"\\s*:\\s*\"([^\"]*)\"");
+    if (std::regex_search(security, label_match, label_re)) {
+      label = label_match[1].str();
+    }
+    wchar_t note_buffer[512];
+    if (!configured) {
+      swprintf_s(note_buffer, _countof(note_buffer), L"%s",
+                 std::wstring(podlens::Tr("settings.storage_none")).c_str());
+    } else if (secure) {
+      swprintf_s(note_buffer, _countof(note_buffer),
+                 std::wstring(podlens::Tr("settings.storage_secure")).c_str(),
+                 to_wide(label).c_str());
+    } else {
+      swprintf_s(note_buffer, _countof(note_buffer),
+                 std::wstring(podlens::Tr("settings.storage_file")).c_str(),
+                 to_wide(label).c_str());
+    }
+    muxc::TextBlock storage_note;
+    storage_note.Text(winrt::hstring(note_buffer));
+    storage_note.FontSize(12);
+    storage_note.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+    storage_note.Foreground(Microsoft::UI::Xaml::Application::Current().Resources()
+        .Lookup(box_value(winrt::hstring(secure ? L"AppPositiveBrush" : L"AppDangerBrush")))
+        .as<Microsoft::UI::Xaml::Media::Brush>());
+    panel.Children().Append(storage_note);
+  }
+
   for (auto const& row : rows) {
     if (row.size() < 2) continue;
 
     muxc::TextBlock key_label;
-    key_label.Text(winrt::hstring(to_wide(row[0])));
+    char const* label_key = SettingLabelKey(row[0]);
+    std::wstring const label = label_key
+        ? std::wstring(podlens::Tr(label_key)) : to_wide(row[0]);
+    key_label.Text(winrt::hstring(label));
     key_label.FontSize(13);
     key_label.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
 

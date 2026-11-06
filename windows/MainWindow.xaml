@@ -30,6 +30,11 @@
                         SelectionChanged="Nav_SelectionChanged"
                         ItemInvoked="Nav_ItemInvoked">
 
+            <NavigationView.Header>
+                <TextBlock x:Name="PageHeaderTitle" FontSize="26" FontWeight="Bold"
+                           Margin="20,8,20,2" />
+            </NavigationView.Header>
+
             <NavigationView.PaneHeader>
                 <StackPanel Margin="16,12,16,8" Spacing="4">
                     <TextBlock Text="PodLens" FontSize="20" FontWeight="SemiBold"
@@ -64,7 +69,7 @@
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 
-            <Grid x:Name="ContentLayout">
+            <Grid x:Name="ContentLayout" Background="{ThemeResource AppCanvasBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="430" />
                     <ColumnDefinition Width="Auto" />
@@ -207,6 +212,10 @@
                             <Button x:Name="PipelineButton" Padding="10,4" Click="Pipeline_Click"
                                     Background="{ThemeResource AppAccentBrush}" Foreground="White"
                                     BorderThickness="0" />
+                            <Button x:Name="CancelJobButton" Padding="10,4"
+                                    Click="CancelJob_Click" Visibility="Collapsed" />
+                            <ProgressBar x:Name="JobProgress" Width="110" Minimum="0" Maximum="100"
+                                         VerticalAlignment="Center" Visibility="Collapsed" />
                             <Button x:Name="MoreButton" Padding="10,4">
                                 <Button.Flyout>
                                     <MenuFlyout>
@@ -222,8 +231,8 @@
 
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4"
                                     VerticalAlignment="Center" Margin="0,0,0,6">
-                            <ToggleButton x:Name="BilingualToggle" IsChecked="True"
-                                          Click="Bilingual_Click" />
+                            <ComboBox x:Name="ReadingModeSelector" MinWidth="132"
+                                      SelectionChanged="ReadingMode_SelectionChanged" />
                             <ToggleButton x:Name="FollowTranscriptButton" Margin="12,0,0,0"
                                           IsChecked="True" Click="FollowTranscript_Click" />
                             <Button x:Name="ReturnToCurrentButton"
@@ -254,7 +263,7 @@
         <!-- persistent player bar -->
         <Border Grid.Row="3" x:Name="PlayerBar" Visibility="Collapsed"
                 BorderThickness="0,1,0,0" BorderBrush="{ThemeResource AppLineBrush}"
-                Background="{ThemeResource AppCardBrush}" Padding="16,10">
+                Background="{ThemeResource AppSurfaceBrush}" Padding="16,10">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

@@ -79,8 +79,11 @@ struct MainWindow : MainWindowT<MainWindow> {
                            Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const&);
   void FocusMode_Click(winrt::Windows::Foundation::IInspectable const&,
                        Microsoft::UI::Xaml::RoutedEventArgs const&);
-  void Bilingual_Click(winrt::Windows::Foundation::IInspectable const&,
-      Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void ReadingMode_SelectionChanged(
+      winrt::Windows::Foundation::IInspectable const&,
+      Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+  void CancelJob_Click(winrt::Windows::Foundation::IInspectable const&,
+                       Microsoft::UI::Xaml::RoutedEventArgs const&);
   void FollowTranscript_Click(winrt::Windows::Foundation::IInspectable const&,
                               Microsoft::UI::Xaml::RoutedEventArgs const&);
   void ReturnToCurrent_Click(winrt::Windows::Foundation::IInspectable const&,
@@ -160,6 +163,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   void RenderSummary();
   void RenderDetailHeader();
   void UpdateDetailVisibility();
+  void UpdatePageHeader();
   void UpdateActionButtons();
   void UpdatePlayerInfo();
   void HighlightRunningSegment(double position_seconds);
@@ -210,8 +214,6 @@ struct MainWindow : MainWindowT<MainWindow> {
                             std::wstring const& show, std::wstring const& artwork);
   void AddFromCatalog(std::string const& url);
   void RunSettingsDialog();
-  void ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
-                          std::string const& error);
   void MarkFromMenu(winrt::Windows::Foundation::IInspectable const& sender,
                     wchar_t const* done);
 
@@ -240,6 +242,7 @@ struct MainWindow : MainWindowT<MainWindow> {
                         std::wstring const& copy_button = std::wstring());
   void ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
                           std::string const& version,
+                          std::string const& security_json,
                           std::string const& error);
 
   struct ChapterMark {
@@ -257,14 +260,19 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::string selected_feed_id_;
   std::string selected_episode_id_;
   bool suppress_nav_ = false;
-  bool bilingual_ = true;  // off: original only
+  // 0 bilingual, 1 translation only, 2 original only
+  int reading_mode_ = 0;
   bool focus_listening_ = false;
   bool follow_transcript_ = true;
+  // job whose progress the detail header is tracking; empty when idle
+  std::string active_job_id_;
+  bool job_running_ = false;
 
   // segment borders for playback highlight; index == transcript_ index
   std::vector<Microsoft::UI::Xaml::Controls::Border> segment_borders_;
   std::vector<Microsoft::UI::Xaml::Controls::Button> segment_buttons_;
   std::vector<Microsoft::UI::Xaml::Controls::TextBlock> translation_blocks_;
+  std::vector<Microsoft::UI::Xaml::Controls::TextBlock> original_blocks_;
   int highlighted_segment_ = -1;
   // true while a feed-peek audition owns the player (no library episode)
   bool preview_active_ = false;

@@ -223,6 +223,28 @@ char const* tr(char const* key) {
       {"action.added", "已订阅", "Added"},
       {"action.preview", "试听", "Preview"},
       {"mode.bilingual", "双语", "Bilingual"},
+      {"mode.translation", "译文", "Translation"},
+      {"mode.original", "原文", "Original"},
+      {"action.cancel_job", "取消作业", "Cancel job"},
+      {"action.cancel_job_hint", "在当前检查点停止，不再发送新的计费批次",
+       "Stop at the next checkpoint; no further billed batch is sent"},
+      {"status.cancelling", "正在取消…", "Cancelling…"},
+      {"status.cancelled", "作业已取消", "Job cancelled"},
+      {"settings.storage_secure", "密钥保存在 %s，不会写入配置文件。",
+       "The key is stored in %s, never in the config file."},
+      {"settings.storage_file", "系统安全存储不可用，密钥写在 %s（仅本人可读）。",
+       "No OS vault available; the key is in %s (owner-readable only)."},
+      {"settings.storage_none", "还没有保存 API key。", "No API key saved yet."},
+      {"settings.field.api_base", "API 地址", "API base URL"},
+      {"settings.field.api_key", "API key", "API key"},
+      {"settings.field.chat_model", "翻译与总结模型", "Translation and summary model"},
+      {"settings.field.asr_model", "语音转写模型", "Speech-to-text model"},
+      {"settings.field.target_lang", "翻译语言", "Translate into"},
+      {"settings.field.ui_lang", "CLI 语言", "CLI language"},
+      {"settings.field.chunk_seconds", "分段长度（秒）", "Chunk length (seconds)"},
+      {"settings.field.max_chars", "总结输入上限（字符）", "Summary input limit (characters)"},
+      {"settings.field.check_updates", "自动检查更新", "Check for updates automatically"},
+      {"settings.field.search_limit", "搜索返回条数", "Search result limit"},
       {"focus.enter", "专注聆听", "Focus Listening"},
       {"focus.exit", "显示资料库", "Show Library"},
       {"focus.enter_hint", "收起导航与单集列表，专注逐句稿和播放器",
@@ -408,6 +430,7 @@ struct AppState {
   GtkLabel* detail_notes{nullptr};
   GtkProgressBar* job_bar{nullptr};
   GtkLabel* job_label{nullptr};
+  GtkButton* job_cancel_button{nullptr};
   GtkBox* transcript_box{nullptr};
   GtkBox* summary_box{nullptr};
 
@@ -452,6 +475,8 @@ struct AppState {
   // The one job whose progress the pipeline bar is tracking.
   std::string active_job_id;
   std::string active_job_episode;
+  // security-status JSON, fetched at startup and after settings save
+  std::string security_json;
 
   // Playback (GStreamer playbin over the local audio cache).
   GstElement* playbin{nullptr};
@@ -464,8 +489,9 @@ struct AppState {
   bool user_seeking{false};
   std::vector<ChapterMark> chapters;
 
-  // Transcript reading: show the line-by-line translation under the original.
+  // Transcript reading: line-by-line translation and/or the original.
   bool transcript_bilingual{true};
+  bool transcript_original{true};
   // Segment widgets parallel to the rendered transcript rows; the player
   // tick highlights and follows the running sentence among them.
   std::vector<GtkWidget*> segment_widgets;
@@ -520,6 +546,8 @@ void update_action_buttons();
 void render_transcript_public();
 void render_summary_public();
 void start_job(std::string const& kind, std::string const& episode_id);
+void cancel_active_job(GtkButton*, gpointer);
+void fetch_security_status();
 void stop_playback(bool save);
 void set_play_button_glyph(bool playing);
 void apply_seek(double seconds);
@@ -552,32 +580,42 @@ void apply_css() {
   auto* provider = gtk_css_provider_new();
   gtk_css_provider_load_from_string(
       provider,
+      "@define-color podlens_accent #C15F3C;\n"
+      "@define-color podlens_accent_soft #F7E5DD;\n"
       ".pl-title { font-weight: 600; font-size: 15px; }\n"
       ".pl-meta { font-size: 12px; opacity: 0.75; }\n"
       ".pl-caption { font-size: 12px; font-weight: 700; opacity: 0.65; "
       "padding: 8px 12px 4px 12px; }\n"
-      ".pl-card { padding: 8px 10px; border-radius: 8px; }\n"
+      ".pl-card { padding: 8px 10px; border-radius: 10px; "
+      "background: alpha(currentColor, 0.03); "
+      "border: 1px solid alpha(currentColor, 0.08); }\n"
       ".pl-card:hover { background: alpha(currentColor, 0.06); }\n"
       ".pl-chip { font-size: 11px; padding: 1px 7px; border-radius: 9px; "
-      "background: alpha(currentColor, 0.10); }\n"
+      "background: alpha(@podlens_accent, 0.12); }\n"
       ".pl-empty { font-size: 26px; }\n"
       ".pl-seg { padding: 6px 10px; border-radius: 6px; }\n"
       ".pl-seg:hover { background: alpha(currentColor, 0.05); }\n"
-      ".pl-seg-active { background: alpha(currentColor, 0.12); }\n"
+      ".pl-seg-active { background: alpha(@podlens_accent, 0.14); "
+      "box-shadow: inset 2.5px 0 @podlens_accent; }\n"
       ".pl-seg-time { font-family: monospace; font-size: 12px; "
       "opacity: 0.65; }\n"
       ".pl-section { font-size: 13px; font-weight: 700; opacity: 0.85; "
-      "margin-top: 10px; }\n"
+      "margin-top: 10px; color: @podlens_accent; }\n"
       ".pl-statusbar { border-top: 1px solid alpha(currentColor, 0.15); "
       "padding: 3px 12px; }\n"
-      ".pl-page-title { font-size: 22px; font-weight: 700; }\n"
+      ".pl-page-title { font-size: 26px; font-weight: 700; "
+      "letter-spacing: -0.02em; }\n"
+      ".pl-storage-note { font-size: 12px; }\n"
+      ".pl-storage-secure { color: #2E7D4F; }\n"
+      ".pl-storage-warning { color: #B25E14; }\n"
       ".pl-tile-label { font-size: 12px; }\n"
       ".pl-artwork { border-radius: 6px; background: "
       "alpha(currentColor, 0.10); }\n"
       ".pl-card-art { border-radius: 6px; }\n"
       ".pl-upnext { border-radius: 12px; overflow: hidden; }\n"
       ".pl-upnext:hover { filter: brightness(1.08); }\n"
-      ".pl-lane { padding: 10px; border-radius: 8px; }\n"
+      ".pl-lane { padding: 10px; border-radius: 10px; "
+      "background: alpha(currentColor, 0.02); }\n"
       ".pl-lane:hover { background: alpha(currentColor, 0.06); }\n"
       ".pl-flow > child { margin: 6px; }\n"
       ".pl-progress { min-height: 4px; }\n");
@@ -1776,7 +1814,7 @@ GtkWidget* make_transcript_segment(std::vector<std::string> const& seg) {
   gtk_box_append(GTK_BOX(grid), time_text);
 
   auto* lines = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-  if (!seg[2].empty()) {
+  if (!seg[2].empty() && g_state.transcript_original) {
     auto* original = GTK_LABEL(gtk_label_new(seg[2].c_str()));
     gtk_label_set_wrap(original, TRUE);
     gtk_label_set_xalign(original, 0.0f);
@@ -2812,11 +2850,33 @@ void load_chapters() {
 void set_job_ui(std::string const& message, double fraction, bool running) {
   gtk_widget_set_visible(GTK_WIDGET(g_state.job_bar), running);
   gtk_widget_set_visible(GTK_WIDGET(g_state.job_label), running);
+  if (g_state.job_cancel_button != nullptr) {
+    gtk_widget_set_visible(GTK_WIDGET(g_state.job_cancel_button), running);
+  }
   if (running) {
     gtk_progress_bar_set_fraction(g_state.job_bar,
                                   std::clamp(fraction, 0.0, 1.0));
     gtk_label_set_text(g_state.job_label, message.c_str());
   }
+}
+
+void cancel_active_job(GtkButton*, gpointer) {
+  if (g_state.api == nullptr || g_state.active_job_id.empty()) return;
+  set_status(tr("status.cancelling"));
+  (void)g_state.api->job_cancel_async(
+      g_state.active_job_id, [](rivet_app::Result<bool> result) {
+        dispatch_ui([result = std::move(result)]() mutable {
+          if (!result.succeeded()) {
+            try {
+              std::rethrow_exception(result.error);
+            } catch (std::exception const& e) {
+              set_status_error(e.what());
+            } catch (...) {
+              set_status_error("cancel failed");
+            }
+          }
+        });
+      });
 }
 
 void start_pipeline(std::string const& episode_id) {
@@ -3216,6 +3276,25 @@ void on_about_activated(GSimpleAction*, GVariant*, gpointer) {
 }
 
 // ---------------------------------------------------------------------------
+// Security status — where the BYOK key lives; never the key itself
+// ---------------------------------------------------------------------------
+
+void fetch_security_status() {
+  if (g_state.api == nullptr) return;
+  (void)g_state.api->security_status_async(
+      [](rivet_app::Result<std::string> result) {
+        if (!result.succeeded()) return;
+        try {
+          std::string json = result.get();
+          dispatch_ui([json = std::move(json)] {
+            g_state.security_json = json;
+          });
+        } catch (...) {
+        }
+      });
+}
+
+// ---------------------------------------------------------------------------
 // Settings — one labeled entry per backend setting, Save pushes them all
 // ---------------------------------------------------------------------------
 
@@ -3230,6 +3309,7 @@ void save_settings_pairs(std::shared_ptr<StringPairs> pairs, size_t index) {
   if (pairs == nullptr || g_state.api == nullptr) return;
   if (index >= pairs->size()) {
     set_status(tr("status.saved"));
+    fetch_security_status();
     return;
   }
   auto const& [key, value] = (*pairs)[index];
@@ -3257,6 +3337,38 @@ void open_url(char const* url) {
   gtk_show_uri(g_state.window, url, GDK_CURRENT_TIME);
 }
 
+char const* setting_label_key(std::string const& key) {
+  if (key == "api-base") return "settings.field.api_base";
+  if (key == "api-key") return "settings.field.api_key";
+  if (key == "chat-model") return "settings.field.chat_model";
+  if (key == "asr-model") return "settings.field.asr_model";
+  if (key == "target-lang") return "settings.field.target_lang";
+  if (key == "ui-lang") return "settings.field.ui_lang";
+  if (key == "asr-chunk-seconds") return "settings.field.chunk_seconds";
+  if (key == "max-transcript-chars") return "settings.field.max_chars";
+  if (key == "check-updates-enabled") return "settings.field.check_updates";
+  if (key == "search-limit") return "settings.field.search_limit";
+  return nullptr;
+}
+
+// Parse the small security-status object without pulling a JSON dependency
+// into the GTK host: `{"backend":"keychain","label":"…","secure":true,…}`.
+struct SecuritySummary {
+  bool configured{false};
+  bool secure{false};
+  std::string label;
+};
+
+SecuritySummary parse_security(std::string const& json) {
+  SecuritySummary summary;
+  summary.configured = json.find("\"configured\":true") != std::string::npos;
+  summary.secure = json.find("\"secure\":true") != std::string::npos;
+  std::smatch match;
+  std::regex const label_re("\"label\"\\s*:\\s*\"([^\"]*)\"");
+  if (std::regex_search(json, match, label_re)) summary.label = match[1].str();
+  return summary;
+}
+
 void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
   if (g_state.api == nullptr) return;
   (void)g_state.api->settings_list_async(
@@ -3280,11 +3392,39 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
 
                     // one labeled GtkEntry per setting; Save pushes every
                     // row through settings-set (Windows parity)
+                    // Where the credential lives; never render the key.
+                    if (!g_state.security_json.empty()) {
+                      auto const security = parse_security(g_state.security_json);
+                      char note_buffer[512];
+                      if (!security.configured) {
+                        std::snprintf(note_buffer, sizeof(note_buffer), "%s",
+                                      tr("settings.storage_none"));
+                      } else if (security.secure) {
+                        std::snprintf(note_buffer, sizeof(note_buffer),
+                                      tr("settings.storage_secure"),
+                                      security.label.c_str());
+                      } else {
+                        std::snprintf(note_buffer, sizeof(note_buffer),
+                                      tr("settings.storage_file"),
+                                      security.label.c_str());
+                      }
+                      auto* storage_note = gtk_label_new(note_buffer);
+                      gtk_label_set_xalign(GTK_LABEL(storage_note), 0.0f);
+                      gtk_label_set_wrap(GTK_LABEL(storage_note), TRUE);
+                      gtk_widget_add_css_class(storage_note, "pl-storage-note");
+                      gtk_widget_add_css_class(storage_note,
+                                               security.secure && security.configured
+                                                   ? "pl-storage-secure"
+                                                   : "pl-storage-warning");
+                      gtk_box_append(GTK_BOX(panel), storage_note);
+                    }
+
                     auto* fields = new SettingsFields();
                     for (auto const& row : rows) {
                       if (row.size() < 2) continue;
-                      auto* key_label =
-                          GTK_LABEL(gtk_label_new(row[0].c_str()));
+                      char const* label_key = setting_label_key(row[0]);
+                      auto* key_label = GTK_LABEL(gtk_label_new(
+                          label_key != nullptr ? tr(label_key) : row[0].c_str()));
                       gtk_label_set_xalign(key_label, 0.0f);
                       gtk_widget_add_css_class(GTK_WIDGET(key_label),
                                                "pl-title");
@@ -3997,6 +4137,7 @@ int on_backend_finished(gpointer) {
   g_state.backend = std::move(backend);
   g_state.api = std::make_unique<rivet_app::API>(*g_state.backend);
   subscribe_to_events();
+  fetch_security_status();
 
   // The shutdown hook goes here, not in main(): the embedded Racket runtime
   // installs its own SIGTERM handler while booting and would leave ours
@@ -4213,6 +4354,10 @@ void on_activate(GtkApplication* app, gpointer) {
     gtk_widget_set_margin_top(home_box, 6);
     gtk_widget_set_margin_start(home_box, 14);
     gtk_widget_set_margin_end(home_box, 14);
+    auto* home_caption = gtk_label_new(tr("nav.home"));
+    gtk_label_set_xalign(GTK_LABEL(home_caption), 0.0f);
+    gtk_widget_add_css_class(home_caption, "pl-page-title");
+    gtk_box_append(GTK_BOX(home_box), home_caption);
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(home_page), home_box);
     gtk_stack_add_named(GTK_STACK(page_stack), home_page, "home");
     g_state.home_list = GTK_BOX(home_box);
@@ -4393,17 +4538,60 @@ void on_activate(GtkApplication* app, gpointer) {
   gtk_widget_add_css_class(job_label, "pl-meta");
   gtk_widget_set_visible(job_label, FALSE);
   gtk_box_append(GTK_BOX(actions), job_label);
+  auto* job_cancel = gtk_button_new_with_label(tr("action.cancel_job"));
+  gtk_widget_set_tooltip_text(job_cancel, tr("action.cancel_job_hint"));
+  gtk_widget_set_visible(job_cancel, FALSE);
+  gtk_box_append(GTK_BOX(actions), job_cancel);
+  g_signal_connect(job_cancel, "clicked", G_CALLBACK(cancel_active_job),
+                   nullptr);
   gtk_box_append(GTK_BOX(detail), actions);
 
   // Reading row: translation on/off, follow, return to current.
   auto* reading = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   {
-    auto* switcher_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    // reading mode: line-by-line translation on/off
-    auto* bilingual_button = GTK_TOGGLE_BUTTON(
-        gtk_toggle_button_new_with_label(tr("mode.bilingual")));
+    auto* switcher_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    // reading mode: bilingual / translation only / original only
+    auto* mode_group = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_add_css_class(mode_group, "linked");
+    auto make_mode = [](char const* label) {
+      auto* button = GTK_TOGGLE_BUTTON(gtk_toggle_button_new_with_label(label));
+      gtk_widget_add_css_class(GTK_WIDGET(button), "flat");
+      return button;
+    };
+    auto* bilingual_button = make_mode(tr("mode.bilingual"));
+    auto* translation_button = make_mode(tr("mode.translation"));
+    auto* original_button = make_mode(tr("mode.original"));
+    gtk_toggle_button_set_group(translation_button, bilingual_button);
+    gtk_toggle_button_set_group(original_button, bilingual_button);
     gtk_toggle_button_set_active(bilingual_button, TRUE);
-    gtk_box_append(GTK_BOX(switcher_row), GTK_WIDGET(bilingual_button));
+    gtk_box_append(GTK_BOX(mode_group), GTK_WIDGET(bilingual_button));
+    gtk_box_append(GTK_BOX(mode_group), GTK_WIDGET(translation_button));
+    gtk_box_append(GTK_BOX(mode_group), GTK_WIDGET(original_button));
+    gtk_box_append(GTK_BOX(switcher_row), mode_group);
+    g_signal_connect(bilingual_button, "toggled",
+                     G_CALLBACK(+[](GtkToggleButton* toggle, gpointer) {
+                       if (gtk_toggle_button_get_active(toggle)) {
+                         g_state.transcript_bilingual = true;
+                         g_state.transcript_original = true;
+                         render_transcript_public();
+                       }
+                     }), nullptr);
+    g_signal_connect(translation_button, "toggled",
+                     G_CALLBACK(+[](GtkToggleButton* toggle, gpointer) {
+                       if (gtk_toggle_button_get_active(toggle)) {
+                         g_state.transcript_bilingual = true;
+                         g_state.transcript_original = false;
+                         render_transcript_public();
+                       }
+                     }), nullptr);
+    g_signal_connect(original_button, "toggled",
+                     G_CALLBACK(+[](GtkToggleButton* toggle, gpointer) {
+                       if (gtk_toggle_button_get_active(toggle)) {
+                         g_state.transcript_bilingual = false;
+                         g_state.transcript_original = true;
+                         render_transcript_public();
+                       }
+                     }), nullptr);
     auto* follow_button = GTK_TOGGLE_BUTTON(
         gtk_toggle_button_new_with_label(tr("transcript.follow")));
     gtk_toggle_button_set_active(follow_button, TRUE);
@@ -4431,13 +4619,6 @@ void on_activate(GtkApplication* app, gpointer) {
             gtk_toggle_button_set_active(g_state.follow_button, TRUE);
           }
           scroll_to_running_segment();
-        }),
-        nullptr);
-    g_signal_connect(
-        bilingual_button, "toggled",
-        G_CALLBACK(+[](GtkToggleButton* toggle, gpointer) {
-          g_state.transcript_bilingual = gtk_toggle_button_get_active(toggle);
-          render_transcript_public();
         }),
         nullptr);
     gtk_box_append(GTK_BOX(reading), switcher_row);
@@ -4601,6 +4782,7 @@ void on_activate(GtkApplication* app, gpointer) {
   g_state.detail_notes = GTK_LABEL(detail_notes);
   g_state.job_bar = GTK_PROGRESS_BAR(job_bar);
   g_state.job_label = GTK_LABEL(job_label);
+  g_state.job_cancel_button = GTK_BUTTON(job_cancel);
   g_state.transcript_scroll = GTK_SCROLLED_WINDOW(transcript_scroll);
   g_state.transcript_box = GTK_BOX(transcript_box);
   g_state.summary_box = GTK_BOX(summary_box);
