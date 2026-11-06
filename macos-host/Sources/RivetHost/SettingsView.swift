@@ -90,6 +90,11 @@ struct SettingsView: View {
         .frame(width: 660, height: 640)
         .background(Palette.canvas)
         .task { await load() }
+        .onAppear {
+            if !loaded {
+                Task { await load() }
+            }
+        }
     }
 
     // MARK: General
@@ -444,16 +449,24 @@ struct SettingsView: View {
     }
 
     private func load() async {
+        guard !loaded else { return }
         await store.loadSettings()
+        var fromBackend: [String: String] = [:]
         for row in store.settingsRows where row.count >= 2 {
             let key = row[0]
             let value = row[1]
             if key == "api-key" { continue }
             // Backend ui-lang and the host language are the same setting in
             // this window; present the host's current choice.
-            values[key] = key == "ui-lang" ? model.language : value
+            fromBackend[key] = key == "ui-lang" ? model.language : value
         }
-        originalValues = values
+        // Never clobber a field the listener already edited while the RPC was
+        // in flight; originalValues still records the backend baseline so
+        // Save becomes enabled for exactly the edited keys.
+        originalValues = fromBackend
+        for (key, value) in fromBackend where values[key] == nil {
+            values[key] = value
+        }
         loaded = true
         errorMessage = store.settingsError
     }

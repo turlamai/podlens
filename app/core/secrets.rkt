@@ -109,6 +109,8 @@
 
 (define (write-private-file! path text)
   (make-directory* (secrets-dir))
+  (with-handlers ([exn:fail? void])
+    (file-or-directory-permissions (secrets-dir) #o700))
   (define tmp (string-append (path->string path) ".tmp"))
   (call-with-output-file tmp
     (lambda (out) (write-string text out))
