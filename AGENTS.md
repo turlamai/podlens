@@ -93,6 +93,9 @@ scripts/update-keys.sh
   像素复制。运行时语言切换仍只在 macOS；Windows 用编译期 `kUiLang`，
   Linux 用 `PODLENS_LANG`。
 - Windows 125–200% 显示缩放截图矩阵仍未执行；1024×768 打包验收已覆盖。
+- 0.7.0 VMPal 实机验证发现：当 API 请求本身阻塞时，取消会停在「正在取消…」
+  直到请求返回；取消标志只在检查点生效。属于后端网络超时/取消缺口，
+  已记录在 `docs/VERIFICATION-0.7.0.md`，下一切片修复。
 - BYOK key 在 macOS 走 Keychain（`security -i`，密钥不进 argv）、Windows
   走 DPAPI、Linux 走 secret-tool；都不可用时才降到 0600 文件，并在
   设置页明确标注。CLI 与日志只显示掩码。

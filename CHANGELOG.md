@@ -113,6 +113,12 @@ All notable changes to PodLens are documented here. Format follows
 - Windows empty-state copy points at the one-click Understand path instead
   of the removed per-stage buttons.
 
+### Known issue
+- A cancel requested while an OpenAI HTTP request is blocked shows
+  “Cancelling…” until that request returns; the flag is only checked at the
+  next stage/batch checkpoint. Found by the 0.7.0 VMPal pass; the fix belongs
+  to the next slice. See `docs/VERIFICATION-0.7.0.md`.
+
 ## 0.6.0 - 2026-11-06
 
 ### Added
