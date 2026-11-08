@@ -144,6 +144,9 @@
     (parameterize ([current-custodian
                     (or (current-request-custodian) (current-custodian))])
       (http-conn-open host #:ssl? ssl? #:port port)))
+  (define (close-conn)
+    (with-handlers ([exn:fail? void]) (http-conn-close! conn)))
+  (register-cancel-hook! close-conn)
   (dynamic-wind
    void
    (lambda ()
@@ -159,8 +162,7 @@
      (define out (port->bytes body-port))
      (close-input-port body-port)
      (values (status-code status) hs out))
-   (lambda ()
-     (with-handlers ([exn:fail? void]) (http-conn-close! conn)))))
+   close-conn))
 
 (define (raise-api-error who code resp)
   (define msg

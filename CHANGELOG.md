@@ -83,14 +83,23 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.3 - 2026-11-09
+
+### Fixed
+- **Windows cancellation closes the active HTTP connection directly.**
+  Shutting the job custodian (0.7.2) still did not unblock a Winsock
+  `recv`. Each job now registers a closer for its current connection;
+  `job-cancel` invokes it from the RPC thread, the blocking read returns,
+  and the stage records `cancelled`. Downloads and multipart ASR use the
+  same hook.
+
 ## 0.7.2 - 2026-11-08
 
 ### Fixed
 - **Windows cancellation while a socket read is blocked.** The 0.7.1 worker
-  interrupt did not unblock a `recv` on Windows. Each job now opens its HTTP
-  sockets under a job-scoped custodian; `job-cancel` shuts that custodian
-  down, which closes the socket and lets the stage record `cancelled`
-  without touching the job's file ports or transcript writes.
+  interrupt did not unblock a `recv` on Windows. 0.7.2 added a job-scoped
+  socket custodian; **0.7.3 adds the direct connection hook that actually
+  closes Winsock** (the custodian alone was not sufficient in VMPal).
 - The job-scoped custodian is also used for multipart ASR and downloads,
   so cancel is immediate regardless of which network call is in flight.
 

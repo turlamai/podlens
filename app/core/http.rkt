@@ -15,6 +15,8 @@
          racket/string)
 
 (provide current-request-custodian
+         current-cancel-hooks
+         register-cancel-hook!
          http-get-bytes
          http-get-string
          http-post-json-bytes
@@ -30,6 +32,15 @@
 ;; Job-scoped custodian for sockets only. Closing it on cancel unblocks a
 ;; read without closing the job's file ports (status/transcript writes).
 (define current-request-custodian (make-parameter #f))
+
+;; Per-job list of functions that close the current connection. Closing the
+;; socket from the cancelling RPC thread is the portable way to unblock a
+;; recv; custodian/thread interrupts alone did not on Windows.
+(define current-cancel-hooks (make-parameter #f))
+
+(define (register-cancel-hook! thunk)
+  (define box (current-cancel-hooks))
+  (when box (set-box! box (cons thunk (unbox box)))))
 
 (define (request-custodian)
   (or (current-request-custodian) (current-custodian)))
@@ -89,6 +100,9 @@
                   "Accept: */*"
                   "Connection: close")
             headers))
+  (define (close-conn)
+    (with-handlers ([exn:fail? void]) (http-conn-close! conn)))
+  (register-cancel-hook! close-conn)
   ;; dynamic-wind so an interrupt (job cancellation) closes the socket even
   ;; when http-conn-sendrecv! is blocked waiting for the provider.
   (dynamic-wind
@@ -107,8 +121,7 @@
      (define body (port->bytes body-port))
      (close-input-port body-port)
      (values (status-code status) resp-headers* body))
-   (lambda ()
-     (with-handlers ([exn:fail? void]) (http-conn-close! conn)))))
+   close-conn))
 
 ;; status line like "HTTP/1.1 200 OK" → 200
 (define (status-code status)
@@ -161,6 +174,9 @@
     (define conn
       (parameterize ([current-custodian (request-custodian)])
         (http-conn-open host #:ssl? ssl? #:port port)))
+    (define (close-conn)
+      (with-handlers ([exn:fail? void]) (http-conn-close! conn)))
+    (register-cancel-hook! close-conn)
     (dynamic-wind
      void
      (lambda ()
@@ -186,8 +202,7 @@
               (download-loop location (add1 hops) 0))]
          [else
           (download-into! conn code resp-headers-strs body-port dest-path on-progress)]))
-     (lambda ()
-       (with-handlers ([exn:fail? void]) (http-conn-close! conn))))))
+     close-conn)))
 
 (define (download-into! conn code resp-headers-strs body-port dest-path on-progress)
   (define total (content-length-or-#f resp-headers-strs))

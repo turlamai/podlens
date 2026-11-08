@@ -433,12 +433,17 @@
                (hash-set! j 'cancel #t)
                (list #t
                      (hash-ref j 'thread-box #f)
-                     (hash-ref j 'request-custodian #f)))))))
+                     (hash-ref j 'request-custodian #f)
+                     (hash-ref j 'cancel-hooks #f)))))))
   (define worker (and accepted (let ([box (second accepted)]) (and box (unbox box)))))
   (define request-custodian (and accepted (third accepted)))
+  (define cancel-hooks (and accepted (fourth accepted)))
   ;; Closing the request custodian unblocks a socket read that a break
   ;; cannot interrupt on every platform (notably Windows); the stage turns
   ;; the resulting exn:fail? into "cancelled" via current-job-cancelled?.
+  (when cancel-hooks
+    (for ([hook (in-list (unbox cancel-hooks))])
+      (with-handlers ([exn:fail? void]) (hook))))
   (when request-custodian (custodian-shutdown-all request-custodian))
   (when worker (break-thread worker))
   (and accepted #t))
@@ -477,6 +482,7 @@
                                          (cons 'cancel #f)
                                          (cons 'thread-box (box #f))
                                          (cons 'request-custodian (make-custodian))
+                                         (cons 'cancel-hooks (box '()))
                                          (cons 'message "")
                                          (cons 'started (now-epoch))))])
               (hash-set! (job-manager-jobs mgr) id j)
@@ -496,6 +502,7 @@
        (parameterize ([current-job-id id]
                       [current-request-custodian
                        (hash-ref job 'request-custodian)]
+                      [current-cancel-hooks (hash-ref job 'cancel-hooks)]
                       [current-job-cancelled?
                        (lambda () (job-cancel-requested? mgr id))])
          (with-handlers
