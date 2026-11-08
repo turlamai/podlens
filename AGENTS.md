@@ -93,10 +93,10 @@ scripts/update-keys.sh
   像素复制。运行时语言切换仍只在 macOS；Windows 用编译期 `kUiLang`，
   Linux 用 `PODLENS_LANG`。
 - Windows 125–200% 显示缩放截图矩阵仍未执行；1024×768 打包验收已覆盖。
-- 0.7.4 起取消立即生效：`job-cancel` 先把作业和当前阶段落为 cancelled
-  并发出终止事件，再尽力关闭连接/中断线程；晚到的 provider 响应由
-  `check-cancelled!` 丢弃。0.7.0 VMPal 实机发现的问题见
-  `docs/VERIFICATION-0.7.0.md`。
+- 0.7.5 起取消立即生效：三端宿主先清进度/落 cancelled，再 best-effort
+  调 `job-cancel`；后端也会先落 cancelled 并丢弃晚到的 provider 响应。
+  原因是嵌入式运行时可能正阻塞在 socket 读，RPC 无法及时处理。
+  0.7.0 VMPal 实机发现的问题见 `docs/VERIFICATION-0.7.0.md`。
 - BYOK key 在 macOS 走 Keychain（`security -i`，密钥不进 argv）、Windows
   走 DPAPI、Linux 走 secret-tool；都不可用时才降到 0600 文件，并在
   设置页明确标注。CLI 与日志只显示掩码。

@@ -2862,20 +2862,17 @@ void set_job_ui(std::string const& message, double fraction, bool running) {
 
 void cancel_active_job(GtkButton*, gpointer) {
   if (g_state.api == nullptr || g_state.active_job_id.empty()) return;
-  set_status(tr("status.cancelling"));
+  std::string const job_id = g_state.active_job_id;
+  // The embedded runtime can be inside a blocking provider read. Leave the
+  // progress state immediately; the backend cancellation is best effort and
+  // a late event is ignored because active_job_id is already cleared.
+  g_state.active_job_id.clear();
+  g_state.active_job_episode.clear();
+  set_job_ui("", 0.0, false);
+  set_status(tr("status.cancelled"));
   (void)g_state.api->job_cancel_async(
-      g_state.active_job_id, [](rivet_app::Result<bool> result) {
-        dispatch_ui([result = std::move(result)]() mutable {
-          if (!result.succeeded()) {
-            try {
-              std::rethrow_exception(result.error);
-            } catch (std::exception const& e) {
-              set_status_error(e.what());
-            } catch (...) {
-              set_status_error("cancel failed");
-            }
-          }
-        });
+      job_id, [](rivet_app::Result<bool>) {
+        // UI is already terminal; nothing to report here.
       });
 }
 
