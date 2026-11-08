@@ -188,6 +188,40 @@ jobs:
       # GStreamer plugin closure (base/good + gst-libav) so m4a/mp3 play on
       # stock Debian/Ubuntu; the AppImage carries its own GTK4 closure, and
       # APPIMAGE_EXTRACT_AND_RUN lets appimagetool run on the runner.
+      - name: Fetch appimagetool (release CDN fallback)
+        # GitHub's release-asset download endpoint has returned 504 for
+        # appimagetool 1.9.0 while the API asset endpoint stayed healthy.
+        # Fetch through the CDN when possible, otherwise through the API,
+        # and still verify Rivet's pinned SHA-256 before use.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "${{ matrix.arch }}" in
+            x64)
+              asset_arch=x86_64
+              digest=46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1
+              ;;
+            arm64)
+              asset_arch=aarch64
+              digest=04f45ea45b5aa07bb2b071aed9dbf7a5185d3953b11b47358c1311f11ea94a96
+              ;;
+            *) echo "::error::unsupported Linux architecture"; exit 1 ;;
+          esac
+          dest="$RUNNER_TEMP/appimagetool-${asset_arch}.AppImage"
+          url="https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-${asset_arch}.AppImage"
+          if ! curl -fSL --retry 2 --retry-delay 2 -o "$dest" "$url"; then
+            asset_id="$(gh api repos/AppImage/appimagetool/releases/tags/1.9.0               --jq ".assets[] | select(.name==\"appimagetool-${asset_arch}.AppImage\") | .id")"
+            gh api -H 'Accept: application/octet-stream'               "repos/AppImage/appimagetool/releases/assets/${asset_id}" > "$dest"
+          fi
+          actual="$(sha256sum "$dest" | awk '{print $1}')"
+          if [ "$actual" != "$digest" ]; then
+            echo "::error::appimagetool checksum mismatch (expected $digest, got $actual)"
+            exit 1
+          fi
+          chmod +x "$dest"
+          echo "RIVET_APPIMAGETOOL_PATH=$dest" >> "$GITHUB_ENV"
       - name: Release (tar.gz + deb + rpm + AppImage + portable zip)
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
