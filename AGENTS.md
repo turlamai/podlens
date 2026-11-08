@@ -93,10 +93,10 @@ scripts/update-keys.sh
   像素复制。运行时语言切换仍只在 macOS；Windows 用编译期 `kUiLang`，
   Linux 用 `PODLENS_LANG`。
 - Windows 125–200% 显示缩放截图矩阵仍未执行；1024×768 打包验收已覆盖。
-- 0.7.2 已修复取消阻塞：`job-cancel` 同时中断作业线程，并关闭该作业
-  的 socket custodian（Windows 上阻塞的 `recv` 靠这一步解开），转写/
-  翻译/总结会把阶段落为 cancelled；0.7.0 VMPal 实机发现的问题见
-  `docs/VERIFICATION-0.7.0.md`。
+- 0.7.3 已修复取消阻塞：`job-cancel` 中断作业线程、关闭该作业的
+  socket custodian，并直接调用当前 HTTP 连接的 closer（Windows 上
+  阻塞的 Winsock `recv` 靠这一步解开）；转写/翻译/总结会把阶段落为
+  cancelled。0.7.0 VMPal 实机发现的问题见 `docs/VERIFICATION-0.7.0.md`。
 - BYOK key 在 macOS 走 Keychain（`security -i`，密钥不进 argv）、Windows
   走 DPAPI、Linux 走 secret-tool；都不可用时才降到 0600 文件，并在
   设置页明确标注。CLI 与日志只显示掩码。
