@@ -267,6 +267,9 @@ struct MainWindow : MainWindowT<MainWindow> {
   // job whose progress the detail header is tracking; empty when idle
   std::string active_job_id_;
   bool job_running_ = false;
+  // Invalidates a job's poll/terminal callbacks when it is cancelled or
+  // replaced, so a late backend reply cannot clear a newer job's UI.
+  std::atomic<std::uint64_t> job_generation_{0};
 
   // segment borders for playback highlight; index == transcript_ index
   std::vector<Microsoft::UI::Xaml::Controls::Border> segment_borders_;

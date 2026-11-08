@@ -2289,8 +2289,9 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
   SetStatus(true, std::wstring(podlens::Tr("status.job_running")));
   auto const dispatcher = DispatcherQueue();
   auto const weak = get_weak();
+  auto const generation = ++job_generation_;
 
-  std::thread([weak, dispatcher, kind, episode_id]() mutable {
+  std::thread([weak, dispatcher, kind, episode_id, generation]() mutable {
     std::string job_id;
     try {
       if (!weak.get()) return;
@@ -2309,8 +2310,8 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
       return;
     }
 
-    dispatcher.TryEnqueue([weak, job_id] {
-      if (auto window = weak.get()) {
+    dispatcher.TryEnqueue([weak, job_id, generation] {
+      if (auto window = weak.get(); window && window->job_generation_ == generation) {
         window->active_job_id_ = job_id;
         window->job_running_ = true;
         window->CancelJobButton().Visibility(Visibility::Visible);
@@ -2331,7 +2332,7 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
     int last_pct = -1;
     for (;;) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      if (!weak.get()) return;
+      if (!weak.get() || weak.get()->job_generation_ != generation) return;
       try {
         auto const status_json = weak.get()->api_->job_status(job_id).get();
         std::regex const status_re("\"status\"\\s*:\\s*\"([^\"]*)\"");
@@ -2351,8 +2352,8 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
         }
         if (pct != last_pct) {
           last_pct = pct;
-          dispatcher.TryEnqueue([weak, pct, message] {
-            if (auto window = weak.get()) {
+          dispatcher.TryEnqueue([weak, pct, message, generation] {
+            if (auto window = weak.get(); window && window->job_generation_ == generation) {
               window->JobProgress().Value(pct);
               std::wstring line = std::wstring(podlens::Tr("action.pipeline"));
               line += L" · " + std::to_wstring(pct) + L"%";
@@ -2367,8 +2368,8 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
       }
     }
 
-    dispatcher.TryEnqueue([weak, kind, episode_id, terminal, terminal_message] {
-      if (auto window = weak.get()) {
+    dispatcher.TryEnqueue([weak, kind, episode_id, terminal, terminal_message, generation] {
+      if (auto window = weak.get(); window && window->job_generation_ == generation) {
         window->active_job_id_.clear();
         window->job_running_ = false;
         window->CancelJobButton().Visibility(Visibility::Collapsed);
@@ -2465,23 +2466,26 @@ void MainWindow::CancelJob_Click(winrt::Windows::Foundation::IInspectable const&
                                  Microsoft::UI::Xaml::RoutedEventArgs const&) {
   if (!api_ || active_job_id_.empty()) return;
   auto const job_id = active_job_id_;
-  SetStatus(true, std::wstring(podlens::Tr("status.cancelling")));
-  auto const dispatcher = DispatcherQueue();
+  // Leave the progress state now: the embedded runtime can be inside a
+  // blocking provider read, so waiting for job-cancel's reply would leave
+  // the UI at "Cancelling..." indefinitely. Backend cleanup is best effort;
+  // a late reply is ignored through the generation counter.
+  ++job_generation_;
+  active_job_id_.clear();
+  job_running_ = false;
+  CancelJobButton().Visibility(Visibility::Collapsed);
+  JobProgress().Visibility(Visibility::Collapsed);
+  JobProgress().Value(0);
+  SetStatus(true, std::wstring(podlens::Tr("status.cancelled")));
   auto const weak = get_weak();
-  std::thread([weak, dispatcher, job_id]() mutable {
-    std::string error;
-    if (weak.get()) {
+  std::thread([weak, job_id]() {
+    if (auto window = weak.get()) {
       try {
-        weak.get()->api_->job_cancel(job_id).get();
-      } catch (std::exception const& e) {
-        error = e.what();
+        window->api_->job_cancel(job_id).get();
+      } catch (std::exception const&) {
+        // The UI is already terminal; backend cleanup is best effort.
       }
     }
-    dispatcher.TryEnqueue([weak, error] {
-      if (auto window = weak.get()) {
-        if (!error.empty()) window->SetStatus(false, to_wide(error));
-      }
-    });
   }).detach();
 }
 

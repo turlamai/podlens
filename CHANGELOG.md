@@ -83,14 +83,27 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.5 - 2026-11-09
+
+### Fixed
+- **Cancel leaves the progress UI immediately on all three hosts.** The
+  embedded runtime can be inside a blocking provider read, so waiting for
+  the `job-cancel` reply kept the UI at “Cancelling…”. Windows clears the
+  active job and invalidates its poll generation, Linux clears the active
+  job before the best-effort RPC, and macOS removes the job so its poll
+  stops. Backend cleanup still runs and late results are discarded.
+- Windows keeps a generation token so a late poll/terminal callback cannot
+  clear a newer job’s progress.
+
 ## 0.7.4 - 2026-11-09
 
 ### Fixed
 - **Cancel is terminal immediately, even if the worker is stuck in a socket
   call.** `job-cancel` now marks the job `cancelled` in the manager and
   emits the terminal event before closing/interrupting anything, marks the
-  running stage `cancelled`, and returns. Hosts leave the progress state at
-  once instead of waiting for the request to finish.
+  running stage `cancelled`, and returns. The host-side immediate clear is
+  completed in 0.7.5 because the RPC itself can be queued behind a blocking
+  read.
 - Late provider responses are discarded: transcribe/translate/summarize call
   `check-cancelled!` before writing results, and the job store refuses to
   overwrite a cancelled status with done/error. The connection closer and

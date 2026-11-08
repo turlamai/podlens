@@ -636,6 +636,8 @@ final class PodLensStore: ObservableObject {
             var finalMessage = ""
             while true {
                 try? await Task.sleep(nanoseconds: 700_000_000)
+                let stillTracked = await MainActor.run { self.jobs[jobId] != nil }
+                if !stillTracked { return }
                 let statusJSON = (try? await api.job_status(job_id: jobId)) ?? ""
                 guard let data = statusJSON.data(using: .utf8),
                       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -674,13 +676,16 @@ final class PodLensStore: ObservableObject {
         jobs.values.first { $0.episodeId == episodeId && $0.status == "running" }
     }
 
-    /// Cooperative cancel. The stage in flight finishes its current provider
-    /// request; no further billed batch is sent.
+    /// Leave the progress state immediately; the embedded runtime can be
+    /// inside a blocking provider read, so waiting for the RPC would leave
+    /// the UI at "Cancelling...". Backend cleanup is best effort and a late
+    /// poll is stopped by removing the job from `jobs`.
     func cancelJob(for episodeId: String) {
         guard let api, let job = runningJob(for: episodeId) else { return }
+        jobs[job.id] = nil
+        statusLine = L("jobCancelled")
         Task {
             _ = try? await api.job_cancel(job_id: job.id)
-            statusLine = L("cancelling")
         }
     }
 
