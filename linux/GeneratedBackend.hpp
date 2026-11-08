@@ -19,8 +19,8 @@ namespace rivet_app {
 inline constexpr char kModuleName[] = "backend";
 inline constexpr char kEntryName[] = "start";
 inline constexpr char kDisplayName[] = "PodLens";
-inline constexpr char kVersion[] = "0.7.3";
-inline constexpr std::int64_t kBuild = 11;
+inline constexpr char kVersion[] = "0.7.4";
+inline constexpr std::int64_t kBuild = 12;
 inline constexpr char kIdentifier[] = "site.jrtx.podlens";
 inline constexpr char kReleaseChannel[] = "stable";
 

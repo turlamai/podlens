@@ -83,15 +83,27 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.4 - 2026-11-09
+
+### Fixed
+- **Cancel is terminal immediately, even if the worker is stuck in a socket
+  call.** `job-cancel` now marks the job `cancelled` in the manager and
+  emits the terminal event before closing/interrupting anything, marks the
+  running stage `cancelled`, and returns. Hosts leave the progress state at
+  once instead of waiting for the request to finish.
+- Late provider responses are discarded: transcribe/translate/summarize call
+  `check-cancelled!` before writing results, and the job store refuses to
+  overwrite a cancelled status with done/error. The connection closer and
+  custodian shutdown remain as best-effort resource cleanup.
+
 ## 0.7.3 - 2026-11-09
 
 ### Fixed
 - **Windows cancellation closes the active HTTP connection directly.**
-  Shutting the job custodian (0.7.2) still did not unblock a Winsock
-  `recv`. Each job now registers a closer for its current connection;
-  `job-cancel` invokes it from the RPC thread, the blocking read returns,
-  and the stage records `cancelled`. Downloads and multipart ASR use the
-  same hook.
+  Shutting the job custodian (0.7.2) did not unblock a Winsock `recv` in
+  VMPal. 0.7.3 registers a closer for each connection; 0.7.4 additionally
+  makes the job terminal immediately, so hosts never depend on the socket
+  actually closing. Downloads and multipart ASR use the same hook.
 
 ## 0.7.2 - 2026-11-08
 

@@ -29,6 +29,11 @@
 (define current-job-id (make-parameter ""))
 (define current-job-cancelled? (make-parameter (lambda () #f)))
 
+(define (check-cancelled!)
+  (when ((current-job-cancelled?))
+    (raise (job-cancelled "cancelled" (current-continuation-marks)
+                          (current-job-id)))))
+
 (provide cfg-snapshot
          ensure-audio!
          ensure-preview-audio!
@@ -175,6 +180,7 @@
       (define result
         (transcribe-file cfg chunk
                          #:prompt "Podcast transcript. Use punctuation and real spelling for names."))
+      (check-cancelled!)
       (set! language (hash-ref result 'language language))
       (define segs (hash-ref result 'segments '()))
       (set! all-segments
@@ -267,6 +273,7 @@
                   (target-name lang)
                   (length batch)))
         (define result (chat-completion-json cfg prompt numbered))
+        (check-cancelled!)
         (define lines (hash-ref result 'lines #f))
         (unless (and (list? lines) (= (length lines) (length batch)))
           (error 'run-translate! "translation batch ~a returned wrong line count" (add1 i)))
@@ -336,6 +343,7 @@
               (target-name lang) (target-name lang)))
     (on-progress 30 "summarizing")
     (define result (chat-completion-json cfg prompt text #:temperature 0.3))
+    (check-cancelled!)
     (unless (and (hash? result) (hash-has-key? result 'tldr))
       (error 'run-summarize! "summary response missing 'tldr'"))
     (transcript-save! id
@@ -416,11 +424,28 @@
       (define j (hash-ref (job-manager-jobs mgr) id #f))
       (and j (hash-ref j 'cancel #f) #t))))
 
-;; Ask a running job to stop. The cancel flag is still checked at every
-;; progress checkpoint (no further batch is billed), and the worker thread is
-;; also interrupted so an in-flight provider request cannot leave the job
-;; stuck at "cancelling" forever. The stage handlers convert the break into
-;; the same job-cancelled terminal state.
+;; Ask a running job to stop. The job becomes terminal in the manager
+;; immediately (so a host never sits at "cancelling"), the running stage is
+;; marked cancelled, and any in-flight request is closed/interrupted as a
+;; best effort. Late provider responses are discarded by check-cancelled!
+;; before they can be written.
+(define (mark-stage-cancelled! kind episode-id)
+  (with-handlers ([exn:fail? void])
+    (define episode (episode-get episode-id))
+    (when episode
+      (define (mark key)
+        (episode-set-status! episode-id key "cancelled" "cancelled"))
+      (cond
+        [(equal? kind "transcribe") (mark 'transcript-status)]
+        [(equal? kind "translate") (mark 'transcript-status)]
+        [(equal? kind "summarize") (mark 'summary-status)]
+        [(equal? kind "pipeline")
+         (cond
+           [(equal? (hash-ref episode 'summary-status "") "running")
+            (mark 'summary-status)]
+           [(equal? (hash-ref episode 'transcript-status "") "running")
+            (mark 'transcript-status)])]))))
+
 (define (job-cancel! mgr id)
   (define accepted
     (with-lock (job-manager-sem mgr)
@@ -431,21 +456,28 @@
              (not (hash-ref j 'cancel #f))
              (begin
                (hash-set! j 'cancel #t)
+               (hash-set! j 'status "cancelled")
+               (hash-set! j 'message "cancelled")
                (list #t
+                     (hash-ref j 'kind)
+                     (hash-ref j 'episode-id)
                      (hash-ref j 'thread-box #f)
                      (hash-ref j 'request-custodian #f)
                      (hash-ref j 'cancel-hooks #f)))))))
-  (define worker (and accepted (let ([box (second accepted)]) (and box (unbox box)))))
-  (define request-custodian (and accepted (third accepted)))
-  (define cancel-hooks (and accepted (fourth accepted)))
-  ;; Closing the request custodian unblocks a socket read that a break
-  ;; cannot interrupt on every platform (notably Windows); the stage turns
-  ;; the resulting exn:fail? into "cancelled" via current-job-cancelled?.
-  (when cancel-hooks
-    (for ([hook (in-list (unbox cancel-hooks))])
-      (with-handlers ([exn:fail? void]) (hook))))
-  (when request-custodian (custodian-shutdown-all request-custodian))
-  (when worker (break-thread worker))
+  (when accepted
+    (define kind (second accepted))
+    (define episode-id (third accepted))
+    (define thread-box (fourth accepted))
+    (define request-custodian (fifth accepted))
+    (define cancel-hooks (sixth accepted))
+    (mark-stage-cancelled! kind episode-id)
+    ((job-manager-emit! mgr) id kind 0 "cancelled")
+    (when cancel-hooks
+      (for ([hook (in-list (unbox cancel-hooks))])
+        (with-handlers ([exn:fail? void]) (hook))))
+    (when request-custodian (custodian-shutdown-all request-custodian))
+    (when (and thread-box (unbox thread-box))
+      (break-thread (unbox thread-box))))
   (and accepted #t))
 
 (define (job-set! mgr id patch)
@@ -455,9 +487,14 @@
                     ;; patch keys mutate j in place; hash-set! returns void, so
                     ;; the updater must return j itself, never the last set.
                     (lambda (j)
-                      (for ([k (in-hash-keys patch)])
-                        (hash-set! j k (hash-ref patch k)))
-                      j)
+                      (if (and (equal? (hash-ref j 'status) "cancelled")
+                               (hash-has-key? patch 'status)
+                               (not (equal? (hash-ref patch 'status) "cancelled")))
+                          j
+                          (begin
+                            (for ([k (in-hash-keys patch)])
+                              (hash-set! j k (hash-ref patch k)))
+                            j)))
                     (make-hasheq)))))
 
 (define (job-start! mgr kind episode-id thunk)
