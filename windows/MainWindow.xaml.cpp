@@ -2311,7 +2311,7 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
     }
 
     dispatcher.TryEnqueue([weak, job_id, generation] {
-      if (auto window = weak.get(); window && window->job_generation_ == generation) {
+      if (auto window = weak.get(); window && window->job_generation_.load() == generation) {
         window->active_job_id_ = job_id;
         window->job_running_ = true;
         window->CancelJobButton().Visibility(Visibility::Visible);
@@ -2332,7 +2332,7 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
     int last_pct = -1;
     for (;;) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      if (!weak.get() || weak.get()->job_generation_ != generation) return;
+      if (!weak.get() || weak.get()->job_generation_.load() != generation) return;
       try {
         auto const status_json = weak.get()->api_->job_status(job_id).get();
         std::regex const status_re("\"status\"\\s*:\\s*\"([^\"]*)\"");
@@ -2353,7 +2353,7 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
         if (pct != last_pct) {
           last_pct = pct;
           dispatcher.TryEnqueue([weak, pct, message, generation] {
-            if (auto window = weak.get(); window && window->job_generation_ == generation) {
+            if (auto window = weak.get(); window && window->job_generation_.load() == generation) {
               window->JobProgress().Value(pct);
               std::wstring line = std::wstring(podlens::Tr("action.pipeline"));
               line += L" · " + std::to_wstring(pct) + L"%";
@@ -2369,7 +2369,7 @@ void MainWindow::StartJob(std::string const& kind, std::string const& episode_id
     }
 
     dispatcher.TryEnqueue([weak, kind, episode_id, terminal, terminal_message, generation] {
-      if (auto window = weak.get(); window && window->job_generation_ == generation) {
+      if (auto window = weak.get(); window && window->job_generation_.load() == generation) {
         window->active_job_id_.clear();
         window->job_running_ = false;
         window->CancelJobButton().Visibility(Visibility::Collapsed);
