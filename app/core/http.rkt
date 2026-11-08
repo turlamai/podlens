@@ -80,20 +80,26 @@
                   "Accept: */*"
                   "Connection: close")
             headers))
-  (define-values (status resp-headers body-port)
-    (if data
-        (http-conn-sendrecv! conn path
-                             #:method method
-                             #:headers all-headers
-                             #:data data)
-        (http-conn-sendrecv! conn path
-                             #:method method
-                             #:headers all-headers)))
-  (define resp-headers* (headers->strings resp-headers))
-  (define body (port->bytes body-port))
-  (close-input-port body-port)
-  (with-handlers ([exn:fail? void]) (http-conn-close! conn))
-  (values (status-code status) resp-headers* body))
+  ;; dynamic-wind so an interrupt (job cancellation) closes the socket even
+  ;; when http-conn-sendrecv! is blocked waiting for the provider.
+  (dynamic-wind
+   void
+   (lambda ()
+     (define-values (status resp-headers body-port)
+       (if data
+           (http-conn-sendrecv! conn path
+                                #:method method
+                                #:headers all-headers
+                                #:data data)
+           (http-conn-sendrecv! conn path
+                                #:method method
+                                #:headers all-headers)))
+     (define resp-headers* (headers->strings resp-headers))
+     (define body (port->bytes body-port))
+     (close-input-port body-port)
+     (values (status-code status) resp-headers* body))
+   (lambda ()
+     (with-handlers ([exn:fail? void]) (http-conn-close! conn)))))
 
 ;; status line like "HTTP/1.1 200 OK" → 200
 (define (status-code status)
@@ -144,28 +150,33 @@
   (let download-loop ([url url-string] [hops 0] [same-url-retries 0])
     (define-values (ssl? host port path) (split-url url))
     (define conn (http-conn-open host #:ssl? ssl? #:port port))
-    (define-values (status resp-headers body-port)
-      (http-conn-sendrecv! conn path
-                           #:method "GET"
-                           #:headers (list (format "User-Agent: ~a" http-user-agent)
-                                           "Accept: */*"
-                                           "Connection: close")))
-    (define code (status-code status))
-    (define resp-headers-strs (headers->strings resp-headers))
-    (cond
-      [(and (member code '(301 302 303 307 308)) (< hops redirect-hop-limit))
-       (define location (header-value resp-headers-strs "location"))
-       (close-input-port body-port)
-       (with-handlers ([exn:fail? void]) (http-conn-close! conn))
-       (unless location
-         (error 'http-download-file "redirect without Location from ~a" url))
-       (if (and (string=? location url) (< same-url-retries same-url-retry-limit))
-           (begin
-             (sleep 0.3)
-             (download-loop url hops (add1 same-url-retries)))
-           (download-loop location (add1 hops) 0))]
-      [else
-       (download-into! conn code resp-headers-strs body-port dest-path on-progress)])))
+    (dynamic-wind
+     void
+     (lambda ()
+       (define-values (status resp-headers body-port)
+         (http-conn-sendrecv! conn path
+                              #:method "GET"
+                              #:headers (list (format "User-Agent: ~a" http-user-agent)
+                                              "Accept: */*"
+                                              "Connection: close")))
+       (define code (status-code status))
+       (define resp-headers-strs (headers->strings resp-headers))
+       (cond
+         [(and (member code '(301 302 303 307 308)) (< hops redirect-hop-limit))
+          (define location (header-value resp-headers-strs "location"))
+          (close-input-port body-port)
+          (with-handlers ([exn:fail? void]) (http-conn-close! conn))
+          (unless location
+            (error 'http-download-file "redirect without Location from ~a" url))
+          (if (and (string=? location url) (< same-url-retries same-url-retry-limit))
+              (begin
+                (sleep 0.3)
+                (download-loop url hops (add1 same-url-retries)))
+              (download-loop location (add1 hops) 0))]
+         [else
+          (download-into! conn code resp-headers-strs body-port dest-path on-progress)]))
+     (lambda ()
+       (with-handlers ([exn:fail? void]) (http-conn-close! conn))))))
 
 (define (download-into! conn code resp-headers-strs body-port dest-path on-progress)
   (define total (content-length-or-#f resp-headers-strs))

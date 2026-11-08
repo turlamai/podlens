@@ -335,8 +335,10 @@
   (define j (job-get (current-jobs) job-id))
   (if j (jsexpr->string j) ""))
 
-;; Cooperative cancel: the stage in flight finishes its current provider
-;; request, then the job stops before the next billed batch.
+;; Cancel sets the checkpoint flag and interrupts the job worker, so an
+;; in-flight provider request is abandoned instead of leaving the job at
+;; "cancelling" forever. The stage records "cancelled" and no further batch
+;; is billed.
 (define-rpc (job-cancel [job-id String] : Bool)
   (and (job-cancel! (current-jobs) job-id) #t))
 

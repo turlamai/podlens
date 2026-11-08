@@ -356,3 +356,43 @@
       (loop (add1 tries))))
   (check-equal? (hash-ref (job-get jm job-id) 'status) "done")
   (check-false (job-cancel! jm job-id)))
+
+;; Regression: cancel used to wait for the in-flight provider request. A
+;; provider that accepts but never answers left the job at "cancelling"
+;; forever; the worker thread is now interrupted and the stage records
+;; "cancelled" instead.
+(test-case "cancel interrupts a blocked provider request"
+  (define hang-listener #f)
+  (define hang-port #f)
+  (for ([p (in-range 18532 18632)] #:unless hang-port)
+    (with-handlers ([exn:fail? void])
+      (set! hang-listener (tcp-listen p 4 #t "127.0.0.1"))
+      (set! hang-port p)))
+  (check-true (and hang-listener hang-port #t))
+  (define held '())
+  (define hang-thread
+    (thread
+     (lambda ()
+       (let loop ()
+         (define-values (in out) (tcp-accept hang-listener))
+         (set! held (cons (cons in out) held))
+         (loop)))))
+  (define hang-cfg
+    (hash-set cfg 'api-base (format "http://127.0.0.1:~a/v1" hang-port)))
+  (define jm (make-job-manager (lambda (_id _kind _pct _message) (void))))
+  (define job-id
+    (job-start! jm "translate" eid
+                (lambda (progress)
+                  (run-translate! hang-cfg (episode-get eid)
+                                  (lambda (p m) (progress p m))))))
+  (sleep 0.4)
+  (check-equal? (hash-ref (job-get jm job-id) 'status) "running")
+  (check-true (job-cancel! jm job-id))
+  (define j (wait-terminal jm job-id))
+  (check-equal? (hash-ref j 'status) "cancelled")
+  (check-equal? (hash-ref (episode-get eid) 'transcript-status) "cancelled")
+  (for ([p (in-list held)])
+    (with-handlers ([exn:fail? void]) (close-input-port (car p)))
+    (with-handlers ([exn:fail? void]) (close-output-port (cdr p))))
+  (kill-thread hang-thread)
+  (with-handlers ([exn:fail? void]) (tcp-close hang-listener)))

@@ -19,7 +19,7 @@ Use [official Releases](https://github.com/turlamai/podlens/releases), select an
 1. Search Discover or add a podcast RSS URL, then play an episode without starting AI jobs.
 2. Open Settings → Intelligence, enter an OpenAI-compatible base URL and key, and use **Test connection** to check the saved configuration before spending tokens.
 3. Choose providers appropriate for audio transcription and text translation; they may require different model capabilities.
-4. Press **Understand** on an episode. The confirmation shows the stages already done and the approximate text volume before anything is billed; **Cancel** stops a running job at its next checkpoint.
+4. Press **Understand** on an episode. The confirmation shows the stages already done and the approximate text volume before anything is billed; **Cancel** stops a running job immediately, abandoning any in-flight provider request; finished batches stay saved.
 5. Read with the transcript toolbar: Bilingual, Translation or Original, plus Follow and Current. **Focus Listening** hides the library and episode lists without interrupting playback, and restores them in place.
 6. Test a short episode, inspect usage, then check transcript export and playback recovery before processing a large library.
 

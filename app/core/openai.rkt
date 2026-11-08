@@ -141,19 +141,23 @@
 (define (request-multipart url body boundary headers)
   (define-values (ssl? host port path) (split-url url))
   (define conn (http-conn-open host #:ssl? ssl? #:port port))
-  (define-values (status resp-headers body-port)
-    (http-conn-sendrecv! conn path
-                         #:method "POST"
-                         #:headers (append headers
-                                           (list (format "User-Agent: ~a" http-user-agent)
-                                                 (format "Content-Type: multipart/form-data; boundary=~a" boundary)
-                                                 "Connection: close"))
-                         #:data body))
-  (define hs (headers->strings resp-headers))
-  (define out (port->bytes body-port))
-  (close-input-port body-port)
-  (with-handlers ([exn:fail? void]) (http-conn-close! conn))
-  (values (status-code status) hs out))
+  (dynamic-wind
+   void
+   (lambda ()
+     (define-values (status resp-headers body-port)
+       (http-conn-sendrecv! conn path
+                            #:method "POST"
+                            #:headers (append headers
+                                              (list (format "User-Agent: ~a" http-user-agent)
+                                                    (format "Content-Type: multipart/form-data; boundary=~a" boundary)
+                                                    "Connection: close"))
+                            #:data body))
+     (define hs (headers->strings resp-headers))
+     (define out (port->bytes body-port))
+     (close-input-port body-port)
+     (values (status-code status) hs out))
+   (lambda ()
+     (with-handlers ([exn:fail? void]) (http-conn-close! conn)))))
 
 (define (raise-api-error who code resp)
   (define msg
