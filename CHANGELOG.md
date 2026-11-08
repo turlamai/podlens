@@ -83,13 +83,23 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.2 - 2026-11-08
+
+### Fixed
+- **Windows cancellation while a socket read is blocked.** The 0.7.1 worker
+  interrupt did not unblock a `recv` on Windows. Each job now opens its HTTP
+  sockets under a job-scoped custodian; `job-cancel` shuts that custodian
+  down, which closes the socket and lets the stage record `cancelled`
+  without touching the job's file ports or transcript writes.
+- The job-scoped custodian is also used for multipart ASR and downloads,
+  so cancel is immediate regardless of which network call is in flight.
+
 ## 0.7.1 - 2026-11-08
 
 ### Fixed
 - **Cancel interrupts an in-flight provider request.** `job-cancel` still
-  sets the checkpoint flag, but now also interrupts the job worker, so a
-  provider that accepts and never answers can no longer leave the job at
-  “Cancelling…” forever. Transcribe/translate/summarize mark their stage
+  sets the checkpoint flag, but now also interrupts the job worker; Windows
+  additionally needs the job-scoped socket custodian from 0.7.2. Transcribe/translate/summarize mark their stage
   `cancelled`, finished batches remain on disk, and the Windows/Linux hosts
   return to idle.
 - Linux now treats the backend's `cancelled` event (pct 0) as terminal and

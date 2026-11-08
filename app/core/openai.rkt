@@ -140,7 +140,10 @@
 
 (define (request-multipart url body boundary headers)
   (define-values (ssl? host port path) (split-url url))
-  (define conn (http-conn-open host #:ssl? ssl? #:port port))
+  (define conn
+    (parameterize ([current-custodian
+                    (or (current-request-custodian) (current-custodian))])
+      (http-conn-open host #:ssl? ssl? #:port port)))
   (dynamic-wind
    void
    (lambda ()

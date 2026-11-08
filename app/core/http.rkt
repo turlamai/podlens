@@ -14,7 +14,8 @@
          racket/port
          racket/string)
 
-(provide http-get-bytes
+(provide current-request-custodian
+         http-get-bytes
          http-get-string
          http-post-json-bytes
          http-download-file
@@ -25,6 +26,13 @@
          status-code)
 
 (define http-user-agent "PodLens/1.0 (+https://github.com/turlamai/podlens)")
+
+;; Job-scoped custodian for sockets only. Closing it on cancel unblocks a
+;; read without closing the job's file ports (status/transcript writes).
+(define current-request-custodian (make-parameter #f))
+
+(define (request-custodian)
+  (or (current-request-custodian) (current-custodian)))
 
 ;; ---- URL splitting (no net/url dependency; feeds are plain http(s)) ------
 
@@ -74,7 +82,8 @@
 (define (request-once method url-string headers [data #f])
   (define-values (ssl? host port path) (split-url url-string))
   (define conn
-    (http-conn-open host #:ssl? ssl? #:port port))
+    (parameterize ([current-custodian (request-custodian)])
+      (http-conn-open host #:ssl? ssl? #:port port)))
   (define all-headers
     (append (list (format "User-Agent: ~a" http-user-agent)
                   "Accept: */*"
@@ -149,7 +158,9 @@
   ;; same url (Podscribe's attribution edge) is retried, not chased
   (let download-loop ([url url-string] [hops 0] [same-url-retries 0])
     (define-values (ssl? host port path) (split-url url))
-    (define conn (http-conn-open host #:ssl? ssl? #:port port))
+    (define conn
+      (parameterize ([current-custodian (request-custodian)])
+        (http-conn-open host #:ssl? ssl? #:port port)))
     (dynamic-wind
      void
      (lambda ()

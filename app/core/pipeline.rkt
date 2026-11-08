@@ -27,6 +27,7 @@
 ;; Set in the job thread so an interrupt (break-thread) can be converted
 ;; into the same terminal "cancelled" state as a checkpoint cancel.
 (define current-job-id (make-parameter ""))
+(define current-job-cancelled? (make-parameter (lambda () #f)))
 
 (provide cfg-snapshot
          ensure-audio!
@@ -149,8 +150,14 @@
                                 (current-job-id))))]
        [exn:fail?
         (lambda (e)
-          (episode-set-status! id 'transcript-status "error" (exn-message e))
-          (raise e))])
+          (if ((current-job-cancelled?))
+              (begin
+                (episode-set-status! id 'transcript-status "cancelled" "cancelled")
+                (raise (job-cancelled "cancelled" (current-continuation-marks)
+                                      (current-job-id))))
+              (begin
+                (episode-set-status! id 'transcript-status "error" (exn-message e))
+                (raise e))))])
     (define audio
       (ensure-audio!
        episode
@@ -230,8 +237,14 @@
                                 (current-job-id))))]
        [exn:fail?
         (lambda (e)
-          (episode-set-status! id 'transcript-status "error" (exn-message e))
-          (raise e))])
+          (if ((current-job-cancelled?))
+              (begin
+                (episode-set-status! id 'transcript-status "cancelled" "cancelled")
+                (raise (job-cancelled "cancelled" (current-continuation-marks)
+                                      (current-job-id))))
+              (begin
+                (episode-set-status! id 'transcript-status "error" (exn-message e))
+                (raise e))))])
     (define segments (hash-ref t 'segments))
     (define lang (hash-ref cfg 'target-lang))
     (define batches
@@ -296,8 +309,14 @@
                                 (current-job-id))))]
        [exn:fail?
         (lambda (e)
-          (episode-set-status! id 'summary-status "error" (exn-message e))
-          (raise e))])
+          (if ((current-job-cancelled?))
+              (begin
+                (episode-set-status! id 'summary-status "cancelled" "cancelled")
+                (raise (job-cancelled "cancelled" (current-continuation-marks)
+                                      (current-job-id))))
+              (begin
+                (episode-set-status! id 'summary-status "error" (exn-message e))
+                (raise e))))])
     (on-progress 10 "preparing transcript")
     (define full-text
       (string-join (for/list ([s (in-list (hash-ref t 'segments))]) (hash-ref s 'text)) " "))
@@ -412,8 +431,15 @@
              (not (hash-ref j 'cancel #f))
              (begin
                (hash-set! j 'cancel #t)
-               (cons #t (hash-ref j 'thread-box #f)))))))
-  (define worker (and accepted (let ([box (cdr accepted)]) (and box (unbox box)))))
+               (list #t
+                     (hash-ref j 'thread-box #f)
+                     (hash-ref j 'request-custodian #f)))))))
+  (define worker (and accepted (let ([box (second accepted)]) (and box (unbox box)))))
+  (define request-custodian (and accepted (third accepted)))
+  ;; Closing the request custodian unblocks a socket read that a break
+  ;; cannot interrupt on every platform (notably Windows); the stage turns
+  ;; the resulting exn:fail? into "cancelled" via current-job-cancelled?.
+  (when request-custodian (custodian-shutdown-all request-custodian))
   (when worker (break-thread worker))
   (and accepted #t))
 
@@ -450,13 +476,15 @@
                                          (cons 'pct 0)
                                          (cons 'cancel #f)
                                          (cons 'thread-box (box #f))
+                                         (cons 'request-custodian (make-custodian))
                                          (cons 'message "")
                                          (cons 'started (now-epoch))))])
               (hash-set! (job-manager-jobs mgr) id j)
-              id)))))
+              (cons id j))))))
   (unless started
     (error 'job-start! "another job is already running for this episode"))
-  (define id started)
+  (define id (car started))
+  (define job (cdr started))
   (define (progress pct [message ""])
     (when (job-cancel-requested? mgr id)
       (raise (job-cancelled "cancelled" (current-continuation-marks) id)))
@@ -465,7 +493,11 @@
   (define worker
     (thread
      (lambda ()
-       (parameterize ([current-job-id id])
+       (parameterize ([current-job-id id]
+                      [current-request-custodian
+                       (hash-ref job 'request-custodian)]
+                      [current-job-cancelled?
+                       (lambda () (job-cancel-requested? mgr id))])
          (with-handlers
              ([job-cancelled?
                (lambda (e)
