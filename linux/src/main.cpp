@@ -4021,13 +4021,17 @@ void subscribe_to_events() {
                   g_state.active_job_id != job_id) {
                 return;  // some other episode's job
               }
-              if (pct >= 100) {
+              bool const cancelled = message == "cancelled";
+              if (pct >= 100 || cancelled) {
                 std::string const episode = g_state.active_job_episode;
                 g_state.active_job_id.clear();
                 g_state.active_job_episode.clear();
                 set_job_ui("", 0.0, false);
-                // A non-empty terminal message is the job's error text.
-                if (!message.empty()) {
+                // A non-empty terminal message is the job's error text;
+                // the cancelled sentinel maps to the localized line.
+                if (cancelled) {
+                  set_status(tr("status.cancelled"));
+                } else if (!message.empty()) {
                   set_status(message.c_str());
                 }
                 reload_feeds();

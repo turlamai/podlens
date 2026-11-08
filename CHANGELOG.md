@@ -83,6 +83,21 @@ All notable changes to PodLens are documented here. Format follows
   at 100ms while a job runs; the durable fix (evented pipe transport)
   goes upstream to rivet.
 
+## 0.7.1 - 2026-11-08
+
+### Fixed
+- **Cancel interrupts an in-flight provider request.** `job-cancel` still
+  sets the checkpoint flag, but now also interrupts the job worker, so a
+  provider that accepts and never answers can no longer leave the job at
+  “Cancelling…” forever. Transcribe/translate/summarize mark their stage
+  `cancelled`, finished batches remain on disk, and the Windows/Linux hosts
+  return to idle.
+- Linux now treats the backend's `cancelled` event (pct 0) as terminal and
+  shows the localized “Job cancelled” line instead of leaving the progress
+  row up.
+- HTTP sockets are closed in a `dynamic-wind`, so an interrupted request
+  does not leak the connection.
+
 ## 0.7.0 - 2026-11-06
 
 ### Added
@@ -116,8 +131,8 @@ All notable changes to PodLens are documented here. Format follows
 ### Known issue
 - A cancel requested while an OpenAI HTTP request is blocked shows
   “Cancelling…” until that request returns; the flag is only checked at the
-  next stage/batch checkpoint. Found by the 0.7.0 VMPal pass; the fix belongs
-  to the next slice. See `docs/VERIFICATION-0.7.0.md`.
+  next stage/batch checkpoint. Found by the 0.7.0 VMPal pass; **fixed in
+  0.7.1**. See `docs/VERIFICATION-0.7.0.md`.
 
 ## 0.6.0 - 2026-11-06
 
