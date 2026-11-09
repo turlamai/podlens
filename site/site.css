@@ -1,0 +1,112 @@
+/* ============================================================
+   PodLens site.css — per-site sections only.
+   Shared frame (nav, hero, cards, footer, tokens) lives in
+   family.css from site-kit; do not duplicate it here.
+   ============================================================ */
+
+/* ---------- Showcase: real app screenshots ---------- */
+.showcase-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 18px;
+    align-items: start;
+}
+.showcase-grid figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+.showcase-grid .showcase-main { grid-row: span 2; }
+.showcase-grid img {
+    width: 100%;
+    height: auto;
+    border-radius: var(--kit-radius-m);
+    border: 1px solid var(--kit-border);
+    background: var(--kit-bg-elevated);
+    box-shadow: var(--kit-shadow);
+}
+.showcase-grid figcaption {
+    font-size: 13px;
+    color: var(--kit-text-2);
+    line-height: 1.55;
+}
+@media (max-width: 900px) {
+    .showcase-grid { grid-template-columns: 1fr; }
+    .showcase-grid .showcase-main { grid-row: auto; }
+}
+
+/* ---------- Small centered notes under sections ---------- */
+.note {
+    margin-top: 26px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--kit-text-2);
+    max-width: 74ch;
+    margin-inline: auto;
+    line-height: 1.65;
+}
+.note a {
+    color: var(--kit-accent-strong);
+    font-weight: 600;
+}
+html[data-theme="dark"] .note a { color: var(--kit-accent); }
+.note a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Download cards (macOS + Windows only, per product decision) ---------- */
+.dl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 18px;
+    max-width: 640px;
+    margin: 44px auto 0;
+}
+.dl-card { text-align: center; color: var(--kit-text); }
+.dl-card:hover { color: var(--kit-text); }
+.dl-card h3 { font-size: 18px; margin-bottom: 4px; }
+.dl-card p { font-size: 13.5px; color: var(--kit-text-2); }
+
+/* ---------- Start-here extras ---------- */
+.start-limits {
+    margin-top: 30px;
+    font-size: 14px;
+    line-height: 1.65;
+    max-width: 74ch;
+}
+.start-limits a {
+    color: var(--kit-accent-strong);
+    font-weight: 600;
+}
+html[data-theme="dark"] .start-limits a { color: var(--kit-accent); }
+.start-limits a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.start-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 26px;
+    margin-top: 20px;
+}
+.start-links a {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--kit-accent-strong);
+}
+html[data-theme="dark"] .start-links a { color: var(--kit-accent); }
+.start-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Support bar (below footer) ---------- */
+#product-support {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px 28px;
+    padding: 22px 24px;
+    background: var(--kit-bg-elevated);
+    border-top: 1px solid var(--kit-border);
+    font-size: 13.5px;
+}
+#product-support a { color: var(--kit-text-2); }
+#product-support a:hover { color: var(--kit-accent); }
+
+/* ---------- Icon visibility per theme ---------- */
+html[data-theme="light"] .kit-icon-moon { display: none; }
+html[data-theme="dark"] .kit-icon-sun { display: none; }
