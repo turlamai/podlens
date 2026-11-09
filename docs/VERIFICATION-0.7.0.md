@@ -45,7 +45,8 @@ kept the job at **正在取消…** while the in-flight OpenAI HTTP request was
 blocked. The cancel flag is honoured at the next checkpoint, so a request
 that never returns also never reaches that checkpoint. This is a backend
 network-timeout/cancellation gap, not a Windows UI regression; it is tracked
-for the next slice and does not lose already-written data.
+for the next slice and does not lose already-written data. Resolved for the
+UI in 0.7.5; see `VERIFICATION-0.7.5.md` for the residual worker limitation.
 
 ## Hashes
 

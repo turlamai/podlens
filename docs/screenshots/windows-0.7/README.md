@@ -12,6 +12,7 @@ listening fixture.
 | `vmpal-windows11-settings.jpg` | Settings with the DPAPI storage note and masked key |
 | `vmpal-windows11-focus.jpg` | Focus Listening, header band removed |
 | `vmpal-windows11-cancel.jpg` | Active pipeline job with the Cancel action |
+| `vmpal-windows11-cancelled-075.jpg` | 0.7.5: Cancel leaves the progress state immediately on Windows 11 |
 
 The journey also asserts the tab order, sentence activation, follow off/on,
 Focus round-trip, Settings save and application termination in

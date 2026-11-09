@@ -95,6 +95,12 @@ All notable changes to PodLens are documented here. Format follows
 - Windows keeps a generation token so a late poll/terminal callback cannot
   clear a newer job’s progress.
 
+### Known limitation
+- If the provider socket never returns, the worker and its stage status can
+  remain blocked until the OS timeout even though the UI is terminal. The
+  durable fix is moving provider I/O off the embedded runtime thread; see
+  `docs/VERIFICATION-0.7.5.md`.
+
 ## 0.7.4 - 2026-11-09
 
 ### Fixed
