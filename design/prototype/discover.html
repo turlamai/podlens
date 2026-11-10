@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PodLens — 发现</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 发现页专属：新用户空态引导 + 一键试听 ==== */
+  .dwrap { max-width: 920px; padding: 4px 24px 24px; }
+  .note { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; }
+  /* 空库引导：说明下一步，不弹窗打断 */
+  .empty-banner { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px;
+    border-radius: 14px; background: var(--accent-soft); color: var(--accent-deep); font-size: 12.5px; font-weight: 600; }
+  .dark .empty-banner { color: var(--accent); }
+  .search { display: flex; align-items: center; gap: 8px; height: 32px; margin-top: 14px; padding: 0 12px;
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; color: var(--ink-soft); font-size: 13px; }
+  .search .kb { margin-left: auto; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+  .dcard { display: flex; gap: 14px; padding: 16px; align-items: flex-start; }
+  .dcard .aw { width: 84px; height: 84px; border-radius: 14px; font-size: 20px; flex: none; box-shadow: 0 8px 16px rgba(0,0,0,.16); }
+  .dcard .tt { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .dcard .pub { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .dcard .desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; margin-top: 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dcard .acts { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .dcard .cat { margin-left: auto; font-size: 11px; color: var(--ink-soft); background: var(--raised); border-radius: 99px; padding: 2px 8px; }
+  .dcard .previewing { font-size: 11.5px; color: var(--accent-deep); font-weight: 600; }
+  .dark .dcard .previewing { color: var(--accent); }
+  /* PlayerBar 静默态 */
+  .np.quiet .mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); opacity: .55;
+    color: var(--on-accent); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="titlebar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="t">PodLens — 发现播客</div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" aria-label="切换亮暗主题" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><div class="mark">PL</div><div class="name">PodLens</div></div>
+        <nav class="nav">
+          <div class="item"><span class="ic">⌂</span>主页</div>
+          <div class="item active"><span class="ic">✦</span>发现</div>
+        </nav>
+        <div class="sect">资料库</div>
+        <nav class="nav">
+          <div class="item"><span class="ic">◷</span>最近更新</div>
+          <div class="item"><span class="ic">⊞</span>节目</div>
+          <div class="item"><span class="ic">⤓</span>已下载</div>
+        </nav>
+        <div class="sect">我的订阅</div>
+        <nav class="nav">
+          <div class="item"><span class="aw lg">LG</span><span>The Long Game<span class="sub">Boring advantages</span></span></div>
+          <div class="item" style="color:var(--accent);font-weight:600;"><span class="ic">＋</span>添加订阅</div>
+        </nav>
+        <div class="foot">
+          <span class="dot off"></span><span class="st">未配置 API key</span>
+          <span class="grow"></span><span class="ic">＋</span><span class="ic">⟳</span><span class="ic">⚙</span>
+        </div>
+      </aside>
+      <section class="main">
+        <div class="head">
+          <div>
+            <h1>发现播客</h1>
+            <div class="note">精选英文播客目录，点「添加」即订阅；不会自动订阅任何节目。</div>
+          </div>
+        </div>
+        <div class="view">
+          <div class="dwrap">
+            <div class="empty-banner">✦ 还没有订阅——从下面挑一档，点「添加」即可开始；也可以先「试听」最新一集</div>
+            <div class="search">⌕ 搜索全目录（iTunes）…<kbd>/</kbd></div>
+            <div class="grid">
+              <div class="card dcard">
+                <div class="aw td">TD</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="tt">The Design Details</div>
+                  <div class="pub">Design Details FM · 每周</div>
+                  <div class="desc">Conversations about design, craft and the decisions behind beloved software.</div>
+                  <div class="acts">
+                    <button class="btn primary">＋ 添加</button>
+                    <button class="btn">▶ 试听</button>
+                    <span class="cat">设计</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card dcard">
+                <div class="aw ds">DS</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="tt">Deep Sky Notes</div>
+                  <div class="pub">Sky &amp; Telescope · 双周</div>
+                  <div class="desc">Tour the night sky: galaxies, nebulae and the light that left before the stars.</div>
+                  <div class="acts">
+                    <button class="btn primary">＋ 添加</button>
+                    <button class="btn">▶ 试听</button>
+                    <span class="cat">科学</span>
+                  </div>
+                </div>
+              </div>
+              <!-- 试听进行态：诚实反馈，不静默 -->
+              <div class="card dcard">
+                <div class="aw mc">MC</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="tt">Machine, Carefully</div>
+                  <div class="pub">Careful Software · 每周</div>
+                  <div class="desc">What evaluation actually measures — and what it quietly misses.</div>
+                  <div class="acts">
+                    <button class="btn primary">＋ 添加</button>
+                    <button class="btn">■ 停止</button>
+                    <span class="previewing">正在下载试听音频…</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card dcard">
+                <div class="aw lg">LG</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="tt">The Long Game</div>
+                  <div class="pub">Longform Media · 双周</div>
+                  <div class="desc">Boring advantages: the compounding value of patient, unglamorous work.</div>
+                  <div class="acts">
+                    <button class="btn quiet">✓ 已订阅</button>
+                    <button class="btn">▶ 试听</button>
+                    <span class="cat">访谈</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- PlayerBar 静默态：未在播放 -->
+        <div class="pbar">
+          <div class="row">
+            <div class="np quiet"><span class="mark">PL</span>
+              <div class="tt"><div class="b" style="font-size:12px;">未在播放</div></div>
+            </div>
+            <div class="transport">
+              <button class="tbtn" aria-label="上一章" title="上一章">⏮</button>
+              <button class="tbtn" aria-label="快退 15 秒" title="快退 15 秒">15</button>
+              <button class="tbtn play" aria-label="播放" title="播放">▶</button>
+              <button class="tbtn" aria-label="快进 30 秒" title="快进 30 秒">30</button>
+              <button class="tbtn" aria-label="下一章" title="下一章">⏭</button>
+            </div>
+            <div class="grow">
+              <div class="track"></div>
+              <div class="times"><span>00:00</span><span>-00:00</span></div>
+            </div>
+            <div class="right"><span class="rate" role="button" aria-label="播放速率">1× ▾</span><span role="button" aria-label="睡眠定时" title="睡眠定时">☾ ▾</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

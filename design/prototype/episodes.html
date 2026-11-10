@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PodLens — 单集列表</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 单集列表专属：动作跟着对象走 ==== */
+  .fhead { display: flex; gap: 16px; padding: 16px 24px 12px; align-items: center; }
+  .fhead .aw { width: 72px; height: 72px; border-radius: 14px; font-size: 20px; flex: none; box-shadow: 0 8px 16px rgba(0,0,0,.16); }
+  .fhead h1 { font-size: 24px; font-weight: 700; letter-spacing: -.2px; }
+  .fhead .meta { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  .fhead .acts { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .list { max-width: 920px; padding: 0 24px 24px; }
+  .ep { display: flex; gap: 12px; padding: 14px 14px; align-items: flex-start; border-bottom: 1px solid var(--hairline); transition: background .14s ease-out; }
+  .ep:last-child { border-bottom: none; }
+  .ep:hover { background: color-mix(in srgb, var(--raised) 55%, transparent); }
+  .ep .unheard { margin-top: 9px; }
+  .ep .heard { margin-top: 9px; width: 8px; flex: none; }
+  .ep .tt { font-size: 15px; font-weight: 600; line-height: 1.35; }
+  .ep .desc { font-size: 13px; color: var(--ink-soft); line-height: 1.45; margin-top: 3px;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .ep .meta { font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
+  .ep .meta .sep { opacity: .55; }
+  .ep .side { flex: none; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  /* 行内作业进度（转写中）：可见但安静 */
+  .job { margin-top: 7px; display: flex; align-items: center; gap: 10px; max-width: 320px; }
+  .job .track { flex: 1; height: 3px; }
+  .job .st { font-size: 11px; color: var(--accent-deep); font-weight: 600; white-space: nowrap; }
+  .dark .job .st { color: var(--accent); }
+  /* 成本预估行：诚实原则 */
+  .est { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; }
+  .est b { color: var(--warning); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="titlebar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="t">PodLens — The Design Details</div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" aria-label="切换亮暗主题" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><div class="mark">PL</div><div class="name">PodLens</div></div>
+        <nav class="nav">
+          <div class="item"><span class="ic">⌂</span>主页</div>
+          <div class="item"><span class="ic">✦</span>发现</div>
+        </nav>
+        <div class="sect">资料库</div>
+        <nav class="nav">
+          <div class="item"><span class="ic">◷</span>最近更新</div>
+          <div class="item"><span class="ic">⊞</span>节目</div>
+          <div class="item"><span class="ic">⤓</span>已下载</div>
+        </nav>
+        <div class="sect">我的订阅</div>
+        <nav class="nav">
+          <div class="item active"><span class="aw td">TD</span><span>The Design Details<span class="sub">Why the best interf…</span></span><span class="pill">2</span></div>
+          <div class="item"><span class="aw ds">DS</span><span>Deep Sky Notes<span class="sub">The light that left b…</span></span><span class="pill">1</span></div>
+          <div class="item"><span class="aw mc">MC</span><span>Machine, Carefully<span class="sub">What evaluation act…</span></span><span class="pill">2</span></div>
+          <div class="item" style="color:var(--accent);font-weight:600;"><span class="ic">＋</span>添加订阅</div>
+        </nav>
+        <div class="foot">
+          <span class="dot"></span><span class="st">API 已连接</span>
+          <span class="grow"></span><span class="ic">＋</span><span class="ic">⟳</span><span class="ic">⚙</span>
+        </div>
+      </aside>
+      <section class="main">
+        <div class="fhead">
+          <div class="aw td">TD</div>
+          <div style="flex:1;min-width:0;">
+            <h1>The Design Details</h1>
+            <div class="meta">42 集 · 每周四更新 · 未听 2</div>
+            <div class="acts">
+              <button class="btn primary">▶ 播放全部</button>
+              <button class="btn">⟳ 刷新</button>
+              <button class="btn quiet">✓ 全部标为已听</button>
+            </div>
+          </div>
+        </div>
+        <div class="view">
+          <div class="list card" style="padding:4px;">
+            <!-- 已完成态：重复收听入口直接可见 -->
+            <div class="ep">
+              <span class="unheard"></span>
+              <div style="flex:1;min-width:0;">
+                <div class="tt">An empty state should explain the next action</div>
+                <div class="desc">Empty states are the cheapest copy in your product and the most read…</div>
+                <div class="meta">11月6日<span class="sep">·</span>48m</div>
+                <div class="chips"><span class="chip">⤓ 已下载</span><span class="chip">逐句翻译就绪</span><span class="chip">总结就绪</span></div>
+              </div>
+              <div class="side"><button class="btn primary">▶ 播放</button></div>
+            </div>
+            <!-- 进行态：行内进度 + 取消（可见但安静，不弹窗） -->
+            <div class="ep">
+              <span class="unheard"></span>
+              <div style="flex:1;min-width:0;">
+                <div class="tt">The light that left before the stars</div>
+                <div class="desc">Astronomers keep finding light from galaxies that should not exist…</div>
+                <div class="meta">11月4日<span class="sep">·</span>36m</div>
+                <div class="chips"><span class="chip busy">转写中…</span></div>
+                <div class="job"><div class="track"><div class="fill" style="width:46%"></div></div><span class="st">46% · 第 3/7 段</span><button class="btn" style="height:22px;font-size:11px;">取消</button></div>
+              </div>
+              <div class="side"><button class="btn" disabled style="opacity:.45;">▶ 播放</button></div>
+            </div>
+            <!-- 未处理态：一键听懂 + 成本预估先行 -->
+            <div class="ep">
+              <span class="unheard"></span>
+              <div style="flex:1;min-width:0;">
+                <div class="tt">Line height and measure decide whether people stay</div>
+                <div class="desc">Reading rhythm is invisible until it is wrong. We test three measures…</div>
+                <div class="meta">10月28日<span class="sep">·</span>52m</div>
+                <div class="est">一键听懂：<b>将翻译约 52,300 字符</b>（费用由你的 API key 承担）</div>
+              </div>
+              <div class="side"><button class="btn promote">✦ 一键听懂</button></div>
+            </div>
+            <!-- 未配置 key 的诚实状态：不阻塞播放 -->
+            <div class="ep">
+              <span class="heard"></span>
+              <div style="flex:1;min-width:0;">
+                <div class="tt">Defaults are the most honest part of a product</div>
+                <div class="desc">We shipped three defaults this year. Each one was an argument…</div>
+                <div class="meta">10月21日<span class="sep">·</span>54m<span class="sep">·</span>已听完</div>
+                <div class="chips"><span class="chip warn">未配置 API key</span></div>
+                <div class="est">在设置里填入任意 OpenAI 兼容服务的 key，即可生成逐句稿与总结；播放不受影响。</div>
+              </div>
+              <div class="side"><button class="btn">▶ 重听</button><button class="btn promote">配置 API key</button></div>
+            </div>
+            <!-- 已听完：重听一步可达 -->
+            <div class="ep">
+              <span class="heard"></span>
+              <div style="flex:1;min-width:0;">
+                <div class="tt">Why the best interfaces disappear</div>
+                <div class="desc">The best interface is the one you never notice…</div>
+                <div class="meta">11月2日<span class="sep">·</span>54m<span class="sep">·</span>已听完</div>
+                <div class="chips"><span class="chip">逐句翻译就绪</span><span class="chip">总结就绪</span></div>
+              </div>
+              <div class="side"><button class="btn">▶ 重听</button><button class="btn quiet">逐句稿</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="pbar">
+          <div class="row">
+            <div class="np"><div class="aw td">TD</div>
+              <div class="tt"><div class="a">Why the best interfaces disap…</div><div class="b">The Design Details</div></div>
+            </div>
+            <div class="transport">
+              <button class="tbtn" aria-label="上一章" title="上一章">⏮</button>
+              <button class="tbtn" aria-label="快退 15 秒" title="快退 15 秒">15</button>
+              <button class="tbtn play" aria-label="暂停" title="暂停">⏸</button>
+              <button class="tbtn" aria-label="快进 30 秒" title="快进 30 秒">30</button>
+              <button class="tbtn" aria-label="下一章" title="下一章">⏭</button>
+            </div>
+            <div class="grow">
+              <div class="track"><div class="fill" style="width:12%"></div><div class="tick" style="left:31%"></div><div class="tick" style="left:64%"></div></div>
+              <div class="times"><span>00:38</span><span>-53:22</span></div>
+            </div>
+            <div class="right"><span class="rate" role="button" aria-label="播放速率">1× ▾</span><span role="button" aria-label="睡眠定时" title="睡眠定时">☾ ▾</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

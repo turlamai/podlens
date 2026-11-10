@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PodLens — 总结</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 总结 tab 专属：结构化卡片 + 锚点回放 ==== */
+  .detail { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ehead { display: flex; gap: 16px; padding: 16px 24px 12px; align-items: flex-start;
+    background: linear-gradient(180deg, var(--accent-soft), transparent 88%); }
+  .ehead .aw { width: 96px; height: 96px; border-radius: 10px; font-size: 24px; flex: none; box-shadow: 0 8px 16px rgba(0,0,0,.16); }
+  .ehead h2 { font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -.2px; }
+  .ehead .meta { font-size: 13px; color: var(--ink-soft); margin-top: 5px; }
+  .ehead .meta .sep { opacity: .55; }
+  .tools { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 24px; border-bottom: 1px solid var(--hairline); }
+  .tabs { display: flex; gap: 4px; background: var(--raised); border-radius: 99px; padding: 3px; }
+  .tabs .tab { font-size: 12.5px; font-weight: 600; padding: 4px 14px; border-radius: 99px; color: var(--ink-soft); }
+  .tabs .tab.on { background: var(--accent); color: var(--on-accent); }
+  .reading { width: 780px; max-width: 100%; margin: 0 auto; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+  .scard { padding: 16px 18px; }
+  .scard .lab { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .scard .tldr { font-family: var(--serif); font-size: 17px; line-height: 1.5; }
+  .pt { display: flex; gap: 10px; padding: 6px 0; font-size: 14px; line-height: 1.5; }
+  .pt .n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-deep);
+    font-size: 11px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+  .dark .pt .n { color: var(--accent); }
+  /* 引语：从原句锚点重放（重复收听） */
+  .quote { padding: 10px 14px; border-left: 2.5px solid var(--accent); background: var(--raised); border-radius: 0 8px 8px 0; margin-bottom: 10px; }
+  .quote .en { font-family: var(--serif); font-size: 15px; font-style: italic; line-height: 1.5; }
+  .quote .zh { font-size: 13px; color: var(--ink-soft); margin-top: 4px; line-height: 1.5; }
+  .quote .anchor { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11.5px; font-weight: 600; color: var(--accent); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-deep); }
+  .dark .tag { color: var(--accent); }
+  .notes { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+  .regen { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="titlebar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="t">PodLens — The Design Details</div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" aria-label="切换亮暗主题" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><div class="mark">PL</div><div class="name">PodLens</div></div>
+        <nav class="nav">
+          <div class="item"><span class="ic">⌂</span>主页</div>
+          <div class="item"><span class="ic">✦</span>发现</div>
+        </nav>
+        <div class="sect">资料库</div>
+        <nav class="nav">
+          <div class="item"><span class="ic">◷</span>最近更新</div>
+          <div class="item"><span class="ic">⊞</span>节目</div>
+          <div class="item"><span class="ic">⤓</span>已下载</div>
+        </nav>
+        <div class="sect">我的订阅</div>
+        <nav class="nav">
+          <div class="item active"><span class="aw td">TD</span><span>The Design Details<span class="sub">Why the best interf…</span></span><span class="pill">2</span></div>
+          <div class="item"><span class="aw ds">DS</span><span>Deep Sky Notes<span class="sub">The light that left b…</span></span><span class="pill">1</span></div>
+          <div class="item"><span class="aw mc">MC</span><span>Machine, Carefully<span class="sub">What evaluation act…</span></span><span class="pill">2</span></div>
+          <div class="item" style="color:var(--accent);font-weight:600;"><span class="ic">＋</span>添加订阅</div>
+        </nav>
+        <div class="foot">
+          <span class="dot"></span><span class="st">API 已连接</span>
+          <span class="grow"></span><span class="ic">＋</span><span class="ic">⟳</span><span class="ic">⚙</span>
+        </div>
+      </aside>
+      <section class="main">
+        <div class="detail">
+          <div class="ehead">
+            <div class="aw td">TD</div>
+            <div style="flex:1;min-width:0;">
+              <h2>Why the best interfaces disappear</h2>
+              <div class="meta">The Design Details<span class="sep">·</span>11月2日<span class="sep">·</span>54m</div>
+              <div class="chips"><span class="chip ok">✓ 已就绪</span><span class="chip">总结由 glm-4.7 生成 · 11月3日</span></div>
+            </div>
+            <button class="iconbtn" title="专注聆听" style="width:30px;height:30px;">⤢</button>
+          </div>
+          <div class="tools">
+            <div class="tabs"><span class="tab">逐句稿</span><span class="tab on">总结</span></div>
+            <span style="flex:1;"></span>
+            <button class="btn">◎ 当前句</button>
+          </div>
+          <div class="view">
+            <div class="reading">
+              <div class="card scard">
+                <div class="lab">一句话总结</div>
+                <div class="tldr">好的界面靠做减法赢得注意力——这一集用排版、默认值与空状态三个例子，说明「看不见的界面」为什么是好界面。</div>
+              </div>
+              <div class="card scard">
+                <div class="lab">要点</div>
+                <div class="pt"><span class="n">1</span><span>每多一个控件就多索取一次注意力，减法是默认动作。（00:06）</span></div>
+                <div class="pt"><span class="n">2</span><span>逐句稿是阅读界面，行高与栏宽决定读者是否留下。（00:29）</span></div>
+                <div class="pt"><span class="n">3</span><span>播放器可以很小，因为文字足够大。（00:45）</span></div>
+                <div class="pt"><span class="n">4</span><span>默认状态是产品最诚实的部分，每个默认值都该有理由。（00:53）</span></div>
+                <div class="pt"><span class="n">5</span><span>空状态说明下一步而不是道歉——它是一集里被读得最多的文案。（01:01）</span></div>
+              </div>
+              <div class="card scard">
+                <div class="lab">值得记的话</div>
+                <div class="quote">
+                  <div class="en">“Defaults are the most honest part of a product.”</div>
+                  <div class="zh">默认状态是一个产品最诚实的部分。</div>
+                  <span class="anchor">▶ 从 00:53 重听</span>
+                </div>
+                <div class="quote">
+                  <div class="en">“A transcript is a reading surface, so set it like one.”</div>
+                  <div class="zh">逐句稿是阅读界面，就该按阅读来排版。</div>
+                  <span class="anchor">▶ 从 00:29 重听</span>
+                </div>
+              </div>
+              <div class="card scard">
+                <div class="lab">话题标签</div>
+                <div class="tags"><span class="tag">设计系统</span><span class="tag">排版</span><span class="tag">默认值</span><span class="tag">空状态</span></div>
+              </div>
+              <div class="card scard">
+                <div class="lab">节目笔记（来自订阅源）</div>
+                <div class="notes">This week we walk through three interfaces that earned attention by refusing to demand it. Show notes and links at designdetails.fm/episodes/212.</div>
+              </div>
+              <div class="regen"><span>逐句稿、翻译与总结都已就绪，无需重复计费。</span><button class="btn" style="height:24px;font-size:11.5px;">↺ 重新生成</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="pbar">
+          <div class="row">
+            <div class="np"><div class="aw td">TD</div>
+              <div class="tt"><div class="a">Why the best interfaces disap…</div><div class="b">The Design Details</div></div>
+            </div>
+            <div class="transport">
+              <button class="tbtn" aria-label="上一章" title="上一章">⏮</button>
+              <button class="tbtn" aria-label="快退 15 秒" title="快退 15 秒">15</button>
+              <button class="tbtn play" aria-label="暂停" title="暂停">⏸</button>
+              <button class="tbtn" aria-label="快进 30 秒" title="快进 30 秒">30</button>
+              <button class="tbtn" aria-label="下一章" title="下一章">⏭</button>
+            </div>
+            <div class="grow">
+              <div class="track"><div class="fill" style="width:12%"></div><div class="tick" style="left:31%"></div><div class="tick" style="left:64%"></div></div>
+              <div class="times"><span>00:38</span><span>-53:22</span></div>
+            </div>
+            <div class="right"><span class="rate" role="button" aria-label="播放速率">1× ▾</span><span role="button" aria-label="睡眠定时" title="睡眠定时">☾ ▾</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>

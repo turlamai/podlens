@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PodLens — 设置（BYOK）</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ==== 设置专属：BYOK 密钥卫生 + 诚实存储状态 ==== */
+  .swrap { max-width: 780px; padding: 4px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .grp { padding: 4px 0; }
+  .grp .gt { font-size: 13px; font-weight: 700; color: var(--accent-deep); padding: 10px 18px 2px; }
+  .dark .grp .gt { color: var(--accent); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 9px 18px; border-top: 1px solid var(--hairline); }
+  .row .lab { width: 150px; flex: none; font-size: 13px; font-weight: 600; }
+  .row .lab .sub { display: block; font-size: 11px; font-weight: 400; color: var(--ink-soft); line-height: 1.4; margin-top: 2px; }
+  .row .val { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink-soft); }
+  .row .ctl { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+  .field { flex: 1; max-width: 300px; height: 28px; padding: 0 10px; font-size: 12.5px; color: var(--ink);
+    background: var(--canvas); border: 1px solid var(--hairline); border-radius: 8px; display: flex; align-items: center; }
+  .field.mono { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; }
+  .switch { width: 34px; height: 20px; border-radius: 99px; background: var(--hairline); position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: auto; right: 2px; }
+  .stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; }
+  .stepper span { padding: 4px 10px; font-size: 12.5px; font-family: var(--mono); background: var(--canvas); }
+  .stepper b { padding: 4px 8px; font-size: 12px; background: var(--raised); color: var(--ink-soft); }
+  /* 密钥卫生：掩码 + 存储状态 + 免计费测试 */
+  .keystate { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--positive); font-weight: 600; }
+  .testresult { font-size: 11.5px; color: var(--positive); }
+</style>
+</head>
+<body>
+  <div class="window" id="app">
+    <div class="titlebar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="t">PodLens — 设置</div>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" aria-label="切换亮暗主题" title="切换亮暗主题">◐</button>
+    </div>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><div class="mark">PL</div><div class="name">PodLens</div></div>
+        <nav class="nav">
+          <div class="item"><span class="ic">⌂</span>主页</div>
+          <div class="item"><span class="ic">✦</span>发现</div>
+        </nav>
+        <div class="sect">资料库</div>
+        <nav class="nav">
+          <div class="item"><span class="ic">◷</span>最近更新</div>
+          <div class="item"><span class="ic">⊞</span>节目</div>
+          <div class="item"><span class="ic">⤓</span>已下载</div>
+        </nav>
+        <div class="sect">我的订阅</div>
+        <nav class="nav">
+          <div class="item"><span class="aw td">TD</span><span>The Design Details<span class="sub">Why the best interf…</span></span><span class="pill">2</span></div>
+          <div class="item"><span class="aw ds">DS</span><span>Deep Sky Notes<span class="sub">The light that left b…</span></span><span class="pill">1</span></div>
+          <div class="item"><span class="aw mc">MC</span><span>Machine, Carefully<span class="sub">What evaluation act…</span></span><span class="pill">2</span></div>
+          <div class="item" style="color:var(--accent);font-weight:600;"><span class="ic">＋</span>添加订阅</div>
+        </nav>
+        <div class="foot" style="color:var(--accent);font-weight:600;">
+          <span class="dot"></span><span class="st">API 已连接</span>
+          <span class="grow"></span><span class="ic">＋</span><span class="ic">⟳</span><span class="ic" style="color:var(--accent);">⚙</span>
+        </div>
+      </aside>
+      <section class="main">
+        <div class="head">
+          <h1>设置</h1>
+          <div class="date">所有设置保存在本机 ~/.podlens/config.json</div>
+        </div>
+        <div class="view">
+          <div class="swrap">
+            <div class="card grp">
+              <div class="gt">资料库</div>
+              <div class="row"><span class="lab">统计</span><span class="val">4 档订阅 · 132 集 · 未听 5</span><button class="btn">⟳ 刷新全部订阅</button></div>
+            </div>
+            <div class="card grp">
+              <div class="gt">通用</div>
+              <div class="row"><span class="lab">界面语言<span class="sub">运行时切换仅 macOS；Windows/Linux 随构建与 PODLENS_LANG</span></span>
+                <span class="ctl"><span class="field" style="max-width:160px;justify-content:space-between;">中文（跟随系统）<span>▾</span></span></span></div>
+              <div class="row"><span class="lab">自动更新<span class="sub">Ed25519 签名清单</span></span><span class="ctl"><span class="switch on"></span></span></div>
+              <div class="row"><span class="lab">自动刷新</span><span class="ctl"><span class="field" style="max-width:160px;justify-content:space-between;">每 30 分钟<span>▾</span></span></span></div>
+            </div>
+            <div class="card grp">
+              <div class="gt">模型（BYOK）</div>
+              <div class="row"><span class="lab">API Base<span class="sub">任意 OpenAI 兼容服务</span></span>
+                <span class="ctl"><span class="field">https://api.openai.com/v1</span></span></div>
+              <div class="row"><span class="lab">API Key<span class="sub">密钥存入系统保险库，不进 config.json，永不同步</span></span>
+                <span class="ctl"><span class="field mono">••••••••••••••••3f9a</span>
+                  <button class="btn" style="height:28px;">显示</button>
+                  <button class="btn" style="height:28px;color:var(--danger);">移除</button></span></div>
+              <div class="row"><span class="lab">存储状态</span>
+                <span class="ctl"><span class="keystate"><span class="dot"></span>已存入 macOS 钥匙串（Keychain）</span></span></div>
+              <div class="row"><span class="lab">测试连接<span class="sub">不产生计费 token</span></span>
+                <span class="ctl"><button class="btn primary" style="height:28px;">⚡ 测试连接</button>
+                  <span class="testresult">✓ 连接成功 · chat/asr 端点可用</span></span></div>
+              <div class="row"><span class="lab">聊天模型<span class="sub">翻译与总结</span></span>
+                <span class="ctl"><span class="field" style="max-width:220px;">gpt-4o-mini</span></span></div>
+              <div class="row"><span class="lab">转写模型</span>
+                <span class="ctl"><span class="field" style="max-width:220px;">whisper-1</span></span></div>
+              <div class="row"><span class="lab">目标语言</span>
+                <span class="ctl"><span class="field" style="max-width:160px;justify-content:space-between;">中文<span>▾</span></span></span></div>
+            </div>
+            <div class="card grp">
+              <div class="gt">管线</div>
+              <div class="row"><span class="lab">分片秒数</span><span class="ctl"><span class="stepper"><b>－</b><span>300</span><b>＋</b></span></span></div>
+              <div class="row"><span class="lab">单次最大字符</span><span class="ctl"><span class="stepper"><b>－</b><span>4000</span><b>＋</b></span></span></div>
+              <div class="row"><span class="lab">搜索结果上限</span><span class="ctl"><span class="stepper"><b>－</b><span>8</span><b>＋</b></span></span></div>
+            </div>
+            <div class="card grp">
+              <div class="gt">存储</div>
+              <div class="row"><span class="lab">数据目录</span><span class="val" style="font-family:var(--mono);font-size:11.5px;">~/.podlens · 129.4 MB</span>
+                <button class="btn">在访达中显示</button><button class="btn">重新加载资料库</button></div>
+            </div>
+            <div class="card grp">
+              <div class="gt">关于</div>
+              <div class="row"><span class="lab">版本</span><span class="val">PodLens 0.7.5 · AGPL-3.0 · podlens.jrtx.site</span>
+                <button class="btn">检查更新</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="pbar">
+          <div class="row">
+            <div class="np"><div class="aw td" style="opacity:.55;">TD</div>
+              <div class="tt"><div class="b" style="font-size:12px;">未在播放</div></div>
+            </div>
+            <div class="transport">
+              <button class="tbtn" aria-label="上一章" title="上一章">⏮</button>
+              <button class="tbtn" aria-label="快退 15 秒" title="快退 15 秒">15</button>
+              <button class="tbtn play" aria-label="播放" title="播放">▶</button>
+              <button class="tbtn" aria-label="快进 30 秒" title="快进 30 秒">30</button>
+              <button class="tbtn" aria-label="下一章" title="下一章">⏭</button>
+            </div>
+            <div class="grow">
+              <div class="track"></div>
+              <div class="times"><span>00:00</span><span>-00:00</span></div>
+            </div>
+            <div class="right"><span class="rate" role="button" aria-label="播放速率">1× ▾</span><span role="button" aria-label="睡眠定时" title="睡眠定时">☾ ▾</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      document.getElementById('app').classList.toggle('dark');
+    });
+  </script>
+</body>
+</html>
