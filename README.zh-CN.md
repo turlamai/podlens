@@ -20,7 +20,7 @@
 |---|---|---|
 | macOS 14+（Apple Silicon 与 Intel） | `podlens-<version>-macos-<arch>.dmg`——`arm64` / `x64`（ad-hoc 签名——首次启动右键 → 打开） | 应用内更新（签名清单），或重新安装新版 DMG |
 | Windows 10+ x64 | `podlens-<version>-windows-x64.msi` 安装器（含开始菜单/桌面快捷方式），或 `podlens-<version>-windows-x64.zip` 便携版 | 便携版：应用内下载并换装（签名清单）；MSI：重新运行新版安装器（应用内会提示） |
-| Linux x64 / arm64 | `podlens-<version>-linux-x64.AppImage` / `podlens-<version>-linux-arm64.AppImage`（自带 GTK4 依赖）、`podlens-<version>-linux-<发行版架构>.deb`（随包附带 GStreamer 插件闭包含 `gst-libav`，保证 m4a/mp3 可播）、`.rpm`，或便携版 `tar.gz`/`.zip` | tar.gz/AppImage：应用内检查并下载（签名清单）；deb/rpm：用系统包管理器升级 |
+| Linux x64 / arm64 | `podlens-<version>-linux-x86_64.AppImage` / `podlens-<version>-linux-aarch64.AppImage`（自带 GTK4 依赖）、`podlens-<version>-linux-<发行版架构>.deb`（随包附带 GStreamer 插件闭包含 `gst-libav`，保证 m4a/mp3 可播）、`.rpm`，或便携版 `tar.gz`/`.zip` | tar.gz/AppImage：应用内检查并下载（签名清单）；deb/rpm：用系统包管理器升级 |
 
 每个发布都带 `SHA256SUMS` 校验清单和 Sigstore 构建来源证明（`gh attestation verify <file> -R turlamai/podlens`）。
 
