@@ -226,6 +226,36 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: raco rivet release --without-updates --development
+      - name: Flatpak bundle
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH="${{ matrix.arch }}"
+          case "$ARCH" in x64) FPARCH=x86_64 ;; arm64) FPARCH=aarch64 ;; esac
+          sudo apt-get install --yes flatpak flatpak-builder
+          # User-level everything: runner accounts install runtimes and
+          # build without root. GNOME 50 is the oldest supported platform
+          # runtime (48 went EOL 2026-03-24); its glibc 2.42 covers the
+          # ubuntu-24.04-built payload.
+          flatpak --user remote-add --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --user install -y --noninteractive flathub \
+            "org.gnome.Platform/${FPARCH}/50" "org.gnome.Sdk/${FPARCH}/50"
+          # The manifest template carries version/arch/sha placeholders so
+          # the archive source's checksum is exact per release.
+          cp "dist/podlens-${VERSION}-linux-${ARCH}.tar.gz" .
+          SHA="$(sha256sum "podlens-${VERSION}-linux-${ARCH}.tar.gz" | cut -d' ' -f1)"
+          sed -e "s/__VERSION__/${VERSION}/" -e "s/__ARCH__/${ARCH}/" \
+              -e "s/__SHA256__/${SHA}/" \
+              flatpak/site.jrtx.podlens.yml > site.jrtx.podlens.gen.yml
+          # --disable-rofiles-fuse: runners have no /dev/fuse.
+          flatpak-builder --user --force-clean --disable-rofiles-fuse \
+            --repo=flatpak-repo flatpak-build site.jrtx.podlens.gen.yml
+          flatpak build-bundle flatpak-repo \
+            "podlens-${VERSION}-linux-${ARCH}.flatpak" site.jrtx.podlens stable
+          rm -rf flatpak-build flatpak-repo "podlens-${VERSION}-linux-${ARCH}.tar.gz"
+          mv "podlens-${VERSION}-linux-${ARCH}.flatpak" dist/
+          test -s "dist/podlens-${VERSION}-linux-${ARCH}.flatpak"
       - name: Collect artifacts + checksums
         run: |
           set -euo pipefail
@@ -312,6 +342,7 @@ jobs:
             linux-arm64.tar.gz linux-arm64.zip linux-x64.tar.gz linux-x64.zip \
             linux-amd64.deb linux-arm64.deb \
             linux-aarch64.AppImage linux-x86_64.AppImage \
+            linux-x64.flatpak linux-arm64.flatpak \
             linux-arm64.sbom.cdx.json linux-x64.sbom.cdx.json \
             linux-arm64-THIRD_PARTY_NOTICES.txt linux-x64-THIRD_PARTY_NOTICES.txt; do
             name="podlens-$VERSION-$suffix"
@@ -328,7 +359,7 @@ jobs:
           cd public
           shasum -a 256 podlens-* | LC_ALL=C sort -k2 > SHA256SUMS
           shasum -a 256 --check SHA256SUMS
-          test "$(grep -c '^' SHA256SUMS)" -eq 20
+          test "$(grep -c '^' SHA256SUMS)" -eq 22
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -349,6 +380,6 @@ jobs:
               fi
             done
       - name: Attest public build provenance
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: public/*

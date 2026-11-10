@@ -20,7 +20,7 @@ Download from [Releases](https://github.com/turlamai/podlens/releases/latest):
 |---|---|---|
 | macOS 14+ (Apple Silicon & Intel) | `podlens-<version>-macos-<arch>.dmg` — `arm64` / `x64` (ad-hoc signed — first launch: right-click → Open) | in-app (signed manifest), or reinstall the newer DMG |
 | Windows 10+ x64 | `podlens-<version>-windows-x64.msi` installer (start-menu & desktop shortcuts), or `podlens-<version>-windows-x64.zip` portable | portable: in-app download & install (signed manifest); MSI: re-run the newer installer (the app points you to it) |
-| Linux x64 / arm64 | `podlens-<version>-linux-x86_64.AppImage` / `podlens-<version>-linux-aarch64.AppImage` (bundled GTK4), `podlens-<version>-linux-<distro-arch>.deb` (ships the GStreamer plugin closure incl. `gst-libav` for m4a/mp3), `.rpm`, or the portable `tar.gz`/`.zip` | tarball/AppImage: in-app check + download (signed manifest); deb/rpm: upgrade through the package manager |
+| Linux x64 / arm64 | `podlens-<version>-linux-x86_64.AppImage` / `podlens-<version>-linux-aarch64.AppImage` (bundled GTK4), `podlens-<version>-linux-<distro-arch>.deb` (ships the GStreamer plugin closure incl. `gst-libav` for m4a/mp3), `.rpm`, the portable `tar.gz`/`.zip`, or a `podlens-<version>-linux-<arch>.flatpak` bundle (app id `site.jrtx.podlens`; install with `flatpak --user install` — sandboxed data dir, so it starts a fresh library) | tarball/AppImage: in-app check + download (signed manifest); deb/rpm: upgrade through the package manager; Flatpak bundle: install the newer bundle the same way |
 
 Every release carries a `SHA256SUMS` manifest and Sigstore build provenance
 (`gh attestation verify <file> -R turlamai/podlens`).

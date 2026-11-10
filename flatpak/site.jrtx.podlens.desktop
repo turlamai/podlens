@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PodLens
+Comment=Podcasts, in your language
+Exec=RivetHost
+Icon=site.jrtx.podlens
+Terminal=false
+Categories=Audio;AudioVideo;Network;
+StartupWMClass=PodLens
