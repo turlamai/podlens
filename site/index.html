@@ -5,17 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PodLens — 听得懂的英文播客</title>
-    <meta name="description" content="PodLens: 用你自己的大模型 API 把英文播客转写、逐句翻译、总结。macOS、Windows 与 Linux 原生应用。">
+    <meta name="description" content="PodLens: 用你自己的大模型 API 把英文播客变成可阅读的逐句稿——逐句对照翻译、总结，当前句跟随回溯，进度永续。macOS、Windows 与 Linux 原生应用。">
     <link rel="canonical" href="https://podlens.jrtx.site/">
     <meta name="theme-color" content="#D97757">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="PodLens">
     <meta property="og:title" content="PodLens — 听得懂的英文播客">
-    <meta property="og:description" content="PodLens: 用你自己的大模型 API 把英文播客转写、逐句翻译、总结。macOS、Windows 与 Linux 原生应用。">
+    <meta property="og:description" content="PodLens: 用你自己的大模型 API 把英文播客变成可阅读的逐句稿——逐句对照翻译、总结，当前句跟随回溯，进度永续。macOS、Windows 与 Linux 原生应用。">
     <meta property="og:url" content="https://podlens.jrtx.site/">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="PodLens — 听得懂的英文播客">
-    <meta name="twitter:description" content="用你自己的大模型 API 把英文播客转写、逐句翻译、总结。">
+    <meta name="twitter:description" content="用你自己的大模型 API 把英文播客变成可读的逐句稿：逐句翻译、总结，听读一体，进度永续。">
 
     <!-- Theme & language pre-paint: no flash before the stylesheet paints. -->
     <script>
@@ -85,7 +85,7 @@
                 <span class="kit-eyebrow" data-i18n="hero.eyebrow">开源 · 本地优先 · 原生应用 · BYOK</span>
                 <h1><span data-i18n="hero.h1a">听得懂的</span><span class="kit-accent-word" data-i18n="hero.h1b">英文播客</span></h1>
                 <p class="kit-hero-meta"><span class="kit-badge" data-i18n="hero.badge">开发预览。免费 BYOK 应用。不提供 PodLens 托管 AI 订阅；模型用量由配置的服务商收费。</span></p>
-                <p class="kit-lead" data-i18n="hero.lead">PodLens 把每一集英文播客变成「逐句稿 + 对照翻译 + 一页总结」。转写、翻译、总结都走你自己的大模型 API，结果缓存在本机，一次生成，永久可读。</p>
+                <p class="kit-lead" data-i18n="hero.lead">PodLens 把英文播客变成可阅读的逐句稿：原文与译文对照排版，当前句跟随高亮，听岔的一句随时回溯。播放进度与阅读上下文存放在本机，下次打开接着上次继续。转写、翻译、总结都走你自己的大模型 API，结果一次生成，永久可读。</p>
                 <div class="kit-btn-row">
                     <div class="kit-dl">
                         <a class="kit-btn kit-btn--primary" data-kit-dl-primary href="https://github.com/turlamai/podlens/releases/latest">
@@ -98,12 +98,13 @@
                         <ul class="kit-dl-menu">
                             <li><a href="https://github.com/turlamai/podlens/releases/latest" data-kit-dl="mac"><span class="kit-dl-os" data-i18n="dl.mac">macOS 版</span><span class="kit-dl-kind">.dmg</span></a></li>
                             <li><a href="https://github.com/turlamai/podlens/releases/latest" data-kit-dl="win"><span class="kit-dl-os" data-i18n="dl.win">Windows 版</span><span class="kit-dl-kind">.msi</span></a></li>
+                            <li><a href="https://github.com/turlamai/podlens/releases/latest" data-kit-dl="linux"><span class="kit-dl-os" data-i18n="dl.linux">Linux 版</span><span class="kit-dl-kind">.AppImage</span></a></li>
                             <li class="kit-dl-note kit-hidden" data-kit-dl-note data-i18n="dl.menu-note">移动端与未知平台请前往 Releases 页面选取对应安装包。</li>
                         </ul>
                     </div>
                     <a class="kit-btn kit-btn--secondary" href="https://github.com/turlamai/podlens" data-i18n="hero.source">查看源码</a>
                 </div>
-                <p class="kit-hero-meta" data-i18n="hero.platforms">macOS 14+（Apple Silicon 与 Intel）· Windows 10+</p>
+                <p class="kit-hero-meta" data-i18n="hero.platforms">macOS 14+（Apple Silicon 与 Intel）· Windows 10+ · Linux（x64 / arm64）</p>
             </div>
         </section>
 
@@ -112,7 +113,7 @@
             <div class="kit-container">
                 <span class="kit-kicker" data-i18n="nav.showcase">界面</span>
                 <h2 class="kit-h2" data-i18n="showcase.title">看得见的阅读体验</h2>
-                <p class="kit-lead" data-i18n="showcase.lead">真实的 macOS 0.7 界面：逐句稿按阅读排版，专注聆听收起资料库，播放器常驻。截图使用合成节目，不含任何真实账号或密钥。</p>
+                <p class="kit-lead" data-i18n="showcase.lead">真实的 macOS 界面（0.6 拍摄，0.7 起三端共用同一阅读体验）：逐句稿按阅读排版，专注聆听收起资料库，播放器常驻。截图使用合成节目，不含任何真实账号或密钥。</p>
                 <div class="showcase-grid" style="margin-top: 44px;">
                     <figure class="showcase-main">
                         <img src="screenshots/reading-0.6.png" alt="PodLens focus listening with a bilingual transcript" loading="lazy" width="1600" height="1000">
@@ -134,17 +135,22 @@
         <!-- Features -->
         <section class="kit-section" id="features">
             <div class="kit-container">
-                <h2 class="kit-h2" data-i18n="features.title">一集播客，三层收获</h2>
+                <h2 class="kit-h2" data-i18n="features.title">为重复收听而设计</h2>
                 <div class="kit-grid kit-grid--3" style="margin-top: 44px;">
                     <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">📝</span>
                         <h3 data-i18n="f1.title">逐句稿</h3>
-                        <p data-i18n="f1.body">接任意 OpenAI 兼容转写端点（Whisper 等），输出带时间戳的逐句稿，跟随播放高亮，点句子即跳转。</p>
+                        <p data-i18n="f1.body">接任意 OpenAI 兼容转写端点（Whisper 等），输出带时间戳的逐句稿：当前句高亮跟随，点句子即跳转播放；听岔了往回翻，「当前句」一键归位并恢复跟随。</p>
+                    </div>
+                    <div class="kit-card">
+                        <span class="kit-card-icon" aria-hidden="true">🎧</span>
+                        <h3 data-i18n="f8.title">继续收听</h3>
+                        <p data-i18n="f8.body">回到应用，第一眼就是上次那一集：细进度条、剩余时间、一键续播；听完的单集从头重听一步可达。播放进度与阅读上下文存在本机，重启、切视图都不丢。</p>
                     </div>
                     <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">🌍</span>
                         <h3 data-i18n="f2.title">对照翻译</h3>
-                        <p data-i18n="f2.body">逐句对齐翻译成中文，双语 / 只看译文 / 只看原文一键切换。听不懂的那一句，低头就有答案。</p>
+                        <p data-i18n="f2.body">逐句对齐翻译成中文或英文，双语 / 只看译文 / 只看原文一键切换。听不懂的那一句，低头就有答案。</p>
                     </div>
                     <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">✨</span>
@@ -152,24 +158,29 @@
                         <p data-i18n="f3.body">每集自动生成一句话总结、5–8 条要点、值得记的话和话题标签——五分钟吸收一小时的内容。</p>
                     </div>
                     <div class="kit-card">
+                        <span class="kit-card-icon" aria-hidden="true">✅</span>
+                        <h3 data-i18n="f9.title">状态诚实</h3>
+                        <p data-i18n="f9.body">没配 key 照样播放，AI 全部可选；「一键听懂」执行前先确认文本量，进行中的作业随时取消；阶段没完成就不会标「已就绪」——界面说的每句话都对得上真实状态。</p>
+                    </div>
+                    <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">🔑</span>
                         <h3 data-i18n="f4.title">BYOK</h3>
-                        <p data-i18n="f4.body">OpenAI、DeepSeek、Groq、SiliconFlow、Ollama——任意 OpenAI 兼容端点。key 存在本机，从不上传。</p>
+                        <p data-i18n="f4.body">OpenAI、DeepSeek、Groq、SiliconFlow、Ollama——任意 OpenAI 兼容端点。key 存进系统安全存储（Keychain / DPAPI / Secret Service），从不上传。</p>
                     </div>
                     <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">🖥️</span>
                         <h3 data-i18n="f5.title">真原生</h3>
-                        <p data-i18n="f5.body">基于 Rivet：一份 Racket 核心嵌入进程内，macOS 是 SwiftUI，Windows 是 WinUI 3。没有 Electron，没有套壳。</p>
+                        <p data-i18n="f5.body">基于 Rivet：一份 Racket 核心嵌入进程内，macOS 是 SwiftUI，Windows 是 WinUI 3，Linux 是 GTK4。没有 Electron，没有套壳。</p>
+                    </div>
+                    <div class="kit-card">
+                        <span class="kit-card-icon" aria-hidden="true">🧭</span>
+                        <h3 data-i18n="f7.title">精选目录</h3>
+                        <p data-i18n="f7.body">「发现」面板内置 16 档经典英文播客（科技/安全/科学/设计/商业/资讯），每张卡片先试听再添加，绝不自动订阅；也能全目录搜索（iTunes Search API，无需密钥）。</p>
                     </div>
                     <div class="kit-card">
                         <span class="kit-card-icon" aria-hidden="true">⌨️</span>
                         <h3 data-i18n="f6.title">Agent 友好</h3>
                         <p data-i18n="f6.body">同一核心的 CLI：add / transcribe / summarize / --json / 稳定退出码。让编码 agent 替你处理播客。</p>
-                    </div>
-                    <div class="kit-card">
-                        <span class="kit-card-icon" aria-hidden="true">🧭</span>
-                        <h3 data-i18n="f7.title">精选目录</h3>
-                        <p data-i18n="f7.body">内置 16 档经典英文播客（科技/安全/科学/设计/商业/资讯），「发现」面板一键添加，绝不自动订阅；每个条目发布前都实测可达。</p>
                     </div>
                 </div>
             </div>
@@ -221,8 +232,8 @@
             </div>
         </section>
 
-        <!-- Download: macOS + Windows only (product decision; Linux builds ship on
-             the Releases page but get no direct button here, as before). -->
+        <!-- Download: macOS / Windows / Linux — all three carry release assets.
+             Linux resolves to the AppImage; deb / rpm / archives live on the Releases page. -->
         <section class="kit-section kit-section--alt" id="download">
             <div class="kit-container">
                 <h2 class="kit-h2" data-i18n="download.title">下载</h2>
@@ -235,8 +246,12 @@
                         <h3>Windows</h3>
                         <p data-i18n="dl.win-desc">10+ · x64 · MSI 安装器 / 便携 zip</p>
                     </a>
+                    <a class="kit-card dl-card" data-kit-dl="linux" href="https://github.com/turlamai/podlens/releases/latest">
+                        <h3>Linux</h3>
+                        <p data-i18n="dl.linux-desc">x64 / arm64 · AppImage（自带 GTK4）· 另有 deb / rpm / 归档</p>
+                    </a>
                 </div>
-                <p class="note"><a href="https://github.com/turlamai/podlens/releases/latest" data-i18n="download.all">全部版本</a> · <span data-i18n="download.note">Windows：MSI 安装器自带开始菜单/桌面快捷方式，zip 为便携版；macOS：首次启动（未公证构建）右键 → 打开。更新通过 Ed25519 签名清单自动推送。</span></p>
+                <p class="note"><a href="https://github.com/turlamai/podlens/releases/latest" data-i18n="download.all">全部版本</a> · <span data-i18n="download.note">Windows：MSI 安装器自带开始菜单/桌面快捷方式，zip 为便携版；macOS：首次启动（未公证构建）右键 → 打开；Linux：AppImage 免安装，deb / rpm 经包管理器升级。AppImage 与便携版的更新通过 Ed25519 签名清单自动推送。</span></p>
             </div>
         </section>
 
@@ -257,7 +272,7 @@
                         <p data-i18n="start.s3">先测试短节目并检查用量，再验证逐句稿导出和播放恢复，最后处理大型资料库。</p>
                     </div>
                 </div>
-                <p class="start-limits kit-text-2"><span data-i18n="start.limits-a">取消与恢复、安全存储及三宿主打包证据仍在 </span><a href="https://github.com/turlamai/podlens/issues/13">#13</a><span data-i18n="start.limits-b">跟进。Windows MSI 更新使用新版安装器，不会静默替换安装目录。</span></p>
+                <p class="start-limits kit-text-2"><span data-i18n="start.limits">作业取消、安全存储与三平台安装包均已交付；macOS 公证与 Windows Authenticode 签名仍在路线图上，进度见 GitHub Issues。</span></p>
                 <div class="start-links">
                     <a href="https://github.com/turlamai/podlens/blob/main/docs/USER-GUIDE.zh-CN.md" data-en-href="https://github.com/turlamai/podlens/blob/main/docs/USER-GUIDE.md" data-i18n="start.guide">安装、隐私与恢复</a>
                     <a href="https://github.com/turlamai/podlens/issues" data-i18n="start.help">反馈与帮助</a>
@@ -323,31 +338,34 @@
             "hero.eyebrow": "开源 · 本地优先 · 原生应用 · BYOK",
             "hero.h1a": "听得懂的", "hero.h1b": "英文播客",
             "hero.badge": "开发预览。免费 BYOK 应用。不提供 PodLens 托管 AI 订阅；模型用量由配置的服务商收费。",
-            "hero.lead": "PodLens 把每一集英文播客变成「逐句稿 + 对照翻译 + 一页总结」。转写、翻译、总结都走你自己的大模型 API，结果缓存在本机，一次生成，永久可读。",
+            "hero.lead": "PodLens 把英文播客变成可阅读的逐句稿：原文与译文对照排版，当前句跟随高亮，听岔的一句随时回溯。播放进度与阅读上下文存放在本机，下次打开接着上次继续。转写、翻译、总结都走你自己的大模型 API，结果一次生成，永久可读。",
             "hero.source": "查看源码",
-            "hero.platforms": "macOS 14+（Apple Silicon 与 Intel）· Windows 10+",
+            "hero.platforms": "macOS 14+（Apple Silicon 与 Intel）· Windows 10+ · Linux（x64 / arm64）",
             "dl.generic": "下载最新版",
             "dl.mac": "macOS 版", "dl.win": "Windows 版",
-            "dl.linux": "下载最新版",
+            "dl.linux": "Linux 版",
             "dl.menu-note": "移动端与未知平台请前往 Releases 页面选取对应安装包。",
             "dl.mac-desc": "14+ · Apple Silicon & Intel · DMG",
             "dl.win-desc": "10+ · x64 · MSI 安装器 / 便携 zip",
+            "dl.linux-desc": "x64 / arm64 · AppImage（自带 GTK4）· 另有 deb / rpm / 归档",
             "download.title": "下载", "download.all": "全部版本",
-            "download.note": "Windows：MSI 安装器自带开始菜单/桌面快捷方式，zip 为便携版；macOS：首次启动（未公证构建）右键 → 打开。更新通过 Ed25519 签名清单自动推送。",
+            "download.note": "Windows：MSI 安装器自带开始菜单/桌面快捷方式，zip 为便携版；macOS：首次启动（未公证构建）右键 → 打开；Linux：AppImage 免安装，deb / rpm 经包管理器升级。AppImage 与便携版的更新通过 Ed25519 签名清单自动推送。",
             "showcase.title": "看得见的阅读体验",
-            "showcase.lead": "真实的 macOS 0.7 界面：逐句稿按阅读排版，专注聆听收起资料库，播放器常驻。截图使用合成节目，不含任何真实账号或密钥。",
+            "showcase.lead": "真实的 macOS 界面（0.6 拍摄，0.7 起三端共用同一阅读体验）：逐句稿按阅读排版，专注聆听收起资料库，播放器常驻。截图使用合成节目，不含任何真实账号或密钥。",
             "showcase.reading": "专注聆听 · 双语逐句稿、当前句高亮、常驻播放器",
             "showcase.home": "主页 · 继续收听、待播清单与资料库",
             "showcase.settings": "原生设置 · 密钥存放于系统安全存储，连接检查不计费",
             "showcase.note": "0.7 起 Windows 与 Linux 也具备三种阅读模式、作业取消与安全存储提示；控件保持 WinUI / GTK 原生，不复制 macOS 外观。",
-            "features.title": "一集播客，三层收获",
-            "f1.title": "逐句稿", "f1.body": "接任意 OpenAI 兼容转写端点（Whisper 等），输出带时间戳的逐句稿，跟随播放高亮，点句子即跳转。",
-            "f2.title": "对照翻译", "f2.body": "逐句对齐翻译成中文，双语 / 只看译文 / 只看原文一键切换。听不懂的那一句，低头就有答案。",
+            "features.title": "为重复收听而设计",
+            "f1.title": "逐句稿", "f1.body": "接任意 OpenAI 兼容转写端点（Whisper 等），输出带时间戳的逐句稿：当前句高亮跟随，点句子即跳转播放；听岔了往回翻，「当前句」一键归位并恢复跟随。",
+            "f8.title": "继续收听", "f8.body": "回到应用，第一眼就是上次那一集：细进度条、剩余时间、一键续播；听完的单集从头重听一步可达。播放进度与阅读上下文存在本机，重启、切视图都不丢。",
+            "f2.title": "对照翻译", "f2.body": "逐句对齐翻译成中文或英文，双语 / 只看译文 / 只看原文一键切换。听不懂的那一句，低头就有答案。",
             "f3.title": "一页总结", "f3.body": "每集自动生成一句话总结、5–8 条要点、值得记的话和话题标签——五分钟吸收一小时的内容。",
-            "f4.title": "BYOK", "f4.body": "OpenAI、DeepSeek、Groq、SiliconFlow、Ollama——任意 OpenAI 兼容端点。key 存在本机，从不上传。",
-            "f5.title": "真原生", "f5.body": "基于 Rivet：一份 Racket 核心嵌入进程内，macOS 是 SwiftUI，Windows 是 WinUI 3。没有 Electron，没有套壳。",
+            "f9.title": "状态诚实", "f9.body": "没配 key 照样播放，AI 全部可选；「一键听懂」执行前先确认文本量，进行中的作业随时取消；阶段没完成就不会标「已就绪」——界面说的每句话都对得上真实状态。",
+            "f4.title": "BYOK", "f4.body": "OpenAI、DeepSeek、Groq、SiliconFlow、Ollama——任意 OpenAI 兼容端点。key 存进系统安全存储（Keychain / DPAPI / Secret Service），从不上传。",
+            "f5.title": "真原生", "f5.body": "基于 Rivet：一份 Racket 核心嵌入进程内，macOS 是 SwiftUI，Windows 是 WinUI 3，Linux 是 GTK4。没有 Electron，没有套壳。",
             "f6.title": "Agent 友好", "f6.body": "同一核心的 CLI：add / transcribe / summarize / --json / 稳定退出码。让编码 agent 替你处理播客。",
-            "f7.title": "精选目录", "f7.body": "内置 16 档经典英文播客（科技/安全/科学/设计/商业/资讯），「发现」面板一键添加，绝不自动订阅；每个条目发布前都实测可达。",
+            "f7.title": "精选目录", "f7.body": "「发现」面板内置 16 档经典英文播客（科技/安全/科学/设计/商业/资讯），每张卡片先试听再添加，绝不自动订阅；也能全目录搜索（iTunes Search API，无需密钥）。",
             "pipeline.title": "三步流水线",
             "s1.title": "转写", "s1.body": "音频进 ASR 端点，长单集自动分段，逐句带时间戳缓存。",
             "s2.title": "翻译", "s2.body": "逐句送入对话模型，编号对齐返回，翻译永远和原句一一对应。",
@@ -364,8 +382,7 @@
             "start.s1": "通过发现页搜索或添加播客 RSS，先播放一集，不启动 AI 任务。",
             "start.s2": "分别选择具备音频转写和文本翻译能力的服务商与模型；二者能力可能不同。",
             "start.s3": "先测试短节目并检查用量，再验证逐句稿导出和播放恢复，最后处理大型资料库。",
-            "start.limits-a": "取消与恢复、安全存储及三宿主打包证据仍在 ",
-            "start.limits-b": " 跟进。Windows MSI 更新使用新版安装器，不会静默替换安装目录。",
+            "start.limits": "作业取消、安全存储与三平台安装包均已交付；macOS 公证与 Windows Authenticode 签名仍在路线图上，进度见 GitHub Issues。",
             "start.guide": "安装、隐私与恢复", "start.help": "反馈与帮助",
             "footer.built": "基于 Rivet 构建",
             "footer.product": "产品", "footer.family": "家族", "footer.legal": "条款",
@@ -378,31 +395,34 @@
             "hero.eyebrow": "Open source · Local-first · Native · BYOK",
             "hero.h1a": "Podcasts, ", "hero.h1b": "in your language",
             "hero.badge": "Development preview. Free BYOK application. There is no PodLens hosted-AI subscription; your configured providers charge for their usage.",
-            "hero.lead": "PodLens turns every English episode into a transcript, a sentence-aligned translation and a one-page summary — powered by your own LLM API key, cached locally, yours forever.",
+            "hero.lead": "PodLens turns English podcasts into something you can read: original and translation side by side, the current sentence highlighted as it plays, and any line you missed one glance away. Your playback position and reading context stay on your machine, so next time you pick up where you left off. Transcription, translation and summary run through your own LLM API — generated once, readable forever.",
             "hero.source": "View source",
-            "hero.platforms": "macOS 14+ (Apple Silicon & Intel) · Windows 10+ · Linux",
+            "hero.platforms": "macOS 14+ (Apple Silicon & Intel) · Windows 10+ · Linux (x64 / arm64)",
             "dl.generic": "Download the latest",
             "dl.mac": "For macOS", "dl.win": "For Windows",
-            "dl.linux": "Download the latest",
+            "dl.linux": "For Linux",
             "dl.menu-note": "On mobile or unknown platforms, pick the right package from the Releases page.",
             "dl.mac-desc": "14+ · Apple Silicon & Intel · DMG",
             "dl.win-desc": "10+ · x64 · MSI installer / portable zip",
+            "dl.linux-desc": "x64 / arm64 · AppImage (GTK4 bundled) · also deb / rpm / archives",
             "download.title": "Download", "download.all": "All releases",
-            "download.note": "Windows: the MSI installer adds start-menu and desktop shortcuts; the zip is the portable build. macOS: first launch of an unnotarized build — right-click → Open. Updates ship through an Ed25519-signed manifest.",
+            "download.note": "Windows: the MSI installer adds start-menu and desktop shortcuts; the zip is the portable build. macOS: first launch of an unnotarized build — right-click → Open. Linux: the AppImage runs as-is; deb / rpm upgrade through the package manager. AppImage and portable builds update in-app through an Ed25519-signed manifest.",
             "showcase.title": "A reading experience you can see",
-            "showcase.lead": "The real macOS 0.7 interface: a transcript set for reading, Focus Listening that gets the library out of the way, and a player that stays. Screenshots use a synthetic show — no real account or key.",
+            "showcase.lead": "Real macOS screenshots (taken on 0.6; the same reading experience ships on all three platforms since 0.7): a transcript set for reading, Focus Listening that gets the library out of the way, and a player that stays. Screenshots use a synthetic show — no real account or key.",
             "showcase.reading": "Focus Listening · bilingual transcript, current sentence, persistent player",
             "showcase.home": "Home · Continue Listening, Up Next and the library",
             "showcase.settings": "Native Settings · key in the OS vault, connection check with no token billing",
             "showcase.note": "Since 0.7, Windows and Linux also have the three reading modes, job cancellation and storage transparency; controls remain native WinUI / GTK rather than macOS copies.",
-            "features.title": "One episode, three layers",
-            "f1.title": "Transcript", "f1.body": "Any OpenAI-compatible ASR endpoint (Whisper and friends) produces timestamped sentences that highlight along with playback — tap a line to seek.",
-            "f2.title": "Aligned translation", "f2.body": "Sentence-aligned Chinese translation with bilingual / translation-only / original-only views. The sentence you missed is one glance away.",
+            "features.title": "Designed for repeat listening",
+            "f1.title": "Transcript", "f1.body": "Any OpenAI-compatible ASR endpoint (Whisper and friends) produces timestamped sentences: the current line highlights as you listen and any click seeks — stray backwards, then one tap on Current returns to the playing sentence and resumes following.",
+            "f8.title": "Continue listening", "f8.body": "Reopen the app and the first thing you see is the episode you were on: a slim progress bar, time remaining, one click to resume. Finished episodes restart from the top in one step. Position and reading context live on your machine — restarts and view switches never lose them.",
+            "f2.title": "Aligned translation", "f2.body": "Sentence-aligned translation into Chinese or English with bilingual / translation-only / original-only views. The sentence you missed is one glance away.",
             "f3.title": "One-page summary", "f3.body": "Every episode gets a TL;DR, 5–8 key points, notable quotes and topic tags — an hour of talk in five minutes.",
-            "f4.title": "BYOK", "f4.body": "OpenAI, DeepSeek, Groq, SiliconFlow, Ollama — any OpenAI-compatible endpoint. Your key stays on your machine.",
-            "f5.title": "Truly native", "f5.body": "Built on Rivet: one Racket core embedded in-process, SwiftUI on macOS and WinUI 3 on Windows. No Electron, no wrapper.",
+            "f9.title": "Honest states", "f9.body": "Play without a key — every AI step is optional. Understand confirms the text volume before anything runs, running jobs cancel at any time, and nothing is marked ready before its stage has finished — the UI only says what is true.",
+            "f4.title": "BYOK", "f4.body": "OpenAI, DeepSeek, Groq, SiliconFlow, Ollama — any OpenAI-compatible endpoint. Your key goes into the OS vault (Keychain / DPAPI / Secret Service) and never leaves your machine.",
+            "f5.title": "Truly native", "f5.body": "Built on Rivet: one Racket core embedded in-process — SwiftUI on macOS, WinUI 3 on Windows, GTK4 on Linux. No Electron, no wrapper.",
             "f6.title": "Agent-friendly", "f6.body": "A CLI over the same core: add / transcribe / summarize / --json / stable exit codes. Let your coding agent handle podcasts.",
-            "f7.title": "Curated catalog", "f7.body": "16 classic English shows (tech, security, science, design, business, news) in a Discover panel — one tap to add, never auto-subscribed; every entry is verified live before each release.",
+            "f7.title": "Curated catalog", "f7.body": "The Discover panel carries 16 classic English shows (tech, security, science, design, business, news) — audition any card, add it in one tap, never auto-subscribed. Full-directory search via the iTunes Search API needs no key.",
             "pipeline.title": "A three-step pipeline",
             "s1.title": "Transcribe", "s1.body": "Audio goes to the ASR endpoint; long episodes are auto-chunked; sentences cache with timestamps.",
             "s2.title": "Translate", "s2.body": "Numbered lines go to a chat model and come back aligned — a translation always maps 1:1 to its sentence.",
@@ -419,8 +439,7 @@
             "start.s1": "Search Discover or add a podcast RSS URL, then play an episode without starting AI jobs.",
             "start.s2": "Choose providers appropriate for audio transcription and text translation; they may require different model capabilities.",
             "start.s3": "Test a short episode, inspect usage, then check transcript export and playback recovery before processing a large library.",
-            "start.limits-a": "Cancellation/recovery, secure storage and three-host packaged evidence remain tracked in ",
-            "start.limits-b": ". Windows MSI updates use a new installer rather than silently replacing the installation.",
+            "start.limits": "Job cancellation, secure storage and three-platform installers are all delivered; macOS notarization and Windows Authenticode signing remain on the roadmap — progress lives in GitHub Issues.",
             "start.guide": "Installation, privacy & recovery", "start.help": "Get help",
             "footer.built": "Built on Rivet",
             "footer.product": "Product", "footer.family": "Family", "footer.legal": "Legal",
@@ -430,14 +449,19 @@
     }
     </script>
 
-    <!-- Download config: macOS + Windows only — the page deliberately offers no
-         Linux button (Linux builds ship on the Releases page). -->
+    <!-- Download config: macOS / Windows / Linux — the resolver picks the
+         per-platform asset; Linux gets the AppImage, the other Linux formats
+         (deb / rpm / tar.gz / zip) live on the Releases page. -->
     <script type="application/json" id="kit-download">
     {
         "repo": "turlamai/podlens",
         "assets": {
             "mac": "podlens-{v}-macos-{arch}.dmg",
-            "win": "podlens-{v}-windows-x64.msi"
+            "win": "podlens-{v}-windows-x64.msi",
+            "linux": "podlens-{v}-linux-{arch}.AppImage"
+        },
+        "archMap": {
+            "linux": { "x64": "x86_64", "arm64": "aarch64" }
         }
     }
     </script>

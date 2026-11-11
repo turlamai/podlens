@@ -104,7 +104,7 @@ var _hmt = _hmt || [];
         <h2 data-i18n="qs.title">五分钟上手</h2>
         <p data-i18n="qs.intro">下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。</p>
         <ol>
-          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。</li>
+          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage（自带 GTK4），或安装 deb / rpm / 解压归档。</li>
           <li data-i18n="qs.s2"><strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。</li>
           <li data-i18n="qs.s3"><strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。</li>
           <li data-i18n="qs.s4"><strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href="#byok">BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。</li>
@@ -129,11 +129,11 @@ var _hmt = _hmt || [];
       <section class="manual-section" id="pipeline">
         <h2 data-i18n="pipe.title">转写 / 翻译 / 总结</h2>
         <p data-i18n="pipe.p1">选中一集，点 <strong>一键听懂</strong>：下载 → 转写 → 翻译 → 总结，一次排队完成。已完成的阶段自动跳过——中断后重跑，只为缺的部分付费。</p>
-        <p data-i18n="pipe.p2">动手之前先看价：操作区显示字符与句数估算（BYOK 账单是真金白银）。逐句稿支持双语 / 只看译文 / 只看原文三种视图，点句子即跳转播放。</p>
+        <p data-i18n="pipe.p2">动手之前先看量：「一键听懂」执行前会确认文本量——句数与字符预估一目了然（BYOK 账单是真金白银）。逐句稿支持双语 / 只看译文 / 只看原文三种视图，点句子即跳转播放。</p>
         <ul>
           <li data-i18n="pipe.l1">播放：倍速 1.0–3.0×，±15/30 秒快进快退，睡眠定时器，章节跳转（播客含 Podcasting 2.0 章节时）。</li>
           <li data-i18n="pipe.l2">连续播放：一集听完自动接同一节目下一集；下次打开从上次的进度继续。</li>
-          <li data-i18n="pipe.l3">系统媒体键、Control Center（macOS）与任务栏媒体控件（Windows）直接可用。</li>
+          <li data-i18n="pipe.l3">系统媒体键、Control Center（macOS）、任务栏媒体控件（Windows）与 MPRIS（Linux）直接可用。</li>
           <li data-i18n="pipe.l4">全部结果缓存在本机：一集只处理一次，结果永远可读、可导出。</li>
         </ul>
       </section>
@@ -141,7 +141,7 @@ var _hmt = _hmt || [];
       <!-- =================== BYOK =================== -->
       <section class="manual-section" id="byok">
         <h2 data-i18n="byok.title">BYOK 密钥配置</h2>
-        <p data-i18n="byok.p1">打开设置，分别配置音频和文本服务。密钥当前保存在 ~/.podlens/config.json，并用于向选择的服务商鉴权；安全存储迁移待完成，不要分享配置。</p>
+        <p data-i18n="byok.p1">打开设置，分别配置音频和文本服务。密钥保存在系统安全存储（macOS Keychain / Windows DPAPI / Linux Secret Service；没有可用保险库时回退为仅限当前用户的文件），从不出现在明文配置里。</p>
         <table>
           <thead>
             <tr>
@@ -192,11 +192,11 @@ var _hmt = _hmt || [];
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q3">支持哪些平台？</h3>
-          <p data-i18n="faq.a3">macOS 14+（Apple Silicon 与 Intel）和 Windows 10+（x64，MSI 安装器或便携 zip）。Linux 宿主在路线图上，暂无下载。</p>
+          <p data-i18n="faq.a3">macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、tar.gz/zip），全部在 Releases 页下载。</p>
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q4">界面语言和主题怎么换？</h3>
-          <p data-i18n="faq.a4">设置面板（<code>⌘,</code>）里有中文 / English 切换。深浅色主题跟随系统外观。CLI 输出语言由 <code>ui-lang</code> 配置控制。</p>
+          <p data-i18n="faq.a4">打开设置，里面有中文 / English 切换（macOS 快捷键 <code>⌘,</code>）。深浅色主题跟随系统外观。CLI 输出语言由 <code>ui-lang</code> 配置控制。</p>
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q5">怎么卸载？</h3>
@@ -231,7 +231,7 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "常见问题", "toc.faq": "FAQ",
     "qs.title": "五分钟上手",
     "qs.intro": "下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。",
-    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行。",
+    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage（自带 GTK4），或安装 deb / rpm / 解压归档。",
     "qs.s2": "<strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。",
     "qs.s3": "<strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。",
     "qs.s4": "<strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href='#byok'>BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。",
@@ -244,13 +244,13 @@ var _hmt = _hmt || [];
     "sub.l3": "取消订阅：右键订阅项即可，已生成的逐句稿和总结保留在本机。",
     "pipe.title": "转写 / 翻译 / 总结",
     "pipe.p1": "选中一集，点 <strong>一键听懂</strong>：下载 → 转写 → 翻译 → 总结，一次排队完成。已完成的阶段自动跳过——中断后重跑，只为缺的部分付费。",
-    "pipe.p2": "动手之前先看价：操作区显示字符与句数估算（BYOK 账单是真金白银）。逐句稿支持双语 / 只看译文 / 只看原文三种视图，点句子即跳转播放。",
+    "pipe.p2": "动手之前先看量：「一键听懂」执行前会确认文本量——句数与字符预估一目了然（BYOK 账单是真金白银）。逐句稿支持双语 / 只看译文 / 只看原文三种视图，点句子即跳转播放。",
     "pipe.l1": "播放：倍速 1.0–3.0×，±15/30 秒快进快退，睡眠定时器，章节跳转（播客含 Podcasting 2.0 章节时）。",
     "pipe.l2": "连续播放：一集听完自动接同一节目下一集；下次打开从上次的进度继续。",
-    "pipe.l3": "系统媒体键、Control Center（macOS）与任务栏媒体控件（Windows）直接可用。",
+    "pipe.l3": "系统媒体键、Control Center（macOS）、任务栏媒体控件（Windows）与 MPRIS（Linux）直接可用。",
     "pipe.l4": "全部结果缓存在本机：一集只处理一次，结果永远可读、可导出。",
     "byok.title": "BYOK 密钥配置",
-    "byok.p1": "打开设置，分别配置音频和文本服务。密钥当前保存在 ~/.podlens/config.json，并用于向选择的服务商鉴权；安全存储迁移待完成，不要分享配置。",
+    "byok.p1": "打开设置，分别配置音频和文本服务。密钥保存在系统安全存储（macOS Keychain / Windows DPAPI / Linux Secret Service；没有可用保险库时回退为仅限当前用户的文件），从不出现在明文配置里。",
     "byok.th1": "配置项", "byok.th2": "填什么",
     "byok.r1": "OpenAI 兼容服务的 API 地址，以 <code>/v1</code> 结尾，例如 <code>https://api.openai.com/v1</code>。DeepSeek、Groq、SiliconFlow、本地 Ollama 均可——具体地址看你的服务商文档。",
     "byok.r2": "服务商控制台里生成的密钥（<code>sk-…</code>）。粘贴进去，点保存。",
@@ -266,9 +266,9 @@ var _hmt = _hmt || [];
     "faq.q2": "需要注册账号吗？",
     "faq.a2": "不需要。没有账号、没有云端依赖。唯一的密钥是你自己的大模型 API key，存在本机。",
     "faq.q3": "支持哪些平台？",
-    "faq.a3": "macOS 14+（Apple Silicon 与 Intel）和 Windows 10+（x64，MSI 安装器或便携 zip）。Linux 宿主在路线图上，暂无下载。",
+    "faq.a3": "macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、tar.gz/zip），全部在 Releases 页下载。",
     "faq.q4": "界面语言和主题怎么换？",
-    "faq.a4": "设置面板（<code>⌘,</code>）里有中文 / English 切换。深浅色主题跟随系统外观。CLI 输出语言由 <code>ui-lang</code> 配置控制。",
+    "faq.a4": "打开设置，里面有中文 / English 切换（macOS 快捷键 <code>⌘,</code>）。深浅色主题跟随系统外观。CLI 输出语言由 <code>ui-lang</code> 配置控制。",
     "faq.q5": "怎么卸载？",
     "faq.a5": "两步：把应用移到废纸篓（Windows 卸载 MSI 或删掉便携目录），再删除 <code>~/.podlens/</code>。后者包含你的全部数据——不删它，重装后数据还在。",
     "faq.q6": "应用内更新失败了？",
@@ -287,7 +287,7 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "FAQ", "toc.faq": "FAQ",
     "qs.title": "Five-minute start",
     "qs.intro": "Download, open, set a key once, listen. That's the whole tutorial — everything else on this page is optional.",
-    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows.",
+    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows; on Linux run the AppImage (GTK4 bundled), or install the deb / rpm / unpack an archive.",
     "qs.s2": "<strong>First launch.</strong> The macOS build is unnotarized — right-click the app and choose Open first. There is no account and nothing to sign up for. The library starts empty and the Discover panel opens for you.",
     "qs.s3": "<strong>Add a podcast.</strong> Click <code>+</code> at the bottom left, paste the show's RSS URL, press Enter. Or pick one from the curated catalog in the Discover panel — one tap.",
     "qs.s4": "<strong>Set your key (once).</strong> Press <code>⌘,</code> (macOS) to open Settings and fill in <code>api-base</code> and <code>api-key</code> (see <a href='#byok'>BYOK setup</a> below). Transcription, translation and summary all run through your own LLM API.",
@@ -300,13 +300,13 @@ var _hmt = _hmt || [];
     "sub.l3": "Unsubscribe: right-click a show. Generated transcripts and summaries stay on your disk.",
     "pipe.title": "Transcribe / translate / summarize",
     "pipe.p1": "Select an episode and click <strong>Understand</strong>: download → transcribe → translate → summarize as one job. Finished stages are skipped — re-run after a failure and you only pay for what's missing.",
-    "pipe.p2": "Check the price first: the action row shows a sentence / character estimate before you start (BYOK bills are real money). The transcript has bilingual / translation-only / original-only views; click a line to seek.",
+    "pipe.p2": "Check the volume first: Understand shows a sentence / character estimate for confirmation before anything runs (BYOK bills are real money). The transcript has bilingual / translation-only / original-only views; click a line to seek.",
     "pipe.l1": "Playback: 1.0–3.0× speed, ±15/30 s skip, sleep timer, chapter jumps (when the feed carries Podcasting 2.0 chapters).",
     "pipe.l2": "Continuous playback: when an episode ends, the next one from the same show starts; reopening the app resumes where you stopped.",
-    "pipe.l3": "System media keys, Control Center (macOS) and taskbar media controls (Windows) work out of the box.",
+    "pipe.l3": "System media keys, Control Center (macOS), taskbar media controls (Windows) and MPRIS (Linux) work out of the box.",
     "pipe.l4": "Everything caches locally: an episode is processed once and stays readable and exportable.",
     "byok.title": "BYOK key setup",
-    "byok.p1": "Open Settings and configure audio/text providers separately. Keys currently live in ~/.podlens/config.json and authenticate requests to your selected provider; secure-storage migration is pending. Do not share that file.",
+    "byok.p1": "Open Settings and configure audio/text providers separately. Keys live in the OS vault (macOS Keychain / Windows DPAPI / Linux Secret Service; an owner-only file is the fallback when no vault exists) and never appear in plaintext config.",
     "byok.th1": "Setting", "byok.th2": "What to put in",
     "byok.r1": "The API base of an OpenAI-compatible service, ending in <code>/v1</code>, e.g. <code>https://api.openai.com/v1</code>. DeepSeek, Groq, SiliconFlow and local Ollama all work — check your provider's docs for the exact address.",
     "byok.r2": "The key you generated in the provider's console (<code>sk-…</code>). Paste it in and save.",
@@ -322,9 +322,9 @@ var _hmt = _hmt || [];
     "faq.q2": "Do I need an account?",
     "faq.a2": "No. No account, no cloud dependency. The only secret is your own LLM API key, stored locally.",
     "faq.q3": "Which platforms are supported?",
-    "faq.a3": "macOS 14+ (Apple Silicon and Intel) and Windows 10+ (x64, MSI installer or portable zip). A Linux host is on the roadmap; no downloads yet.",
+    "faq.a3": "macOS 14+ (Apple Silicon and Intel), Windows 10+ (x64, MSI installer or portable zip) and Linux (x64 / arm64: AppImage, deb, rpm, tar.gz/zip) — all from the Releases page.",
     "faq.q4": "How do I change the interface language or theme?",
-    "faq.a4": "The Settings sheet (<code>⌘,</code>) has a Chinese / English toggle. Dark and light follow the system appearance. CLI output language is controlled by the <code>ui-lang</code> setting.",
+    "faq.a4": "Settings has a Chinese / English toggle (<code>⌘,</code> on macOS). Dark and light follow the system appearance. CLI output language is controlled by the <code>ui-lang</code> setting.",
     "faq.q5": "How do I uninstall?",
     "faq.a5": "Two steps: move the app to the Trash (on Windows, uninstall the MSI or delete the portable folder), then delete <code>~/.podlens/</code>. That directory holds all your data — keep it and a reinstall picks up where you left off.",
     "faq.q6": "The in-app update failed.",
