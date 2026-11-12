@@ -19,23 +19,18 @@ Tokens 逐值提取自现行实现：真源 `docs/DESIGN-ROADMAP.md` §5，镜�
 - **键盘一等公民**：Space 播放/暂停、⌘←/→（Ctrl）seek、Return 跳到选中句、专注模式往返；文本框聚焦不抢键。
 - **每端都是第一方原生**：原型锁定信息架构、tokens 与交互逻辑；控件形态（sheet/ContentDialog/GTK 对话框）尊重平台习惯，不做像素复制。
 
-## Tokens（与实现 1:1，亮/暗成对）
+## Tokens（语义；值不在此复制，亮/暗成对）
 
-| Token | Light | Dark | 用途 |
-|---|---|---|---|
-| `--accent` | `#C15F3C` | `#E08A66` | 陶土橙：当前句、选中、进行态、主按钮 |
-| `--accent-soft` | `#F7E5DD` | `#3B2A22` | accent 弱底：当前句高亮底、跟随激活、徽标 |
-| `--canvas` | `#FAF7F2` | `#171614` | 窗口画布（暖纸白） |
-| `--surface` | `#FFFFFF` | `#232120` | 卡片/侧栏/PlayerBar |
-| `--raised` | `#F4EFE8` | `#2C2926` | 悬停/按下/嵌套底 |
-| `--hairline` | `#E8E2D9` | `#3A3733` | 唯一分隔线 |
-| `--ink` | `#1F1D1A` | `#F0EDE8` | 主文字 |
-| `--ink-soft` | `#6B6660` | `#A8A29B` | 次级文字/元信息 |
-| `--positive` | `#2E7D4F` | `#6FD08C` | 已就绪/成功 |
-| `--warning` | `#B25E14` | `#E8A25C` | 等待/注意 |
-| `--danger` | `#B3261E` | `#F27A72` | 失败/破坏性 |
+值类 token 真源 = `docs/DESIGN-ROADMAP.md` §5，镜像于三端实现（`windows/Themes/Tokens.xaml` · `macos-host/Sources/RivetHost/DesignSystem.swift` 的 Palette/Typeface/Space/Radius/Motion · `linux/src/main.cpp` 的 `@define-color`）；原型 `design/prototype/shared.css` 与其一一对应，本表只记语义与层级。
 
-- **on-accent** `#FFFFFF`；macOS 另有 hover 深变体 `accent-deep`（light `#9E4A2E` / dark `#E08A66`）。
+| Token | 语义 |
+|---|---|
+| `--accent --accent-soft` | 陶土橙：当前句/选中/进行态/主按钮 + 弱底（当前句高亮底、跟随激活、徽标） |
+| `--canvas --surface --raised --hairline` | 暖纸画布 / 卡片侧栏 PlayerBar / 悬停按下嵌套底 / 唯一分隔线（三层明度层级） |
+| `--ink --ink-soft` | 主/次级文字 |
+| `--positive --warning --danger` | 已就绪成功 / 等待注意 / 失败破坏性（双态均须达对比度） |
+
+- **on-accent** 为 accent 底上的文字（`#FFFFFF`）；macOS 另有 hover 深变体 `accent-deep`（值见 DesignSystem.swift）。
 - **字号阶**：11 micro / 12 caption / 13 callout / 14 body / 15 headline / 17 reading / 19 title / 24 display / 30 hero。**阅读排版**：原文 17 系统衬线（New York）、译文 14 sans、时间戳 10 mono，行高 1.45–1.55，栏宽 ≤780。
 - **字体栈**：`system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei"`；衬线 `ui-serif, "New York", Georgia`；等宽 `ui-monospace, "SF Mono", Menlo`。
 - **间距** 4/8/12/16/24/32/48。**圆角** 8 控件 / 10 封面 / 14 卡片 / 18 弹层。**动效** 0.14s ease-out（按压/悬停）、spring 0.34（模式切换），不做持续动画。
