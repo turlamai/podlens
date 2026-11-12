@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  RIVET_PIN: b9811930fcda0893cf5de40a41f4a25d539b958e
+  RIVET_PIN: d6e98896fffa3f484e9ea0162d807ad2518c1538
   KEEL_PIN: 76a5b9fdd01bde284d310ff5c05ec73972f64201
 
 jobs:
@@ -108,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up embeddable Racket CS
-        uses: turlamai/rivet/.github/actions/setup-embed-racket@b9811930fcda0893cf5de40a41f4a25d539b958e
+        uses: turlamai/rivet/.github/actions/setup-embed-racket@d6e98896fffa3f484e9ea0162d807ad2518c1538
       - name: Install native and pinned Racket dependencies
         shell: bash
         run: |

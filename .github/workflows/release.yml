@@ -15,7 +15,7 @@ concurrency:
 
 # Single source of truth for the rivet pin (matches ci.yml).
 env:
-  RIVET_PIN: b9811930fcda0893cf5de40a41f4a25d539b958e
+  RIVET_PIN: d6e98896fffa3f484e9ea0162d807ad2518c1538
 jobs:
   validate:
     name: Validate release tag
@@ -230,7 +230,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up embeddable Racket CS
-        uses: turlamai/rivet/.github/actions/setup-embed-racket@b9811930fcda0893cf5de40a41f4a25d539b958e
+        uses: turlamai/rivet/.github/actions/setup-embed-racket@d6e98896fffa3f484e9ea0162d807ad2518c1538
       # Installed after the embeddable runtime so the catalog dependency
       # closure (cext-lib, crypto-lib, keel) resolves against the minimal
       # build — it ships no packages of its own. crypto backs the updater.
