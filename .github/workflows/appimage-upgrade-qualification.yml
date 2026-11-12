@@ -69,7 +69,11 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main --depth 1
-          git checkout FETCH_HEAD -- scripts/acceptance/upgrade-qualification.rkt
+          # The driver requires the updater module by repo path; since the
+          # engine moved to racket/ on main, published tags still carry the
+          # old app/ layout, so overlay the module beside the driver (the
+          # N tag's own updater stays in control of the executed behavior).
+          git checkout FETCH_HEAD -- scripts/acceptance/upgrade-qualification.rkt racket/update.rkt
           echo "OVERLAY_SHA=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
 
       - name: Read the rivet pin the N release was built against
