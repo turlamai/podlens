@@ -8,7 +8,7 @@
 ;;   --json switches every command to one machine-readable JSON object on
 ;;   stdout ({"ok":true,...}); progress and errors go to stderr.
 ;;
-;; Run with:  racket app/cli.rkt <command> …   (see `help`)
+;; Run with:  racket racket/cli.rkt <command> …   (see `help`)
 
 (require json
          racket/format
@@ -32,7 +32,7 @@
 
 (provide resolve-feed resolve-episode)
 
-;; the version mirrors rivet.rktd (see app/version.rkt)
+;; the version mirrors rivet.rktd (see racket/version.rkt)
 (define cli-version app-version)
 
 ;; ---- output helpers ----------------------------------------------------------

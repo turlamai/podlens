@@ -13,7 +13,7 @@
          racket/string
          racket/list
          racket/file
-         (file "../app/core/http.rkt"))
+         (file "../racket/core/http.rkt"))
 
 ;; ---- tiny redirect server ---------------------------------------------------
 ;;

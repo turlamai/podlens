@@ -66,7 +66,7 @@ PodLens is built on [Rivet](https://github.com/turlamai/rivet): one shared Racke
 
 - The backend embeds Racket CS in-process — no helper daemon, no console window
 - Playback uses the platform media stack; the audio cache lives in `~/.podlens/audio/`
-- The UI talks only to the typed contract in `app/backend.rkt` — changing it is a cross-platform release
+- The UI talks only to the typed contract in `racket/backend.rkt` — changing it is a cross-platform release
 
 ## What's inside
 
@@ -102,10 +102,10 @@ Add a podcast RSS URL, pick an episode, press **Understand** (一键听懂). Or 
 ```bash
 git clone https://github.com/turlamai/podlens && cd podlens
 raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#v0.11.0'
-racket app/cli.rkt add "https://feeds.example.com/show.xml"
-racket app/cli.rkt episodes <feed-id>
-racket app/cli.rkt transcribe <episode-id>
-racket app/cli.rkt show <episode-id> --json
+racket racket/cli.rkt add "https://feeds.example.com/show.xml"
+racket racket/cli.rkt episodes <feed-id>
+racket racket/cli.rkt transcribe <episode-id>
+racket racket/cli.rkt show <episode-id> --json
 ```
 
 The CLI is the same Racket source the GUI embeds, run headless. (Shipping a
@@ -117,7 +117,7 @@ no API key for `--help`, `list`, `doctor` and `config`.)
 ```text
 podlens/
 ├── rivet.rktd              # release identity, version, deployment targets
-├── app/
+├── racket/
 │   ├── backend.rkt         # the RVT1 wire contract (21 RPCs, 5 events, 1 state)
 │   ├── update.rkt          # signed-manifest update checks
 │   ├── cli.rkt             # agent-facing CLI (--json, exit codes)

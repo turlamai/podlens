@@ -6,7 +6,7 @@
 ;; release, not a local edit.
 ;;
 ;; Rows are positional strings (Fulcrum style); ids are stable hex strings
-;; from app/core/library.rkt.
+;; from racket/core/library.rkt.
 ;;
 ;;   feed-list row    = (id title author artwork-url episode-count
 ;;                       latest-title latest-pub unplayed-count)
@@ -22,7 +22,7 @@
 ;;
 ;; Lifecycle: the embedded runtime calls `start` with the two RVT1 fds.
 ;; library/config managers are built once here and shared by every request
-;; worker; tests drive app/core directly instead.
+;; worker; tests drive racket/core directly instead.
 
 (require json
          racket/format
@@ -163,7 +163,7 @@
 
 ;; Try before you subscribe: fetch a feed WITHOUT adding it to the library
 ;; and return its newest episodes for one-click preview playback. Row shape
-;; comes from app/core/feed.rkt peek-rows:
+;; comes from racket/core/feed.rkt peek-rows:
 ;;   (feed-title author artwork-url enclosure-url episode-title
 ;;    pub-display duration-sec)
 ;; Newest first, capped at peek-limit rows; enclosure-url is what

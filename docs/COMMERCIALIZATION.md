@@ -13,7 +13,7 @@ Authoritative policy read for this audit:
   no Permit/Commerce product gate.
 - [`AGENTS.md`](../AGENTS.md) — authorization preamble and portfolio
   placement (`2026-10-v2`).
-- Product contract: [`app/backend.rkt`](../app/backend.rkt) and
+- Product contract: [`racket/backend.rkt`](../racket/backend.rkt) and
   [`docs/DESIGN-ROADMAP.md`](DESIGN-ROADMAP.md).
 - Repository state audited at `cc6262db26ec10fc29c72422a1fbd8a57b638442`
   plus the 0.6.0 work in this branch (redesign, secure BYOK storage,

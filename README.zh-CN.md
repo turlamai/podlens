@@ -63,7 +63,7 @@ PodLens 基于 [Rivet](https://github.com/turlamai/rivet) 构建：一个共享�
 
 - 后端把 Racket CS 嵌入应用进程内——没有后台守护进程，没有控制台窗口
 - 播放走平台媒体栈；音频缓存在 `~/.podlens/audio/`
-- UI 只与 `app/backend.rkt` 中的类型化契约对话——改契约就是一次三端同步发布
+- UI 只与 `racket/backend.rkt` 中的类型化契约对话——改契约就是一次三端同步发布
 
 ## 都有什么
 
@@ -100,10 +100,10 @@ PodLens 基于 [Rivet](https://github.com/turlamai/rivet) 构建：一个共享�
 ```bash
 git clone https://github.com/turlamai/podlens && cd podlens
 raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#v0.11.0'
-racket app/cli.rkt add "https://feeds.example.com/show.xml"
-racket app/cli.rkt episodes <feed-id>
-racket app/cli.rkt transcribe <episode-id>
-racket app/cli.rkt show <episode-id> --json
+racket racket/cli.rkt add "https://feeds.example.com/show.xml"
+racket racket/cli.rkt episodes <feed-id>
+racket racket/cli.rkt transcribe <episode-id>
+racket racket/cli.rkt show <episode-id> --json
 ```
 
 CLI 就是 GUI 内嵌的那份 Racket 源码，无头运行。（自带运行时的单文件 CLI
@@ -114,7 +114,7 @@ CLI 就是 GUI 内嵌的那份 Racket 源码，无头运行。（自带运行时
 ```text
 podlens/
 ├── rivet.rktd              # 发布身份、版本、部署目标
-├── app/
+├── racket/
 │   ├── backend.rkt         # RVT1 契约（21 个 RPC、5 个事件、1 个 State）
 │   ├── update.rkt          # 签名清单更新检查
 │   ├── cli.rkt             # agent 向 CLI（--json、退出码）

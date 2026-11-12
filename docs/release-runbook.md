@@ -16,7 +16,7 @@ explains the trust model.
 
 ## 1. Version bump
 
-The root `VERSION` file, `rivet.rktd` and `app/version.rkt` carry the same
+The root `VERSION` file, `rivet.rktd` and `racket/version.rkt` carry the same
 version; bump all three (`scripts/check-release-version.sh` enforces the
 alignment locally, in CI and in the release pipeline). Bump `rivet.rktd`'s
 `build` (integer, never reuse). Add a matching `## X.Y.Z` section to
@@ -31,7 +31,7 @@ git push origin v1.4.0
 
 `.github/workflows/release.yml` then:
 
-1. validates tag == VERSION == rivet.rktd == app/version.rkt == CHANGELOG section;
+1. validates tag == VERSION == rivet.rktd == racket/version.rkt == CHANGELOG section;
 2. macOS (arm64 + x64 matrix): `raco rivet package` → DMG (human installer)
    + ditto zip (update feed) + per-artifact sha256;
 3. Windows: `raco rivet release` → x64 MSI + portable zip + sha256;

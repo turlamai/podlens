@@ -6,7 +6,7 @@
 (require rackunit
          racket/file
          racket/path
-         (file "../app/core/library.rkt"))
+         (file "../racket/core/library.rkt"))
 
 (putenv "PODLENS_DATA_DIR" (path->string (make-temporary-file "podlens-test~a" 'directory)))
 (library-load!)

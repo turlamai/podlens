@@ -16,13 +16,13 @@ A clear description of what happened and what you expected instead.
 Steps (or the exact CLI invocation) that trigger the behavior:
 
 ```
-racket app/cli.rkt episodes <feed-id>
+racket racket/cli.rkt episodes <feed-id>
 ```
 
 **Environment**
 
 - Platform: macOS / Windows (and version)
-- PodLens version: (Settings ▸ About, or `racket app/cli.rkt version`)
+- PodLens version: (Settings ▸ About, or `racket racket/cli.rkt version`)
 - Install shape: app bundle / portable zip
 
 **Update context (if this happened during an update)**

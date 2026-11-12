@@ -18,8 +18,8 @@ Please do not open public issues for security problems.
 
 In scope:
 
-- **Your LLM API key (BYOK)** (`app/core/secrets.rkt`,
-  `app/core/config.rkt`, `app/core/openai.rkt`): the key is yours, not
+- **Your LLM API key (BYOK)** (`racket/core/secrets.rkt`,
+  `racket/core/config.rkt`, `racket/core/openai.rkt`): the key is yours, not
   ours — PodLens never ships one and has no provider account. Storage
   goes to the OS secret vault where one is available (macOS Keychain,
   Windows DPAPI CurrentUser scope, Linux Secret Service via
@@ -32,7 +32,7 @@ In scope:
   file itself is uploaded to that same endpoint. A report that the key
   lands anywhere else (logs, transcripts, telemetry, a hardcoded host,
   or a request to a URL you did not configure) is a critical bug.
-- **Update trust** (`app/update.rkt`,
+- **Update trust** (`racket/update.rkt`,
   `macos-host/Sources/RivetHost/UpdateService.swift`,
   `scripts/make-update-manifest.sh`; key id `podlens-2026-10`):
   verification of the Ed25519-signed `update-manifest.json` and its
@@ -42,18 +42,18 @@ In scope:
   before any install, and the host-owned install/rollback steps. The
   4-hour silent-check throttle lives in the hosts; nothing downloads or
   quits without explicit user action.
-- **Local data handling** (`app/core/paths.rkt`,
-  `app/core/library.rkt`): `library.json` (subscriptions, episodes,
+- **Local data handling** (`racket/core/paths.rkt`,
+  `racket/core/library.rkt`): `library.json` (subscriptions, episodes,
   playback positions), the `audio/` cache, `transcripts/<id>.json`
   (segments, translation, summary) and `chapters/<id>.json` — all under
   the platform data directory, never uploaded anywhere, never synced.
-- **Feed and catalog fetching** (`app/core/feed.rkt`,
-  `app/core/itunes.rkt`): the app fetches exactly the feeds you
+- **Feed and catalog fetching** (`racket/core/feed.rkt`,
+  `racket/core/itunes.rkt`): the app fetches exactly the feeds you
   subscribe to and the iTunes search/catalog endpoints; it sends no
   library contents, transcripts or identifiers beyond the request
   itself.
 - **The host/backend boundary**: hosts render and install; the Racket
-  backend (`app/backend.rkt`) decides. Crypto or trust decisions
+  backend (`racket/backend.rkt`) decides. Crypto or trust decisions
   sneaking into a native host are a bug (update verification lives in
   the backend and its `rivet/distribution` layer).
 

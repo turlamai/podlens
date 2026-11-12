@@ -6,8 +6,8 @@
          rackunit
          racket/file
          racket/string
-         (file "../app/core/config.rkt")
-         (file "../app/core/paths.rkt"))
+         (file "../racket/core/config.rkt")
+         (file "../racket/core/paths.rkt"))
 
 (putenv "PODLENS_DATA_DIR" (path->string (make-temporary-file "podlens-test~a" 'directory)))
 ;; Never touch a real OS vault in tests.

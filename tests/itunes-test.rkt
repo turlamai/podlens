@@ -5,7 +5,7 @@
 ;; scripts/verify-catalog.rkt-style release checks, not here.
 
 (require rackunit
-         (file "../app/core/itunes.rkt"))
+         (file "../racket/core/itunes.rkt"))
 
 (define fixture
   (hasheq 'resultCount 3

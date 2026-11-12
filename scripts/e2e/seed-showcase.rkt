@@ -8,8 +8,8 @@
          racket/file
          racket/list
          racket/path
-         (file "../../app/core/library.rkt")
-         (file "../../app/core/paths.rkt"))
+         (file "../../racket/core/library.rkt")
+         (file "../../racket/core/paths.rkt"))
 
 (define script-dir
   (or (current-load-relative-directory) (current-directory)))

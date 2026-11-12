@@ -18,7 +18,7 @@ public final class UpdateService {
     /// Ed25519 public key (base64, raw 32 bytes) — pair of the
     /// UPDATE_ED25519_PRIVATE_KEY GitHub secret that signs release
     /// manifests (generate: scripts/update-keys.sh). Same literal the
-    /// engine embeds (app/update.rkt).
+    /// engine embeds (racket/update.rkt).
     nonisolated public static let publicKeyBase64 = "CRJhkEfo79/a7lgRkLhWSvVGviGcLNL2obvE2k7bFZI="
 
     /// The manifest must carry this key id — rotation ships a build that

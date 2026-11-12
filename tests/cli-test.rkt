@@ -11,8 +11,8 @@
          racket/format
          racket/port
          racket/string
-         (file "../app/cli.rkt")
-         (file "../app/core/library.rkt"))
+         (file "../racket/cli.rkt")
+         (file "../racket/core/library.rkt"))
 
 (define data-dir (path->string (make-temporary-file "podlens-cli~a" 'directory)))
 (putenv "PODLENS_DATA_DIR" data-dir)
@@ -51,7 +51,7 @@
 ;; ---- real dispatch over subprocess -------------------------------------------
 
 (define here (or (current-load-relative-directory) (current-directory)))
-(define cli-path (path->string (simplify-path (build-path here ".." "app" "cli.rkt"))))
+(define cli-path (path->string (simplify-path (build-path here ".." "racket" "cli.rkt"))))
 (define racket-path (find-executable-path "racket"))
 
 (define (run-cli . args)

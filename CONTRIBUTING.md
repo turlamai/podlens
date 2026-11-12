@@ -6,20 +6,20 @@ agree your contribution is licensed under AGPL-3.0.
 
 PodLens follows the Rivet application architecture: Racket owns domain
 logic, native hosts own UI, and the contract between them lives in
-`app/backend.rkt` (RVT1) plus `rivet-schema.json`. Keep that split
+`racket/backend.rkt` (RVT1) plus `rivet-schema.json`. Keep that split
 intact.
 
 ## Ground rules
 
 1. **The wire contract is cross-platform.** Changing any RPC/State in
-   `app/backend.rkt` is a three-platform release: regenerate the
+   `racket/backend.rkt` is a three-platform release: regenerate the
    checked-in clients with `raco rivet build`
    (`macos-host/Sources/RivetHost/GeneratedBackend.swift`,
    `windows/GeneratedBackend.hpp`, `linux/GeneratedBackend.hpp`) in the
    same commit — they are build inputs, never hand-edit them.
 2. **Update trust has two roots and they must agree.** The Ed25519
    public key and the exact key id (`podlens-2026-10`) are pinned in
-   both `app/update.rkt` and
+   both `racket/update.rkt` and
    `macos-host/Sources/RivetHost/UpdateService.swift`; the release
    workflow fails closed unless the signing secret matches both. Never
    weaken a verification step (signature, key id, size, SHA-256) to
@@ -27,7 +27,7 @@ intact.
 3. **Secrets degrade honestly.** The BYOK API key lives in the OS
    secret vault (Keychain / DPAPI / Secret Service) with a labelled
    0600-file fallback
-   (`app/core/secrets.rkt`); a locked vault must never take the app or
+   (`racket/core/secrets.rkt`); a locked vault must never take the app or
    a CLI command down. The raw key value is never displayed, logged or
    returned — settings show the mask, the mask itself is refused as a
    write, and the key travels only as the `Authorization: Bearer`
@@ -47,8 +47,8 @@ intact.
 
 ```bash
 raco test tests/                       # backend contract tests
-raco make app/backend.rkt              # backend compiles against the RVT1 contract
-bash scripts/check-release-version.sh  # VERSION == rivet.rktd == app/version.rkt == generated clients
+raco make racket/backend.rkt              # backend compiles against the RVT1 contract
+bash scripts/check-release-version.sh  # VERSION == rivet.rktd == racket/version.rkt == generated clients
 racket scripts/verify-catalog.rkt      # catalog feeds must parse on the live wire
 ```
 
@@ -59,7 +59,7 @@ you were able to build locally.
 ## Releasing
 
 Releases are tag-driven (`v*`). A release bump moves `VERSION`,
-`rivet.rktd` and `app/version.rkt` in the same commit and regenerates
+`rivet.rktd` and `racket/version.rkt` in the same commit and regenerates
 the clients — `scripts/check-release-version.sh` enforces all four
 identities and the dated CHANGELOG entry. The pipeline refuses to
 publish without the Ed25519 update signing key and signs one merged

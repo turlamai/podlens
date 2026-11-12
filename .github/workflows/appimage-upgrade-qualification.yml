@@ -20,7 +20,7 @@ name: Published upgrade qualification (N -> N+1)
 # from main. N already ships a correct updater (the ten-argument
 # updater-config call with the component the feed stamps), so no updater
 # overlay is needed; if a future published tag ever ships a broken updater,
-# overlay app/update.rkt from main the same way the driver is overlaid.
+# overlay racket/update.rkt from main the same way the driver is overlaid.
 
 on:
   workflow_dispatch:

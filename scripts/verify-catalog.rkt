@@ -1,6 +1,6 @@
 #lang racket/base
 
-;; Verify every feed in app/core/catalog.rkt against the live wire using
+;; Verify every feed in racket/core/catalog.rkt against the live wire using
 ;; the app's own HTTP client and RSS parser. A catalog entry only earns its
 ;; place if it parses right now — no hand-copied URLs that died in 2021.
 ;;
@@ -13,8 +13,8 @@
          racket/match
          racket/port
          racket/string
-         (file "../app/core/feed.rkt")
-         (file "../app/core/catalog.rkt"))
+         (file "../racket/core/feed.rkt")
+         (file "../racket/core/catalog.rkt"))
 
 (define entries (catalog-entries))
 

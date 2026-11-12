@@ -10,7 +10,7 @@
 #   flatpak-builder --user --force-clean --repo=repo build-dir site.jrtx.podlens.gen.yml
 #   flatpak build-bundle repo podlens-<v>-linux-<arch>.flatpak site.jrtx.podlens
 #
-# The payload is self-contained (embedded Racket CS runtime, res/, app/);
+# The payload is self-contained (embedded Racket CS runtime, res/, racket/);
 # like every family product, readelf on the release binary shows exactly two
 # NEEDED entries outside the GNOME Platform runtime — liblz4.so.1 and
 # libtinfo.so.6 — provided by the two small modules below. GStreamer needs
@@ -38,7 +38,7 @@ finish-args:
   # PipeWire's pulse replacement), so the pulse socket is the sound path.
   # No --device=all: playbin never opens ALSA/hardware devices directly.
   - --socket=pulseaudio
-  # Network is the product: feed refresh and iTunes search (app/core/
+  # Network is the product: feed refresh and iTunes search (racket/core/
   # feed.rkt, itunes.rkt), streamed episode downloads into the cache
   # (http-download-file), OpenAI-compatible BYOK transcription/summary
   # requests (openai.rkt), and the signed-manifest update check (update.rkt)
@@ -49,7 +49,7 @@ finish-args:
   # ~/.var/app/site.jrtx.podlens automatically (a Flatpak install starts a
   # fresh library). No Secret Service talk-name: the BYOK key store
   # degrades to its documented 0600 file when secret-tool's bus is
-  # unreachable (app/core/secrets.rkt degrades instead of raising).
+  # unreachable (racket/core/secrets.rkt degrades instead of raising).
 modules:
   - name: lz4
     # Upstream keeps meson under build/ (flatpak-builder needs it at the
@@ -94,9 +94,9 @@ modules:
         path: flatpak/site.jrtx.podlens.desktop
     build-commands:
       # flatpak-builder strips the archive's leading directory: the payload
-      # (RivetHost, runtime/, res/, app/) lands flat in the build dir.
+      # (RivetHost, runtime/, res/, racket/) lands flat in the build dir.
       - mkdir -p /app/podlens
-      - cp -a RivetHost runtime res app /app/podlens/
+      - cp -a RivetHost runtime res racket /app/podlens/
       # The bundle's `command` resolves on the sandbox PATH (/app/bin); the
       # payload lives outside it. A symlink keeps /proc/self/exe pointing
       # at the real binary so the runtime layout discovery works.

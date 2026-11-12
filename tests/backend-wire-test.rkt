@@ -11,7 +11,7 @@
 (define test-directory
   (or (current-load-relative-directory) (current-directory)))
 (define backend-path
-  (simplify-path (build-path test-directory ".." "app" "backend.rkt")))
+  (simplify-path (build-path test-directory ".." "racket" "backend.rkt")))
 (void (dynamic-require backend-path #f))
 ;; `start` normally owns this initialization before it hands file descriptors
 ;; to serve-fds. The in-memory wire harness uses ports, so reproduce that

@@ -7,7 +7,7 @@
 (require rackunit
          racket/list
          racket/string
-         (file "../app/core/catalog.rkt"))
+         (file "../racket/core/catalog.rkt"))
 
 (test-case "catalog shape"
   (define es (catalog-entries))

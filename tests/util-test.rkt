@@ -3,7 +3,7 @@
 ;; Unit tests for the shared helpers. Run: raco test tests/
 
 (require rackunit
-         (file "../app/core/util.rkt"))
+         (file "../racket/core/util.rkt"))
 
 (test-case "bytes->hex left-pads"
   (check-equal? (bytes->hex #"\x01\x0f\xfe") "010ffe"))

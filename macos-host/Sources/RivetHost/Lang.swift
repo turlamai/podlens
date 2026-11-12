@@ -1,7 +1,7 @@
 import Foundation
 
 /// Host-side strings. zh is the default; en is the fallback map. The Racket
-/// core has its own table (app/core/i18n.rkt) for CLI/backend messages —
+/// core has its own table (racket/core/i18n.rkt) for CLI/backend messages —
 /// the two sets intentionally share keys only where both sides speak.
 func L(_ key: String) -> String {
     let lang = UserDefaults.standard.string(forKey: "podlens-lang") ?? "zh"

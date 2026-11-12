@@ -12,12 +12,12 @@
          racket/port
          racket/string
          racket/tcp
-         (file "../app/core/chapters.rkt")
-         (file "../app/core/config.rkt")
-         (file "../app/core/feed.rkt")
-         (file "../app/core/http.rkt")
-         (file "../app/core/library.rkt")
-         (file "../app/core/pipeline.rkt"))
+         (file "../racket/core/chapters.rkt")
+         (file "../racket/core/config.rkt")
+         (file "../racket/core/feed.rkt")
+         (file "../racket/core/http.rkt")
+         (file "../racket/core/library.rkt")
+         (file "../racket/core/pipeline.rkt"))
 
 (putenv "PODLENS_DATA_DIR" (path->string (make-temporary-file "podlens-test~a" 'directory)))
 ;; Never touch a real OS vault in tests.

@@ -32,8 +32,8 @@ RIVET_RKTD_VERSION="$(grep -o '"[0-9]*\.[0-9]*\.[0-9]*"' "$ROOT/rivet.rktd" | he
 
 # The backend version module embeds the release identity for the RPC, the
 # CLI and the update feed.
-grep -qF "(define app-version \"$VERSION\")" "$ROOT/app/version.rkt" || \
-  fail "app/version.rkt app-version does not match VERSION '$VERSION'"
+grep -qF "(define app-version \"$VERSION\")" "$ROOT/racket/version.rkt" || \
+  fail "racket/version.rkt app-version does not match VERSION '$VERSION'"
 
 # The generated native clients embed the same release identity. These files
 # are marked do-not-edit: a mismatch means the tree forgot to regenerate
@@ -55,4 +55,4 @@ check_generated_version \
   "linux/GeneratedBackend.hpp" \
   'kVersion\[\] = "[^"]+"'
 
-echo "release preflight: version $VERSION is aligned (VERSION == rivet.rktd == app/version.rkt == generated clients)"
+echo "release preflight: version $VERSION is aligned (VERSION == rivet.rktd == racket/version.rkt == generated clients)"

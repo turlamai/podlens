@@ -20,7 +20,7 @@
          racket/runtime-path
          racket/string
          racket/tcp
-         (file "../app/update.rkt"))
+         (file "../racket/update.rkt"))
 
 (define (file-sha256-hex path) (sha256-file/hex path))
 

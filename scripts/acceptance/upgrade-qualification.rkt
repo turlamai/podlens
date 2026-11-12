@@ -43,7 +43,7 @@
                   base64-string->bytes
                   sha256-file/hex
                   verify-signed-manifest)
-         "../../app/update.rkt")
+         "../../racket/update.rkt")
 
 (define (need name)
   (or (getenv name)
@@ -59,7 +59,7 @@
 (define tamper-path (getenv "TAMPER_BYTES_PATH"))
 
 ;; The updater's embedded key: fixed SPKI prefix + the raw 32-byte public
-;; half (the same assembly app/update.rkt does; it is not exported, so the
+;; half (the same assembly racket/update.rkt does; it is not exported, so the
 ;; driver rebuilds it from update-public-key-b64).
 (define embedded-public-key
   (datum->pk-key

@@ -70,7 +70,7 @@ Inner manifest (decoded `payload`) — rivet's manifest schema:
 
 - `version` — release version without the `v` prefix; must equal the root
   `VERSION` file (release preflight checks it, along with `rivet.rktd` and
-  `app/version.rkt`)
+  `racket/version.rkt`)
 - `artifacts` carries one entry per platform × architecture; there is no
   Linux entry yet (no Linux host ships today — the GTK4 host is planned,
   and a feed entry follows when it exists)
@@ -122,7 +122,7 @@ consent, 400 ms `update-state` progress polling and the install handoff.
 - Generation: `scripts/update-keys.sh` → `~/.podlens/update-signing-key.pem`
   (OpenSSL 3 Ed25519; refuses to overwrite; prints the base64 raw public key)
 - The **public key** is embedded in hosts: `UpdateService.swift`
-  (`publicKeyBase64`) and `app/update.rkt`
+  (`publicKeyBase64`) and `racket/update.rkt`
   (`current-update-public-key-hex`, base64 of the raw 32 bytes)
 - The **private key** lives outside any repository (keys vault) and reaches
   CI only as the `UPDATE_ED25519_PRIVATE_KEY` secret (PEM), consumed by

@@ -4,7 +4,7 @@
 
 (require rackunit
          racket/file
-         (file "../app/core/feed.rkt"))
+         (file "../racket/core/feed.rkt"))
 
 (define fixture
   #"<?xml version=\"1.0\" encoding=\"UTF-8\"?>
