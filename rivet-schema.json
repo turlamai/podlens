@@ -1,0 +1,729 @@
+{
+  "device-rpcs": [],
+  "enums": [],
+  "events": [
+    {
+      "name": "episodes-changed",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "name": "job-progress",
+      "type": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "name": "notify",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "name": "open-url",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "name": "update-available",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    }
+  ],
+  "format": "rivet-schema",
+  "format-version": 1,
+  "records": [
+    {
+      "fields": [
+        {
+          "name": "status",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "error",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "current-version",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "available-version",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "build",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "Int64"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "published-at",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "installer",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "size-bytes",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "Int64"
+            },
+            "kind": "optional"
+          }
+        }
+      ],
+      "name": "UpdateCheck"
+    },
+    {
+      "fields": [
+        {
+          "name": "phase",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "percent",
+          "type": {
+            "kind": "scalar",
+            "name": "Int64"
+          }
+        },
+        {
+          "name": "message",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "downloaded-path",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        },
+        {
+          "name": "available-version",
+          "type": {
+            "element": {
+              "kind": "scalar",
+              "name": "String"
+            },
+            "kind": "optional"
+          }
+        }
+      ],
+      "name": "UpdateState"
+    }
+  ],
+  "rpcs": [
+    {
+      "arguments": [],
+      "name": "ai-test",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "catalog-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "query",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "catalog-search",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-chapters",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-download",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-estimate",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "feed-id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-pipeline",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "episode-recent",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-remove-audio",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "done",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-set-done",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-summarize",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-summary",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-transcribe",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-transcript",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "episode-translate",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "url",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "feed-add",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "feed-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "url",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "feed-peek",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "feed-refresh",
+      "result": {
+        "kind": "scalar",
+        "name": "Int64"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "feed-refresh-all",
+      "result": {
+        "kind": "scalar",
+        "name": "Int64"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "feed-remove",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "health",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "job-id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "job-cancel",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "job-id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "job-status",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "open-releases",
+      "result": {
+        "kind": "scalar",
+        "name": "Void"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "seconds",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "done",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "position-save",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "enclosure-url",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "preview-audio",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "resume-last",
+      "result": {
+        "element": {
+          "kind": "scalar",
+          "name": "String"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "security-status",
+      "result": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "settings-list",
+      "result": {
+        "element": {
+          "element": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "kind": "list"
+        },
+        "kind": "list"
+      }
+    },
+    {
+      "arguments": [
+        {
+          "name": "key",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        },
+        {
+          "name": "value",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          }
+        }
+      ],
+      "name": "settings-set",
+      "result": {
+        "kind": "scalar",
+        "name": "Bool"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "start-download",
+      "result": {
+        "kind": "scalar",
+        "name": "Void"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "update-check",
+      "result": {
+        "kind": "record",
+        "name": "UpdateCheck"
+      }
+    },
+    {
+      "arguments": [],
+      "name": "update-state",
+      "result": {
+        "kind": "record",
+        "name": "UpdateState"
+      }
+    }
+  ],
+  "rvt-protocol": 1,
+  "states": [
+    {
+      "name": "version",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      }
+    }
+  ]
+}

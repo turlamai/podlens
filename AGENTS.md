@@ -60,6 +60,7 @@ scripts/update-keys.sh
 | 位置 | 内容 |
 |---|---|
 | `racket/backend.rkt` | RVT1 契约：35 个 RPC、5 个事件（notify/job-progress/episodes-changed/open-url/update-available）、State `version`。行布局是位置参数字符串，注释在文件头。0.6 新增 `job-cancel`、`security-status`、`ai-test`；`settings-list` 对 `api-key` 只返回掩码 |
+| `rivet-schema.json` | RVT1 schema 基线（当前 35 RPC / 5 事件），由 `raco rivet schema --output rivet-schema.json` 生成入库，不手写。改 `racket/backend.rkt` 公开契约后同 commit 重生成；兼容门禁 `raco rivet schema check rivet-schema.json --json` 必须零 breaking（新增兼容，删改签名/参数顺序/结果为 breaking） |
 | `docs/UPDATE.md` | 更新契约：清单 JSON schema、Ed25519 签名对象、资产命名、客户端行为 |
 | `rivet.rktd` | 发布身份唯一真源：version/build/identifier/最低系统版本。**tag 必须等于其中 version** |
 | CHANGELOG.md | 每个 tag 必须有同名小节，release 前置检查会拒绝 |

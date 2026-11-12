@@ -15,8 +15,11 @@ intact.
    `racket/backend.rkt` is a three-platform release: regenerate the
    checked-in clients with `raco rivet build`
    (`macos-host/Sources/RivetHost/GeneratedBackend.swift`,
-   `windows/GeneratedBackend.hpp`, `linux/GeneratedBackend.hpp`) in the
-   same commit — they are build inputs, never hand-edit them.
+   `windows/GeneratedBackend.hpp`, `linux/GeneratedBackend.hpp`) and the
+   checked-in schema baseline with `raco rivet schema --output
+   rivet-schema.json` in the same commit — they are build inputs, never
+   hand-edit them. `raco rivet schema check rivet-schema.json --json`
+   must report zero breaking changes.
 2. **Update trust has two roots and they must agree.** The Ed25519
    public key and the exact key id (`podlens-2026-10`) are pinned in
    both `racket/update.rkt` and
