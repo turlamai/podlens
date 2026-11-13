@@ -15,11 +15,9 @@
 #   <key-path>  Ed25519 private key PEM (default: $UPDATE_KEY_PATH, then
 #               ~/.podlens/update-signing-key.pem)
 #
-# Emits <dist-dir>/update-manifest.json — a single self-contained signed
-# wrapper (schema + base64 payload + signature block): the family format
-# every rivet/distribution client verifies, hosts included. Requires racket
-# with rivet linked (the release publish job installs the checkout) and
-# OpenSSL 3 for the PEM → DER key conversion.
+# The signing, artifact hashing, schema validation, and feed format live in
+# `raco rivet sign-manifest`; this wrapper keeps PodLens' five artifacts,
+# identity, and the Windows Git Bash path handling.
 set -euo pipefail
 
 TAG="${1:?usage: make-update-manifest.sh <tag> <dist-dir> [key-path]}"
@@ -27,9 +25,6 @@ DIST="${2:?usage: make-update-manifest.sh <tag> <dist-dir> [key-path]}"
 KEY="${3:-${UPDATE_KEY_PATH:-$HOME/.podlens/update-signing-key.pem}}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${TAG#v}"
-[[ "$VERSION" == "$(tr -d '[:space:]' < "$ROOT/VERSION")" ]] || {
-  echo "error: tag $TAG does not match VERSION '$(cat "$ROOT/VERSION")'" >&2; exit 1; }
 
 # Git Bash hands out msys-style paths (/d/...), which Racket's path
 # primitives misread as drive-relative; convert to Windows mixed form.
@@ -39,14 +34,20 @@ if command -v cygpath >/dev/null 2>&1; then
   KEY="$(cygpath -m "$KEY")"
 fi
 
-for artifact in "$DIST/podlens-$VERSION-macos-arm64.zip" \
-                "$DIST/podlens-$VERSION-macos-x64.zip" \
-                "$DIST/podlens-$VERSION-windows-x64.zip" \
-                "$DIST/podlens-$VERSION-linux-x64.tar.gz" \
-                "$DIST/podlens-$VERSION-linux-arm64.tar.gz"; do
-  [[ -f "$artifact" ]] || { echo "error: missing $artifact" >&2; exit 1; }
-done
-[[ -f "$KEY" ]] || { echo "error: missing signing key $KEY (see scripts/update-keys.sh)" >&2; exit 1; }
+VERSION="${TAG#v}"
+cd "$ROOT"
+raco rivet check-release-version "$TAG"
+
+APP_ID="$(sed -nE 's/.*\(identifier \. "([^"]+)"\).*/\1/p' "$ROOT/rivet.rktd" | head -n1)"
+BUILD="$(sed -nE 's/.*\(build \. ([0-9]+)\).*/\1/p' "$ROOT/rivet.rktd" | head -n1)"
+[[ -n "$APP_ID" && -n "$BUILD" ]] || {
+  echo "error: could not read application id/build from rivet.rktd" >&2
+  exit 1
+}
+[[ -f "$KEY" ]] || {
+  echo "error: missing signing key $KEY (see scripts/update-keys.sh)" >&2
+  exit 1
+}
 
 BASE_URL="${RELEASE_ASSET_BASE_URL:-https://github.com/turlamai/podlens/releases/download/$TAG}"
 
@@ -68,88 +69,27 @@ fi
   exit 1
 }
 
-SCRIPT="$(mktemp "${TMPDIR:-/tmp}/podlens-manifest-XXXXXX.rkt")"
 KEY_DER="$(mktemp "${TMPDIR:-/tmp}/podlens-key-XXXXXX.der")"
 command -v cygpath >/dev/null 2>&1 && KEY_DER="$(cygpath -m "$KEY_DER")"
-trap 'rm -f "$SCRIPT" "$KEY_DER"' EXIT
+trap 'rm -f "$KEY_DER"' EXIT
 
 # rivet's signer reads DER (OneAsymmetricKey); convert the PEM once here.
 "$OPENSSL_BIN" pkey -in "$KEY" -outform DER -out "$KEY_DER"
 
-cat > "$SCRIPT" <<RKT
-#lang racket/base
-(require rivet/distribution
-         racket/date
-         racket/file
-         racket/format)
-(define rktd (file->value (build-path (path->complete-path "$ROOT") "rivet.rktd")))
-(define version "$VERSION")
-(define base-url "$BASE_URL")
-(define dist (path->complete-path "$DIST"))
-(define key-path (path->complete-path "$KEY_DER"))
-(define key-id "podlens-2026-10")
-(define app-id (hash-ref rktd 'identifier))
-(define build (hash-ref rktd 'build))
+raco rivet sign-manifest \
+  --application-id "$APP_ID" \
+  --version "$VERSION" \
+  --build "$BUILD" \
+  --channel stable \
+  --base-url "$BASE_URL" \
+  --key-id podlens-2026-10 \
+  --private-key "$KEY_DER" \
+  --output "$DIST/update-manifest.json" \
+  --artifact "macos:arm64:zip:$DIST/podlens-$VERSION-macos-arm64.zip" \
+  --artifact "macos:x64:zip:$DIST/podlens-$VERSION-macos-x64.zip" \
+  --artifact "windows:x64:zip:$DIST/podlens-$VERSION-windows-x64.zip" \
+  --artifact "linux:x64:targz:$DIST/podlens-$VERSION-linux-x64.tar.gz" \
+  --artifact "linux:arm64:targz:$DIST/podlens-$VERSION-linux-arm64.tar.gz" \
+  --rollback-allowed
 
-(define (artifact platform architecture file installer)
-  (define path (build-path dist file))
-  (unless (file-exists? path)
-    (error 'make-update-manifest "missing installer: ~a" path))
-  (update-artifact platform architecture
-                   (string-append base-url "/" file)
-                   (sha256-file/hex path)
-                   (file-size path)
-                   installer
-                   '()
-                   ;; component #f serializes as a legacy manifest without
-                   ;; the field, so clients predating rivet's component
-                   ;; discriminator (app/cli/tool) still parse the feed.
-                   #f))
-
-(define manifest
-  (update-manifest app-id
-                   version
-                   build
-                   'stable
-                   ;; published-at: RFC 3339, second precision, UTC
-                   (let ([d (seconds->date (current-seconds) #f)])
-                     (format "~a-~a-~aT~a:~a:~aZ"
-                             (date-year d)
-                             (~r (date-month d) #:min-width 2 #:pad-string "0")
-                             (~r (date-day d) #:min-width 2 #:pad-string "0")
-                             (~r (date-hour d) #:min-width 2 #:pad-string "0")
-                             (~r (date-minute d) #:min-width 2 #:pad-string "0")
-                             (~r (date-second d) #:min-width 2 #:pad-string "0")))
-                   "0.0.0"
-                   #f
-                   #t
-                   100
-                   (list (artifact 'macos 'arm64
-                                   (format "podlens-~a-macos-arm64.zip" version) 'zip)
-                         (artifact 'macos 'x64
-                                   (format "podlens-~a-macos-x64.zip" version) 'zip)
-                         (artifact 'windows 'x64
-                                   (format "podlens-~a-windows-x64.zip" version) 'zip)
-                         (artifact 'linux 'x64
-                                   (format "podlens-~a-linux-x64.tar.gz" version) 'targz)
-                         (artifact 'linux 'arm64
-                                   (format "podlens-~a-linux-arm64.tar.gz" version) 'targz))))
-
-;; write-signed-manifest validates the struct against the manifest schema
-;; before signing, so a malformed manifest fails the release instead of
-;; shipping something every client would reject.
-(call-with-output-file (build-path dist "update-manifest.json")
-  #:exists 'truncate/replace
-  (lambda (out)
-    (write-signed-manifest manifest
-                           (read-ed25519-private-key key-path)
-                           key-id
-                           out)
-    (newline out)))
-(printf "manifest: ~a (5 artifacts, key-id ~a)\\n"
-        (build-path dist "update-manifest.json") key-id)
-RKT
-
-# rivet must be installed for the signer; the release publish job links a
-# checkout at the release pin.
-racket "$SCRIPT"
+echo "manifest: $DIST/update-manifest.json (5 artifacts, key-id podlens-2026-10)"
