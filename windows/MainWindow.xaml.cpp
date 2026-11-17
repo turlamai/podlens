@@ -23,6 +23,7 @@
 #include <winrt/Microsoft.UI.Windowing.h>
 
 #include <chrono>
+#include <cwctype>
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
