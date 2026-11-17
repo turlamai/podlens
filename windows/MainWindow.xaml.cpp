@@ -367,11 +367,12 @@ MainWindow::MainWindow() {
   InitializeComponent();
 
   // The slash accelerator is built in code: the XAML compiler's VirtualKey
-  // whitelist rejects every OEM spelling ("Slash", "Oem2", "Number23")
-  // while the enum itself carries Number23 (0xBF, the /? key).
-  muxc::KeyboardAccelerator slash_accel;
-  slash_accel.Key(winrt::Windows::System::VirtualKey::Number23);
-  slash_accel.Modifiers(muxc::KeyboardAcceleratorModifiers::None);
+  // whitelist has no OEM spelling, and the projected enum names none either.
+  // 191 (0xBF) is the /? key on every layout that matters here.
+  winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
+  slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
+  slash_accel.Modifiers(
+      winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorModifiers::None);
   slash_accel.Invoked({this, &MainWindow::PlayerAccel_Invoked});
   PlayerBar().KeyboardAccelerators().Append(slash_accel);
 
@@ -3509,7 +3510,7 @@ void MainWindow::PlayerAccel_Invoked(
       FocusMode_Click(nullptr, nullptr);
       args.Handled(true);
     }
-  } else if (key == winrt::Windows::System::VirtualKey::Number23 &&
+  } else if (key == static_cast<winrt::Windows::System::VirtualKey>(191) &&
              modifiers == Mods::None && page_ == Page::Discover) {
     // The prototype's "/" lands in the discover search field.
     DiscoverSearchBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
