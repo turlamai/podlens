@@ -728,6 +728,10 @@ void MainWindow::ApplyDetailTab() {
   SummaryTabButton().Content(box_value(winrt::hstring(std::wstring(podlens::Tr("detail.tab_summary")))));
   StyleBrandButton(TranscriptTabButton(), !summary);
   StyleBrandButton(SummaryTabButton(), summary);
+  winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+      TranscriptTabButton(), winrt::hstring(L"DetailTab-transcript"));
+  winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+      SummaryTabButton(), winrt::hstring(L"DetailTab-summary"));
   SummaryPanel().Visibility(summary ? Visibility::Visible : Visibility::Collapsed);
   TranscriptList().Visibility(summary ? Visibility::Collapsed : Visibility::Visible);
   // Reading modes only make sense with sentences on screen.
