@@ -3500,7 +3500,7 @@ void MainWindow::PlayerAccel_Invoked(
       FocusMode_Click(nullptr, nullptr);
       args.Handled(true);
     }
-  } else if (key == winrt::Windows::System::VirtualKey::Oem2 &&
+  } else if (key == winrt::Windows::System::VirtualKey::Number23 &&
              modifiers == Mods::None && page_ == Page::Discover) {
     // The prototype's "/" lands in the discover search field.
     DiscoverSearchBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
