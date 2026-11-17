@@ -380,8 +380,10 @@ MainWindow::MainWindow() {
         static_cast<std::uint64_t>(reinterpret_cast<UINT_PTR>(icon))});
   }
 
-  Loaded([weak = get_weak()](winrt::Windows::Foundation::IInspectable const&,
-                            winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
+  // Window has no Loaded of its own; the root content grid does.
+  Content().Loaded([weak = get_weak()](
+                       winrt::Windows::Foundation::IInspectable const&,
+                       winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
     if (auto window = weak.get()) window->InstallSlashAccelerator();
   });
 
