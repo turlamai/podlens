@@ -373,7 +373,14 @@ MainWindow::MainWindow() {
   slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
   // Modifiers defaults to None; every spelling of the flags enum tried so
   // far has been another namespace guess.
-  slash_accel.Invoked({this, &MainWindow::PlayerAccel_Invoked});
+  // A member-delegate binding ({this, &Fn}) reaches for a weak reference,
+  // which the constructor cannot create yet; a plain [this] capture is
+  // safe here because the accelerator dies with the same window.
+  slash_accel.Invoked(
+      [this](winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator const& sender,
+             winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const& args) {
+        PlayerAccel_Invoked(sender, args);
+      });
   PlayerBar().KeyboardAccelerators().Append(slash_accel);
 
   Title(winrt::hstring(std::wstring(podlens::Tr("app.title"))));
