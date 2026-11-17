@@ -442,8 +442,6 @@ struct AppState {
   GtkEntry* discover_entry{nullptr};
   GtkBox* discover_results{nullptr};
   bool discover_loaded{false};
-  // The header focus toggle, so the keyboard shortcut can flip it too.
-  GtkToggleButton* focus_button{nullptr};
 
   // Cross-feed lane data behind home / recent / downloaded.
   std::vector<RecentRow> recents;
@@ -1303,8 +1301,8 @@ GtkWidget* make_home_hero(RecentRow const& item) {
   gtk_label_set_ellipsize(GTK_LABEL(title), PANGO_ELLIPSIZE_END);
   gtk_widget_add_css_class(title, "pl-hero-title");
   gtk_box_append(GTK_BOX(texts), title);
-  auto* meta_text = std::string(item.feed_title) + " · " +
-                    format_seconds(item.episode.duration_sec);
+  auto meta_text = std::string(item.feed_title) + " · " +
+                   format_seconds(item.episode.duration_sec);
   auto* meta = gtk_label_new(meta_text.c_str());
   gtk_label_set_xalign(GTK_LABEL(meta), 0.0f);
   gtk_widget_add_css_class(meta, "pl-meta");
@@ -1384,10 +1382,11 @@ GtkWidget* make_home_hero(RecentRow const& item) {
   // The resume line: where the listener last read.
   auto* resume = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
   auto* resume_title = gtk_label_new(
-      transcript_ready
-          ? std::string(tr("home.resume_prefix")) + " " +
-                format_seconds(item.episode.position_sec)
-          : std::string(tr("home.resume_none")));
+      (transcript_ready
+           ? std::string(tr("home.resume_prefix")) + " " +
+                 format_seconds(item.episode.position_sec)
+           : std::string(tr("home.resume_none")))
+          .c_str());
   gtk_label_set_xalign(GTK_LABEL(resume_title), 0.0f);
   gtk_widget_add_css_class(resume_title, "pl-meta");
   gtk_widget_add_css_class(resume_title, "bold");
@@ -5008,7 +5007,7 @@ void on_activate(GtkApplication* app, gpointer) {
     gtk_box_append(GTK_BOX(tabs), GTK_WIDGET(summary_tab));
     g_state.transcript_tab = transcript_tab;
     g_state.summary_tab = summary_tab;
-    g_state.summary_scroll = summary_scroll;
+    g_state.summary_scroll = GTK_SCROLLED_WINDOW(summary_scroll);
     g_signal_connect(
         transcript_tab, "toggled",
         G_CALLBACK(+[](GtkToggleButton* tab, gpointer) {
