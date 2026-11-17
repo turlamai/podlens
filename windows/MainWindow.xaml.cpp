@@ -371,8 +371,8 @@ MainWindow::MainWindow() {
   // 191 (0xBF) is the /? key on every layout that matters here.
   winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
   slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
-  slash_accel.Modifiers(
-      winrt::Microsoft::UI::Input::KeyboardAcceleratorModifiers::None);
+  // Modifiers defaults to None; every spelling of the flags enum tried so
+  // far has been another namespace guess.
   slash_accel.Invoked({this, &MainWindow::PlayerAccel_Invoked});
   PlayerBar().KeyboardAccelerators().Append(slash_accel);
 
