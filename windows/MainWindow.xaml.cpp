@@ -372,7 +372,7 @@ MainWindow::MainWindow() {
   winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
   slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
   slash_accel.Modifiers(
-      winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorModifiers::None);
+      winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorModifiers{});
   slash_accel.Invoked({this, &MainWindow::PlayerAccel_Invoked});
   PlayerBar().KeyboardAccelerators().Append(slash_accel);
 
@@ -1359,7 +1359,7 @@ void MainWindow::RenderSummary() {
             winrt::hstring(std::wstring(L"SummaryAnchor-") + std::to_wstring(index)));
         auto const seconds = *point.start;
         anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
-                                     winrt::Windows::UI::Xaml::RoutedEventArgs const&) {
+                                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
           if (auto window = weak.get()) {
             window->follow_transcript_ = true;
             window->SeekTo(seconds);
@@ -1407,7 +1407,7 @@ void MainWindow::RenderSummary() {
             winrt::hstring(std::wstring(L"SummaryQuote-") + std::to_wstring(index)));
         auto const seconds = *quote.start;
         anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
-                                     winrt::Windows::UI::Xaml::RoutedEventArgs const&) {
+                                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
           if (auto window = weak.get()) {
             window->follow_transcript_ = true;
             window->SeekTo(seconds);
@@ -1911,7 +1911,7 @@ void MainWindow::LoadHeroResume(RecentRow const& item) {
             } catch (...) {
               return;
             }
-            window->hero_resume_line_->Text(winrt::hstring(sentence));
+            window->hero_resume_line_.Text(winrt::hstring(sentence));
           }
         });
       });
