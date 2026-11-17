@@ -278,8 +278,6 @@ char const* tr(char const* key) {
       {"home.resume_none_hint", "可先体验播放控制，再查看生成流程。",
        "Playback still works; generate the transcript to read along."},
       {"home.recent_empty", "最近没有可展示的更新。", "Nothing new to show right now."},
-       "%s · %d min. Transcribe, translate and summarize in order; your provider bills actual usage."},
-       "About %s characters to process; the provider bills actual usage."},
       {"settings.field.appearance", "外观", "Appearance"},
       {"settings.appearance_system", "跟随系统", "Match system"},
       {"settings.appearance_light", "浅色", "Light"},
