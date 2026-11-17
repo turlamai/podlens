@@ -301,8 +301,6 @@
                                          Invoked="PlayerAccel_Invoked" />
                     <KeyboardAccelerator Key="F" Modifiers="None"
                                          Invoked="PlayerAccel_Invoked" />
-                    <KeyboardAccelerator Key="Number23" Modifiers="None"
-                                         Invoked="PlayerAccel_Invoked" />
                     <KeyboardAccelerator Key="Left" Modifiers="Control"
                                          Invoked="PlayerAccel_Invoked" />
                     <KeyboardAccelerator Key="Right" Modifiers="Control"

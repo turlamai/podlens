@@ -366,6 +366,15 @@ double TimeSpanSeconds(winrt::Windows::Foundation::TimeSpan const& span) {
 MainWindow::MainWindow() {
   InitializeComponent();
 
+  // The slash accelerator is built in code: the XAML compiler's VirtualKey
+  // whitelist rejects every OEM spelling ("Slash", "Oem2", "Number23")
+  // while the enum itself carries Number23 (0xBF, the /? key).
+  muxc::KeyboardAccelerator slash_accel;
+  slash_accel.Key(winrt::Windows::System::VirtualKey::Number23);
+  slash_accel.Modifiers(muxc::KeyboardAcceleratorModifiers::None);
+  slash_accel.Invoked({this, &MainWindow::PlayerAccel_Invoked});
+  PlayerBar().KeyboardAccelerators().Append(slash_accel);
+
   Title(winrt::hstring(std::wstring(podlens::Tr("app.title"))));
 
   // The title bar shows WinUI's generic placeholder unless the window is
