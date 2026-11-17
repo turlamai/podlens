@@ -301,7 +301,7 @@
                                          Invoked="PlayerAccel_Invoked" />
                     <KeyboardAccelerator Key="F" Modifiers="None"
                                          Invoked="PlayerAccel_Invoked" />
-                    <KeyboardAccelerator Key="Slash" Modifiers="None"
+                    <KeyboardAccelerator Key="Oem2" Modifiers="None"
                                          Invoked="PlayerAccel_Invoked" />
                     <KeyboardAccelerator Key="Left" Modifiers="Control"
                                          Invoked="PlayerAccel_Invoked" />
