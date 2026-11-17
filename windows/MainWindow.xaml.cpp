@@ -380,12 +380,6 @@ MainWindow::MainWindow() {
         static_cast<std::uint64_t>(reinterpret_cast<UINT_PTR>(icon))});
   }
 
-  // Window has no Loaded of its own; the root content grid does.
-  Content().Loaded([weak = get_weak()](
-                       winrt::Windows::Foundation::IInspectable const&,
-                       winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
-    if (auto window = weak.get()) window->InstallSlashAccelerator();
-  });
 
   SubtitleText().Text(std::wstring(podlens::Tr("app.subtitle")));
   StatusLine().Text(std::wstring(podlens::Tr("status.starting")));
@@ -560,6 +554,10 @@ MainWindow::MainWindow() {
 }
 
 winrt::fire_and_forget MainWindow::InitializeBackendAsync() {
+  // The slash accelerator mounts here rather than in the constructor: the
+  // member-delegate bindings that worked everywhere else are the one thing
+  // the launch smoke ruled out, so this runs strictly post-construction.
+  InstallSlashAccelerator();
   auto const dispatcher = DispatcherQueue();
   auto const weak = get_weak();
   auto backend = std::make_shared<rivet::windows::Backend>(runtime_config());
