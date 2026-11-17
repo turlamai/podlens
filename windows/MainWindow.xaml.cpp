@@ -697,9 +697,10 @@ void MainWindow::DetailTab_Click(winrt::Windows::Foundation::IInspectable const&
                                  Microsoft::UI::Xaml::RoutedEventArgs const&) {
   auto const button = sender.try_as<Microsoft::UI::Xaml::Controls::Button>();
   if (!button) return;
-  detail_tab_ = button.AutomationProperties::AutomationId() == winrt::hstring(L"DetailTab-summary")
-                    ? 1
-                    : 0;
+  auto const automation_id =
+      winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::GetAutomationId(
+          button);
+  detail_tab_ = automation_id == winrt::hstring(L"DetailTab-summary") ? 1 : 0;
   ApplyDetailTab();
 }
 
@@ -1342,7 +1343,8 @@ void MainWindow::RenderSummary() {
         anchor.Padding(winrt::Microsoft::UI::Xaml::Thickness{0, 2, 0, 2});
         anchor.Background(nullptr);
         anchor.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0});
-        anchor.AutomationProperties::AutomationId(
+        winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+            anchor,
             winrt::hstring(std::wstring(L"SummaryAnchor-") + std::to_wstring(index)));
         auto const seconds = *point.start;
         anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
@@ -1389,7 +1391,8 @@ void MainWindow::RenderSummary() {
         anchor.Padding(winrt::Microsoft::UI::Xaml::Thickness{0, 2, 0, 2});
         anchor.Background(nullptr);
         anchor.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0});
-        anchor.AutomationProperties::AutomationId(
+        winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+            anchor,
             winrt::hstring(std::wstring(L"SummaryQuote-") + std::to_wstring(index)));
         auto const seconds = *quote.start;
         anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
