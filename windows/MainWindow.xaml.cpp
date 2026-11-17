@@ -554,10 +554,6 @@ MainWindow::MainWindow() {
 }
 
 winrt::fire_and_forget MainWindow::InitializeBackendAsync() {
-  // The slash accelerator mounts here rather than in the constructor: the
-  // member-delegate bindings that worked everywhere else are the one thing
-  // the launch smoke ruled out, so this runs strictly post-construction.
-  InstallSlashAccelerator();
   auto const dispatcher = DispatcherQueue();
   auto const weak = get_weak();
   auto backend = std::make_shared<rivet::windows::Backend>(runtime_config());
@@ -1959,25 +1955,6 @@ muxc::StackPanel MainWindow::MakeShowTile(FeedRow const& feed) {
   count_label.Opacity(0.65);
   tile.Children().Append(count_label);
   return tile;
-}
-
-// The slash accelerator is built in code after layout: the XAML compiler's
-// VirtualKey whitelist has no OEM spelling, and 191 (0xBF) is the /? key.
-void MainWindow::InstallSlashAccelerator() {
-  if (slash_accel_installed_) return;
-  slash_accel_installed_ = true;
-  winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
-  slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
-  auto slash_copy = slash_accel;
-  slash_accel.Invoked(
-      [weak = get_weak(), slash_copy](
-          winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator const& sender,
-          winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const& args) {
-        if (auto window = weak.get()) {
-          window->PlayerAccel_Invoked(sender, args);
-        }
-      });
-  PlayerBar().KeyboardAccelerators().Append(slash_accel);
 }
 
 void MainWindow::RenderHomePage() {
