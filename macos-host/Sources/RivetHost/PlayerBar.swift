@@ -96,7 +96,7 @@ struct PlayerBar: View {
             } label: {
                 Image(systemName: store.playing ? "pause.fill" : "play.fill")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Palette.onAccent)
                     .frame(width: 34, height: 34)
                     .background(Palette.accent, in: Circle())
                     .shadow(color: Palette.accent.opacity(0.25), radius: 6, y: 2)

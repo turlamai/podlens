@@ -41,9 +41,9 @@
          config-number)
 
 ;; key -> (list default kind description)
-;; kind is one of string secret boolean number enum-lang internal;
-;; internal keys are managed by the app (update throttling, secret plumbing)
-;; and never surface through the settings RPC surface
+;; kind is one of string secret boolean number enum-lang enum-appearance
+;; internal; internal keys are managed by the app (update throttling, secret
+;; plumbing) and never surface through the settings RPC surface
 (define schema
   (list
    (list 'api-base "https://api.openai.com/v1" 'string
@@ -54,6 +54,10 @@
          "Chat model for translation and summary")
    (list 'asr-model "whisper-1" 'string
          "Speech-to-text model (provider must expose /audio/transcriptions)")
+   (list 'appearance "system" 'enum-appearance
+         "Interface appearance (system / light / dark)")
+   (list 'follow-transcript "true" 'boolean
+         "Automatically follow the current sentence while playing")
    (list 'target-lang "zh" 'enum-lang
          "Translation target language (zh / en)")
    (list 'ui-lang "zh" 'enum-lang
@@ -124,6 +128,11 @@
      (define v (string-trim (if (string? value) value (format "~a" value))))
      (unless (member v '("zh" "en"))
        (raise-argument-error 'config-set! "\"zh\" or \"en\"" value))
+     v]
+    [(enum-appearance)
+     (define v (string-trim (if (string? value) value (format "~a" value))))
+     (unless (member v '("system" "light" "dark"))
+       (raise-argument-error 'config-set! "\"system\", \"light\" or \"dark\"" value))
      v]
     [(boolean)
      (define v (string-trim (if (string? value) value (format "~a" value))))

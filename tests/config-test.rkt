@@ -18,7 +18,9 @@
 (test-case "defaults"
   (check-equal? (config-get mgr 'api-base) "https://api.openai.com/v1")
   (check-equal? (config-get mgr 'target-lang) "zh")
-  (check-equal? (config-get mgr 'asr-model) "whisper-1"))
+  (check-equal? (config-get mgr 'asr-model) "whisper-1")
+  (check-equal? (config-get mgr 'appearance) "system")
+  (check-equal? (config-get mgr 'follow-transcript) "true"))
 
 (test-case "set + persist"
   (config-set! mgr 'api-key "sk-test")
@@ -30,6 +32,9 @@
 
 (test-case "validation"
   (check-exn exn:fail:contract? (lambda () (config-set! mgr 'target-lang "fr")))
+  (check-exn exn:fail:contract? (lambda () (config-set! mgr 'appearance "blue")))
+  (check-equal? (config-set! mgr 'appearance "dark") "dark")
+  (check-equal? (config-set! mgr 'follow-transcript "no") "false")
   (check-exn exn:fail:contract? (lambda () (config-set! mgr 'no-such-key "x")))
   (check-exn exn:fail:contract? (lambda () (config-set! mgr 'max-transcript-chars "not-a-number")))
   (check-exn exn:fail:contract? (lambda () (config-set! mgr 'max-transcript-chars "-1")))

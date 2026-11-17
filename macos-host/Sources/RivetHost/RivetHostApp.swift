@@ -58,6 +58,27 @@ struct PodLensApp: App {
                 Button(L("downloadedTab")) { model.store.sidebarItem = .downloaded }
                     .keyboardShortcut("5")
             }
+            // The prototype's theme toggle, mapped to the platform menu bar:
+            // one quick switch and an explicit three-way appearance choice.
+            CommandGroup(after: .toolbar) {
+                Button(L("toggleAppearance")) {
+                    model.store.setAppearance(
+                        AppModel.isDarkEffective ? "light" : "dark")
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+
+                Divider()
+
+                Picker(L("appearance"), selection: Binding(
+                    get: { model.store.appearance },
+                    set: { model.store.setAppearance($0) })) {
+                    Text(L("appearanceSystem")).tag("system")
+                    Text(L("appearanceLight")).tag("light")
+                    Text(L("appearanceDark")).tag("dark")
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
             CommandMenu(L("menuPlayback")) {
                 Button(model.store.playing ? L("pause") : L("play")) {
                     model.store.togglePlay()
@@ -137,8 +158,59 @@ final class AppModel: ObservableObject {
         language = lang
     }
 
+    /// The effective system appearance, for toggling an unspecified theme.
+    static var isDarkEffective: Bool {
+        NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    }
+
+    // MARK: reading shortcuts
+    //
+    // The prototype's single-key shortcuts (F for focus reading, / to focus
+    // the discover search) cannot be SwiftUI menu commands — menus need a
+    // modifier — so they are installed as a local NSEvent monitor once the
+    // window is up. Text-input and sheet contexts hand the event straight
+    // back to the responder chain.
+
+    private var keyMonitor: Any?
+    static let searchFocusNotification = Notification.Name("podlens.focusSearch")
+
+    func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        // The local monitor fires on the main thread; assumeIsolated bridges
+        // that guarantee to the store's MainActor isolation.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            let consumed = MainActor.assumeIsolated { () -> Bool in
+                guard let key = event.characters?.lowercased(),
+                      event.modifierFlags.subtracting(.deviceIndependentFlagsMask).isEmpty,
+                      let window = NSApp.keyWindow else { return false }
+                // Text fields and editors keep the keyboard.
+                let responder = window.firstResponder
+                if responder is NSTextView || responder is NSTextField || responder is NSText {
+                    return false
+                }
+                switch key {
+                case "f":
+                    guard self.store.selectedEpisode != nil else { return false }
+                    NotificationCenter.default.post(
+                        name: .podlensFocusListening, object: nil,
+                        userInfo: ["focus": !self.store.focusMode])
+                    return true
+                case "/":
+                    guard self.store.sidebarItem == .discover else { return false }
+                    NotificationCenter.default.post(name: Self.searchFocusNotification, object: nil)
+                    return true
+                default:
+                    return false
+                }
+            }
+            return consumed ? nil : event
+        }
+    }
+
     func start() {
         guard backend == nil else { return }
+        installKeyMonitor()
         do {
             let config = try Self.runtimeConfiguration()
             let backend = EmbeddedRacketBackend(configuration: config)

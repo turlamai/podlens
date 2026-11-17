@@ -19,6 +19,10 @@
 ;;   transcript row   = (start end text translation)
 ;;   chapters row     = (start-sec title)
 ;;   resume-last row  = (feed-id episode-id position-sec) or empty
+;;   episode-summary  = JSON string {tldr key-points quotes topics}, where
+;;                      key-points = [{text start}] and quotes =
+;;                      [{text translation start}]; start is sentence seconds
+;;                      or false (legacy summaries without an anchor)
 ;;
 ;; Lifecycle: the embedded runtime calls `start` with the two RVT1 fds.
 ;; library/config managers are built once here and shared by every request
@@ -317,7 +321,7 @@
 
 (define-rpc (episode-summary [id String] : String)
   (define t (transcript-load id))
-  (define s (and t (hash-ref t 'summary #f)))
+  (define s (and t (summary-normalize (hash-ref t 'summary #f))))
   (if s
       (jsexpr->string s)
       ""))

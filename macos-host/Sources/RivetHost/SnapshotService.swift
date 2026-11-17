@@ -69,6 +69,14 @@ enum SnapshotService {
             try? await Task.sleep(nanoseconds: 1_100_000_000)
             capture(window: window, to: directory.appendingPathComponent("reading.png"))
             store.focusMode = false
+
+            // The summary tab with its anchors back to sentences.
+            if store.summary != nil {
+                store.detailTab = .summary
+                try? await Task.sleep(nanoseconds: 1_100_000_000)
+                capture(window: window, to: directory.appendingPathComponent("summary.png"))
+                store.detailTab = .transcript
+            }
         }
 
         // Discover

@@ -14,7 +14,10 @@
 ;;                    summary asr-model chat-model updated-epoch}
 ;;   segments     = list of {start end text}   (start/end in seconds)
 ;;   translation  = list of strings, 1:1 with segments (or empty)
-;;   summary      = {tldr key-points quotes topics} (or #f)
+;;   summary      = {tldr key-points quotes topics} (or #f), where key-points
+;;                  and quotes are normalized to {text translation? start}
+;;                  objects on the wire; start is the sentence time in seconds
+;;                  or #f when the summary has no anchor (legacy data).
 ;; library.json also carries last-episode = {episode-id feed-id} (or absent),
 ;; the episode the position-saver touched last — what "resume" reopens.
 
@@ -46,6 +49,7 @@
          last-episode-get
          transcript-load
          transcript-save!
+         summary-normalize
          feed-artwork-of
          episode-sort-key)
 
@@ -252,3 +256,38 @@
   (define p (transcript-path episode-id))
   (make-directory* (path-only p))
   (write-json-file! p data))
+
+;; ---- summary anchors -----------------------------------------------------------
+;; Key points and quotes may carry the sentence start they came from so hosts can
+;; offer a jump-back anchor. Model responses and legacy stored data may still be
+;; plain strings; normalize both so the wire only ever carries objects.
+
+;; A usable anchor is any real sentence time — 0 is the first sentence and
+;; perfectly valid. Non-numeric junk (legacy false, strings) has no anchor.
+(define (summary-anchor-start value)
+  (and (real? value) (inexact->exact (floor (max value 0)))))
+
+;; Points/quotes without a usable sentence time simply omit the start key:
+;; JSON false would bridge to NSNumber 0 in the hosts and read as 00:00.
+(define (summary-point-normalize p)
+  (define text (format "~a" (if (hash? p) (hash-ref p 'text "") p)))
+  (define start (and (hash? p) (summary-anchor-start (hash-ref p 'start #f))))
+  (if start
+      (hasheq 'text text 'start start)
+      (hasheq 'text text)))
+
+(define (summary-quote-normalize q)
+  (define text (format "~a" (if (hash? q) (hash-ref q 'text "") q)))
+  (define translation (format "~a" (if (hash? q) (hash-ref q 'translation "") "")))
+  (define start (and (hash? q) (summary-anchor-start (hash-ref q 'start #f))))
+  (if start
+      (hasheq 'text text 'translation translation 'start start)
+      (hasheq 'text text 'translation translation)))
+
+;; summary -> normalized summary (same keys, anchored points/quotes); #f passthrough
+(define (summary-normalize s)
+  (and (hash? s)
+       (hasheq 'tldr (format "~a" (hash-ref s 'tldr ""))
+               'key-points (map summary-point-normalize (hash-ref s 'key-points '()))
+               'quotes (map summary-quote-normalize (hash-ref s 'quotes '()))
+               'topics (map (lambda (t) (format "~a" t)) (hash-ref s 'topics '())))))

@@ -57,7 +57,7 @@ Accent foreground/background pairs change together in dark mode. This is a contr
 4. Selecting another episode restores its position. Restart resets the current episode to zero. Back and forward controls seek −15 / +30 seconds, bounded by the episode duration.
 5. Transcript sample text covers the opening through 01:09 of the existing interfaces episode. Other episodes must not display that transcript or summary as their own. Missing content gets an explanatory state and an entry to the generation explanation.
 6. Sentence selection updates the simulated position. Bilingual / translation / original modes retain the selected sentence and reading layout. Follow updates the current sentence inside the available sample; reading beyond that sample is never fabricated.
-7. Summary timestamp actions return to the corresponding source sentence and start simulated progress. Summaries are labeled sample text, not a completed model call.
+7. Summary timestamp actions return to the corresponding source sentence and start simulated progress. In the product, key points and quotes carry the sentence time they came from (the summary RPC normalizes legacy rows to unanchored objects, which render without a jump button). Summaries are labeled sample text in the prototype, not a completed model call.
 8. Focus mode removes navigation without creating a new playback state. Exiting restores the surrounding application.
 9. Space starts or pauses when the page body has focus; native buttons keep their own activation. Ctrl/Command + arrows seek. Enter or Space activates a focused sentence. F toggles reading focus mode. Inputs and open dialogs do not trigger these shortcuts.
 10. Playback rate changes timer progression. Sleep timing stops the simulation; it is not a background audio guarantee.
@@ -90,6 +90,8 @@ Desktop uses a 232px sidebar, normal-flow content, and a player that reserves it
 | Shortcut modifier | Command | Ctrl | Ctrl |
 | Native interface | SwiftUI | WinUI 3 | GTK4 |
 | Settings presentation | Native settings window | Native settings surface | Native settings surface |
+| Appearance choice | Follow System / Light / Dark (menu ⇧⌘T quick toggle) | Same three states in settings | Same three states in settings |
+| Single-key shortcuts | F and / via a local key monitor; F also on the menu as ⌘⇧F | F and / via accelerators | F and / via key controller |
 | Shared contract | Information architecture, action semantics, reading continuity, status vocabulary | Same | Same |
 
 The prototype uses one platform-neutral interface. No macOS traffic lights are presented as universal desktop window controls.

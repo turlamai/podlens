@@ -3,28 +3,32 @@ import SwiftUI
 
 // MARK: - Palette
 
-/// PodLens's semantic colors. Everything the app paints comes from here so
-/// light/dark adaptation is decided once, not in each view. The terracotta
-/// accent is the same one the site and the app icon use (#C15F3C).
+/// PodLens's semantic colors, mirrored 1:1 from the prototype contract
+/// (design/prototype/shared.css). Everything the app paints comes from here so
+/// light/dark adaptation is decided once, not in each view. Accent foreground/
+/// background pairs change together in dark mode.
 enum Palette {
-    static let accent = Color(red: 0xC1 / 255.0, green: 0x5F / 255.0, blue: 0x3C / 255.0)
-    static let accentDeep = dynamic(light: 0x9E4A2E, dark: 0xE08A66)
-    static let highlight = dynamic(light: 0xF7E5DD, dark: 0x3B2A22)
+    static let accent = dynamic(light: 0xAC4B2D, dark: 0xEBAB8A)
+    static let accentDeep = dynamic(light: 0x893A23, dark: 0xF5C1A6)
+    static let accentSoft = dynamic(light: 0xF6E8E1, dark: 0x3B2C25)
+    static let onAccent = dynamic(light: 0xFFFFFF, dark: 0x281B14)
+    /// Back-compat alias: the prototype's accent-soft token.
+    static let highlight = accentSoft
 
     /// Window canvas. A hair warmer than the system background so cards and
     /// the player bar read as separate layers without borders everywhere.
-    static let canvas = dynamic(light: 0xFAF7F2, dark: 0x171614)
-    static let surface = dynamic(light: 0xFFFFFF, dark: 0x232120)
-    static let surfaceRaised = dynamic(light: 0xF4EFE8, dark: 0x2C2926)
-    static let hairline = dynamic(light: 0xE8E2D9, dark: 0x3A3733)
+    static let canvas = dynamic(light: 0xFAF7F2, dark: 0x1A1917)
+    static let surface = dynamic(light: 0xFFFFFF, dark: 0x22211F)
+    static let surfaceRaised = dynamic(light: 0xF2EEE8, dark: 0x2B2925)
+    static let hairline = dynamic(light: 0xE4DED5, dark: 0x403D37)
 
-    static let ink = Color(nsColor: .labelColor)
-    static let inkSecondary = Color(nsColor: .secondaryLabelColor)
+    static let ink = dynamic(light: 0x252521, dark: 0xF1EEE8)
+    static let inkSecondary = dynamic(light: 0x69675F, dark: 0xB2ADA3)
     static let inkTertiary = Color(nsColor: .tertiaryLabelColor)
 
-    static let positive = dynamic(light: 0x2E7D4F, dark: 0x6FD08C)
+    static let positive = dynamic(light: 0x276742, dark: 0x8DD1A3)
     static let warning = dynamic(light: 0xB25E14, dark: 0xE8A25C)
-    static let danger = dynamic(light: 0xB3261E, dark: 0xF27A72)
+    static let danger = dynamic(light: 0xA52C2C, dark: 0xF4A09A)
 
     static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -130,7 +134,7 @@ struct ProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Typeface.headline)
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.onAccent)
             .padding(.horizontal, Space.md)
             .padding(.vertical, 7)
             .background(Palette.accent, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
@@ -192,7 +196,7 @@ struct CountBadge: View {
             Text("\(count)")
                 .font(Typeface.micro.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(emphasized ? Color.white : Palette.inkSecondary)
+                .foregroundStyle(emphasized ? Palette.onAccent : Palette.inkSecondary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 1.5)
                 .background(

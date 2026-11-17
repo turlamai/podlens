@@ -263,7 +263,7 @@ struct ModeSelector: View {
                 } label: {
                     Text(mode.label)
                         .font(Typeface.micro.weight(.semibold))
-                        .foregroundStyle(selection == mode ? .white : Palette.inkSecondary)
+                        .foregroundStyle(selection == mode ? Palette.onAccent : Palette.inkSecondary)
                         .frame(width: 66, height: 22)
                         .background(selection == mode ? Palette.accent : Color.clear,
                                     in: Capsule())
@@ -285,7 +285,9 @@ struct TranscriptToolbar: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: Space.xs) {
+            HStack(spacing: Space.sm) {
+                tabSelector
+                divider
                 modeControl
                 Spacer()
                 translateButton
@@ -293,6 +295,8 @@ struct TranscriptToolbar: View {
                 currentButton(compact: false)
             }
             HStack(spacing: Space.xs) {
+                tabSelector
+                divider
                 modeControl
                 Spacer()
                 followButton(compact: true)
@@ -302,6 +306,42 @@ struct TranscriptToolbar: View {
         .padding(.horizontal, Space.lg)
         .padding(.vertical, 7)
         .background(Palette.canvas)
+    }
+
+    /// The two reading tabs of the detail surface — transcript and summary
+    /// are siblings, as in the prototype, not stacked views.
+    private var tabSelector: some View {
+        HStack(spacing: Space.md) {
+            ForEach(DetailTab.allCases) { tab in
+                tabButton(tab)
+            }
+        }
+    }
+
+    private func tabButton(_ tab: DetailTab) -> some View {
+        Button {
+            store.detailTab = tab
+        } label: {
+            VStack(spacing: 0) {
+                Text(tab.label)
+                    .font(Typeface.callout.weight(store.detailTab == tab ? .semibold : .regular))
+                    .foregroundStyle(store.detailTab == tab ? Palette.accentDeep : Palette.inkSecondary)
+                    .padding(.vertical, 6)
+                Rectangle()
+                    .fill(store.detailTab == tab ? Palette.accent : Color.clear)
+                    .frame(height: 2)
+            }
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityAddTraits(store.detailTab == tab ? .isSelected : [])
+        .accessibilityIdentifier("DetailTab-\(tab.rawValue)")
+        .accessibilityLabel(tab.label)
+    }
+
+    private var divider: some View {
+        Divider()
+            .frame(height: 14)
     }
 
     @ViewBuilder
@@ -378,14 +418,19 @@ struct TranscriptReader: View {
     @FocusState private var focusedSegment: Int?
 
     var body: some View {
+        if store.detailTab == .summary {
+            SummaryReader(episode: episode,
+                          onUnderstand: onUnderstand,
+                          openSettings: openSettings)
+        } else {
+            transcriptView
+        }
+    }
+
+    private var transcriptView: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if let summary = store.summary {
-                        SummaryCard(summary: summary)
-                            .padding(.bottom, Space.md)
-                    }
-
                     if store.segments.isEmpty {
                         transcriptPlaceholder
                             .frame(maxWidth: .infinity, minHeight: 260)
@@ -406,6 +451,9 @@ struct TranscriptReader: View {
                                     return .handled
                                 }
                         }
+
+                        keyboardFooter
+                            .padding(.top, Space.lg)
                     }
                 }
                 .padding(.horizontal, Space.lg)
@@ -427,6 +475,26 @@ struct TranscriptReader: View {
                 }
             }
         }
+    }
+
+    /// The prototype's reading footer: the shortcuts that work while the
+    /// reading surface is up.
+    private var keyboardFooter: some View {
+        HStack(spacing: Space.lg) {
+            Text(L("keyboardSpaceHint"))
+            Text(L("keyboardSeekHint"))
+            Text(L("keyboardFocusHint"))
+        }
+        .font(Typeface.caption)
+        .foregroundStyle(Palette.inkSecondary)
+        .padding(.top, Space.md)
+        .padding(.bottom, Space.xxs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Palette.hairline)
+                .frame(height: 0.7)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func activate(_ segment: Segment) {
@@ -532,85 +600,167 @@ struct SegmentRow: View {
 
 // MARK: - Summary
 
-struct SummaryCard: View {
+/// The summary tab: the model's overview plus its anchors — every point and
+/// quote that carries a sentence time jumps back to that sentence.
+struct SummaryReader: View {
+    @EnvironmentObject private var store: PodLensStore
+    let episode: Episode
+    let onUnderstand: () -> Void
+    let openSettings: () -> Void
+
+    var body: some View {
+        ScrollView {
+            if let summary = store.summary {
+                SummaryPage(summary: summary)
+                    .padding(.horizontal, Space.lg)
+                    .padding(.vertical, Space.md)
+                    .frame(maxWidth: 780, alignment: .leading)
+                    .frame(maxWidth: .infinity)
+            } else {
+                summaryPlaceholder
+                    .frame(maxWidth: .infinity, minHeight: 260)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var summaryPlaceholder: some View {
+        if episode.summaryStatus == "running" || store.runningJob(for: episode.id) != nil {
+            HStack(spacing: Space.xs) {
+                ProgressView().controlSize(.small)
+                Text(L("summarizing"))
+                    .font(Typeface.callout)
+                    .foregroundStyle(Palette.inkSecondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 200)
+        } else {
+            EmptyStateView(
+                icon: "sparkles",
+                title: L("summaryEmptyTitle"),
+                message: L("summaryEmptyBody"),
+                actionTitle: L("understandFlow"),
+                action: onUnderstand)
+        }
+    }
+}
+
+struct SummaryPage: View {
+    @EnvironmentObject private var store: PodLensStore
     let summary: PodLensStore.Summary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Palette.accent)
-                Text(L("summaryTitle"))
-                    .font(Typeface.micro.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.8)
-                    .foregroundStyle(Palette.accent)
-                Spacer()
-                if !summary.topics.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(summary.topics.prefix(4), id: \.self) { topic in
-                            Text(topic)
-                                .font(Typeface.micro)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Palette.highlight, in: Capsule())
-                                .foregroundStyle(Palette.accentDeep)
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            section(L("summaryTldrTitle")) {
+                if !summary.tldr.isEmpty {
+                    Text(summary.tldr)
+                        .font(Typeface.reading(22))
+                        .lineSpacing(5)
+                        .foregroundStyle(Palette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            if !summary.tldr.isEmpty {
-                Text(summary.tldr)
-                    .font(Typeface.reading(18))
-                    .lineSpacing(4)
-                    .foregroundStyle(Palette.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
             if !summary.keyPoints.isEmpty {
-                VStack(alignment: .leading, spacing: 5) {
-                    ForEach(Array(summary.keyPoints.enumerated()), id: \.offset) { _, point in
-                        HStack(alignment: .top, spacing: 7) {
-                            Circle()
-                                .fill(Palette.accent.opacity(0.65))
-                                .frame(width: 4, height: 4)
-                                .padding(.top, 7)
-                            Text(point)
-                                .font(Typeface.body)
-                                .foregroundStyle(Palette.inkSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                section(L("summaryPointsTitle")) {
+                    ForEach(Array(summary.keyPoints.enumerated()), id: \.offset) { index, point in
+                        HStack(alignment: .top, spacing: Space.sm) {
+                            Text(String(format: "%02d", index + 1))
+                                .font(Typeface.mono(12))
+                                .foregroundStyle(Palette.accentDeep)
+                                .padding(.top, 4)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(point.text)
+                                    .font(Typeface.body)
+                                    .foregroundStyle(Palette.ink)
+                                    .lineSpacing(3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let start = point.start {
+                                    anchorButton(start,
+                                                 label: "\(formatClock(start)) \(L("summaryJumpToPoint"))",
+                                                 icon: "arrow.right",
+                                                 identifier: "SummaryAnchor-\(index)")
+                                }
+                            }
                         }
+                        .padding(.bottom, Space.md)
                     }
                 }
             }
 
             if !summary.quotes.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(summary.quotes.enumerated()), id: \.offset) { _, quote in
-                        HStack(alignment: .top, spacing: 8) {
-                            Rectangle()
-                                .fill(Palette.accent.opacity(0.5))
-                                .frame(width: 2)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("“\(quote.0)”")
-                                    .font(Typeface.reading(15))
-                                    .italic()
-                                    .foregroundStyle(Palette.ink)
-                                if !quote.1.isEmpty {
-                                    Text(quote.1)
-                                        .font(Typeface.caption)
-                                        .foregroundStyle(Palette.inkSecondary)
-                                }
+                section(L("summaryQuotesTitle")) {
+                    ForEach(Array(summary.quotes.enumerated()), id: \.offset) { index, quote in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("“\(quote.text)”")
+                                .font(Typeface.reading(19))
+                                .italic()
+                                .foregroundStyle(Palette.ink)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if !quote.translation.isEmpty {
+                                Text(quote.translation)
+                                    .font(Typeface.callout)
+                                    .foregroundStyle(Palette.inkSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
+                            if let start = quote.start {
+                                anchorButton(start,
+                                             label: "\(L("summaryReplayQuote")) \(formatClock(start))",
+                                             icon: "play.fill",
+                                             identifier: "SummaryQuote-\(index)")
+                            }
+                        }
+                        .padding(.bottom, Space.md)
+                    }
+                }
+            }
+
+            if !summary.topics.isEmpty {
+                section(L("summaryTopicsTitle")) {
+                    HStack(spacing: Space.xs) {
+                        ForEach(summary.topics, id: \.self) { topic in
+                            Text(topic)
+                                .font(Typeface.micro)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3)
+                                .background(Palette.surfaceRaised, in: Capsule())
+                                .foregroundStyle(Palette.inkSecondary)
                         }
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardSurface(padding: Space.md)
+    }
+
+    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Text(title)
+                .font(Typeface.caption.weight(.semibold))
+                .foregroundStyle(Palette.inkSecondary)
+            content()
+        }
+        .padding(.top, Space.md)
+        .padding(.bottom, Space.lg)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Palette.hairline)
+                .frame(height: 0.7)
+        }
+    }
+
+    private func anchorButton(_ start: Double, label: String, icon: String,
+                              identifier: String) -> some View {
+        Button {
+            store.jumpToAnchor(start)
+        } label: {
+            Label(label, systemImage: icon)
+                .font(Typeface.caption.weight(.medium))
+                .foregroundStyle(Palette.accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(label)
+        .help(L("summaryJumpToPoint"))
     }
 }
 

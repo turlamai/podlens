@@ -19,6 +19,7 @@ struct ContentView: View {
                 BootView()
             }
         }
+        .preferredColorScheme(model.store.appearanceScheme)
         .environmentObject(model.store)
         .sheet(isPresented: $showAddFeed) {
             AddFeedSheet()
@@ -413,7 +414,7 @@ struct ContentColumn: View {
 
     private var pageTitle: String? {
         switch store.sidebarItem {
-        case .home: return L("homeTab")
+        case .home: return nil // the home page owns its heading
         case .discover: return L("discover")
         case .shows: return L("showsTab")
         case .recent: return L("recentlyUpdated")
@@ -425,6 +426,10 @@ struct ContentColumn: View {
 
 // MARK: - Home
 
+/// The prototype's home: one current episode, one primary playback action, and
+/// a direct return to reading. Recent updates follow; subscribed shows are
+/// secondary. The former Up Next lane is gone — a queue is outside the
+/// product scope.
 struct HomeView: View {
     @EnvironmentObject private var store: PodLensStore
 
@@ -440,36 +445,54 @@ struct HomeView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.xl) {
-                    if let next = store.upNext.first {
-                        ContinueCard(item: next)
+                    HStack(alignment: .center, spacing: Space.md) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L("homeHeroTitle"))
+                                .font(Typeface.hero)
+                                .foregroundStyle(Palette.ink)
+                            Text(L("homeHeroSubtitle"))
+                                .font(Typeface.callout)
+                                .foregroundStyle(Palette.inkSecondary)
+                        }
+                        Spacer(minLength: Space.sm)
+                        Button {
+                            NotificationCenter.default.post(name: .podlensAddFeed, object: nil)
+                        } label: {
+                            Label(L("addFeed"), systemImage: "plus")
+                        }
+                        .buttonStyle(QuietButtonStyle(promotes: true))
+                        .help(L("addFeed"))
+                    }
+
+                    if let item = store.resumeCandidate {
+                        HomeHero(item: item)
                     }
 
                     VStack(alignment: .leading, spacing: Space.sm) {
-                        LaneTitle(title: L("upNextLane"))
-                        UpNextLane()
-                    }
-
-                    VStack(alignment: .leading, spacing: Space.sm) {
-                        LaneTitle(title: L("myShowsLane"),
-                                  actionTitle: L("seeAll"),
-                                  action: { store.sidebarItem = .shows })
-                        ShowsGrid(shows: store.homeShows)
-                    }
-
-                    VStack(alignment: .leading, spacing: Space.sm) {
-                        LaneTitle(title: L("latestEpisodesLane"),
+                        LaneTitle(title: L("recentlyUpdated"),
                                   actionTitle: L("seeAll"),
                                   action: { store.sidebarItem = .recent })
-                        VStack(spacing: 0) {
-                            ForEach(Array(store.recentEpisodes.prefix(6))) { item in
-                                EpisodeRow(data: EpisodeRowData(recent: item, showFeed: true),
-                                           selected: store.selectedEpisode?.id == item.id,
-                                           onOpen: { store.selectRecent(item, autoplay: false) },
-                                           onPlay: { store.selectRecent(item) })
-                                Divider().overlay(Palette.hairline)
+                        if store.recentUpdates.isEmpty {
+                            Text(L("homeRecentEmpty"))
+                                .font(Typeface.callout)
+                                .foregroundStyle(Palette.inkSecondary)
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(store.recentUpdates) { item in
+                                    EpisodeRow(data: EpisodeRowData(recent: item, showFeed: true),
+                                               selected: store.selectedEpisode?.id == item.id,
+                                               onOpen: { store.selectRecent(item, autoplay: false) },
+                                               onPlay: { store.selectRecent(item) })
+                                    Divider().overlay(Palette.hairline)
+                                }
                             }
+                            .cardSurface(padding: Space.xxs)
                         }
-                        .cardSurface(padding: Space.xxs)
+                    }
+
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        LaneTitle(title: L("myShowsLane"))
+                        ShowsGrid(shows: store.homeShows)
                     }
                 }
                 .padding(.horizontal, Space.lg)
@@ -482,83 +505,134 @@ struct HomeView: View {
     }
 }
 
-struct ContinueCard: View {
+/// The home hero: eyebrow, a serif episode title, listening progress, one
+/// primary action plus a direct return to reading, and the resume line that
+/// recalls the sentence the listener last read.
+struct HomeHero: View {
     @EnvironmentObject private var store: PodLensStore
     let item: RecentEpisode
     @State private var hovering = false
 
+    private var isCurrent: Bool { store.selectedEpisode?.id == item.id }
+    private var isPlaying: Bool { isCurrent && store.playing }
+    private var transcriptReady: Bool { item.transcriptStatus == "done" }
+
     var body: some View {
-        HStack(spacing: Space.lg) {
-            ArtworkView(url: item.artworkURL, seed: item.feedTitle, cornerRadius: Radius.artwork)
-                .frame(width: 128, height: 128)
-                .shadow(color: .black.opacity(0.18), radius: 16, y: 8)
+        VStack(alignment: .leading, spacing: Space.md) {
+            HStack(alignment: .center, spacing: Space.md) {
+                ArtworkView(url: item.artworkURL, seed: item.feedTitle, cornerRadius: Radius.control)
+                    .frame(width: 92, height: 92)
+                    .shadow(color: .black.opacity(0.16), radius: 12, y: 6)
 
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(item.positionSec > 5 ? L("continueListening") : L("startListening"))
-                    .font(Typeface.micro.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.8)
-                    .foregroundStyle(Palette.accent)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text(item.positionSec > 5 ? L("continueListening") : L("startListening"))
+                        .font(Typeface.micro.weight(.bold))
+                        .textCase(.uppercase)
+                        .tracking(1)
+                        .foregroundStyle(Palette.accentDeep)
 
-                Text(item.title)
-                    .font(Typeface.title)
-                    .foregroundStyle(Palette.ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(item.title)
+                        .font(Typeface.reading(24, weight: .medium))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                MetaLine(parts: [item.feedTitle, formatPubDate(item.pubDisplay),
-                                 formatDuration(item.duration)])
-
-                if let fraction = progressFraction(position: item.positionSec, duration: item.duration) {
-                    HStack(spacing: Space.xs) {
-                        ProgressLine(fraction: fraction)
-                            .frame(width: 132)
-                        Text(formatRemaining(item.duration - item.positionSec))
-                            .font(Typeface.mono(10))
-                            .foregroundStyle(Palette.inkTertiary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                    .padding(.top, 2)
+                    MetaLine(parts: [item.feedTitle, formatDuration(item.duration)])
                 }
-
-                HStack(spacing: Space.xs) {
-                    Button {
-                        store.selectRecent(item)
-                    } label: {
-                        Label(store.playing && store.selectedEpisode?.id == item.id
-                              ? L("pause") : L("play"),
-                              systemImage: store.playing && store.selectedEpisode?.id == item.id
-                              ? "pause.fill" : "play.fill")
-                    }
-                    .buttonStyle(ProminentButtonStyle())
-
-                    Button {
-                        store.selectRecent(item, autoplay: false)
-                    } label: {
-                        Image(systemName: "arrow.up.right.square")
-                    }
-                    .buttonStyle(QuietButtonStyle())
-                    .help(L("openEpisode"))
-                    .accessibilityLabel(L("openEpisode"))
-                }
-                .padding(.top, Space.xxs)
             }
 
-            Spacer(minLength: 0)
+            if let fraction = progressFraction(position: item.positionSec, duration: item.duration) {
+                HStack(spacing: Space.md) {
+                    ProgressLine(fraction: fraction)
+                    Text("\(formatClock(item.positionSec)) / \(formatDuration(item.duration))")
+                        .font(Typeface.mono(11))
+                        .foregroundStyle(Palette.inkSecondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+
+            HStack(spacing: Space.xs) {
+                Button {
+                    if isCurrent { store.togglePlay() } else { store.selectRecent(item) }
+                } label: {
+                    Label(isPlaying ? L("pause") : L("continueListening"),
+                          systemImage: isPlaying ? "pause.fill" : "play.fill")
+                }
+                .buttonStyle(ProminentButtonStyle())
+                .fixedSize()
+
+                Button {
+                    store.selectRecent(item, autoplay: false)
+                } label: {
+                    Label(transcriptReady ? L("backToTranscript") : L("viewEpisode"),
+                          systemImage: "book")
+                }
+                .buttonStyle(QuietButtonStyle())
+                .fixedSize()
+
+                Button {
+                    store.selectRecent(item)
+                    store.seek(to: 0)
+                } label: {
+                    Label(L("restartFromStart"), systemImage: "gobackward")
+                }
+                .buttonStyle(QuietButtonStyle())
+                .labelStyle(.iconOnly)
+                .help(L("restartFromStart"))
+                .accessibilityLabel(L("restartFromStart"))
+                .fixedSize()
+            }
+
+            resumeLine
         }
-        .padding(Space.md)
-        .background(Palette.highlight.opacity(0.55),
-                    in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
+        .padding(Space.lg)
+        .background(Palette.surface,
+                    in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous)
-                .strokeBorder(Palette.accent.opacity(hovering ? 0.35 : 0.16), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .strokeBorder(Palette.hairline, lineWidth: 0.7)
         }
-        .animation(Motion.quick, value: hovering)
-        .onHover { hovering = $0 }
         .contentShape(Rectangle())
         .onTapGesture { store.selectRecent(item, autoplay: false) }
+        .task(id: item.id) { store.loadHeroResume(for: item) }
+    }
+
+    @ViewBuilder private var resumeLine: some View {
+        HStack(alignment: .top, spacing: Space.sm) {
+            Image(systemName: "book")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Palette.accent)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                if transcriptReady {
+                    Text(L("homeResumePrefix") + " " + formatClock(item.positionSec))
+                        .font(Typeface.callout.weight(.semibold))
+                        .foregroundStyle(Palette.ink)
+                    if let sentence = store.heroResumeSentence(item.id), !sentence.isEmpty {
+                        Text(sentence)
+                            .font(Typeface.callout)
+                            .foregroundStyle(Palette.inkSecondary)
+                            .lineLimit(2)
+                    }
+                } else {
+                    Text(L("homeResumeNone"))
+                        .font(Typeface.callout.weight(.semibold))
+                        .foregroundStyle(Palette.ink)
+                    Text(L("homeResumeNoneHint"))
+                        .font(Typeface.caption)
+                        .foregroundStyle(Palette.inkSecondary)
+                }
+            }
+        }
+        .padding(.top, Space.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Palette.hairline)
+                .frame(height: 0.7)
+                .offset(y: -Space.xs)
+        }
     }
 }
 
@@ -575,92 +649,6 @@ struct ProgressLine: View {
         }
         .frame(height: 3)
         .accessibilityHidden(true)
-    }
-}
-
-struct UpNextLane: View {
-    @EnvironmentObject private var store: PodLensStore
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: Space.sm) {
-                ForEach(store.upNext) { item in
-                    UpNextCard(item: item)
-                }
-            }
-            .padding(.vertical, Space.xxs)
-        }
-    }
-}
-
-struct UpNextCard: View {
-    @EnvironmentObject private var store: PodLensStore
-    let item: RecentEpisode
-    @State private var hovering = false
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            ArtworkBackdrop(url: item.artworkURL, seed: item.feedTitle, opacity: 0.9)
-                .frame(width: 236, height: 132)
-                .clipped()
-            LinearGradient(colors: [.clear, .black.opacity(0.72)],
-                           startPoint: .center, endPoint: .bottom)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.feedTitle)
-                    .font(Typeface.micro.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(1)
-                Text(item.title)
-                    .font(Typeface.callout.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                HStack(spacing: 6) {
-                    Image(systemName: "play.fill").font(.system(size: 9))
-                    Text(formatDuration(item.duration))
-                }
-                .font(Typeface.micro.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Color.black.opacity(0.34), in: Capsule())
-            }
-            .padding(Space.sm)
-        }
-        .frame(width: 236, height: 132)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                .strokeBorder(.white.opacity(hovering ? 0.35 : 0.12), lineWidth: 0.8)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { store.selectRecent(item, autoplay: false) }
-        .onHover { hovering = $0 }
-        .animation(Motion.quick, value: hovering)
-        .scaleEffect(hovering ? 1.015 : 1)
-        .contextMenu {
-            Button(L("pipeline")) {
-                store.selectRecent(item, autoplay: false)
-                if let episode = store.selectedEpisode {
-                    store.startJob("pipeline", episode: episode)
-                }
-            }
-            Button(item.downloaded ? L("removeAudio") : L("download")) {
-                if item.downloaded {
-                    store.withEpisode(item.id) { api in
-                        _ = try? await api.episode_remove_audio(id: item.id)
-                    }
-                } else {
-                    store.withEpisode(item.id) { api in
-                        _ = try? await api.episode_download(id: item.id)
-                    }
-                }
-            }
-            Button(item.done ? L("markUnplayed") : L("markPlayed")) {
-                store.setRecentDone(item, done: !item.done)
-            }
-        }
     }
 }
 
@@ -986,7 +974,7 @@ struct EpisodeRow: View {
             Button(action: onPlay) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(hovering || selected ? .white : Palette.accent)
+                    .foregroundStyle(hovering || selected ? Palette.onAccent : Palette.accent)
                     .frame(width: 27, height: 27)
                     .background(
                         hovering || selected ? Palette.accent : Palette.highlight,
@@ -1082,6 +1070,11 @@ struct DiscoverView: View {
         VStack(spacing: 0) {
             searchBar
             Divider().overlay(Palette.hairline)
+            // The prototype's "/" shortcut lands here.
+            .onReceive(NotificationCenter.default.publisher(
+                for: AppModel.searchFocusNotification)) { _ in
+                searchFocused = true
+            }
 
             if store.isSearching {
                 VStack(spacing: Space.xs) {
@@ -1194,7 +1187,7 @@ struct DiscoverView: View {
         } label: {
             Text(title)
                 .font(Typeface.callout)
-                .foregroundStyle(category == value ? .white : Palette.inkSecondary)
+                .foregroundStyle(category == value ? Palette.onAccent : Palette.inkSecondary)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 5)
                 .background(category == value ? Palette.accent : Palette.surfaceRaised, in: Capsule())

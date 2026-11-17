@@ -67,8 +67,9 @@
        (jsexpr->string (hasheq 'lines lines))]
       [else
        (jsexpr->string (hasheq 'tldr "一句总结。"
-                               'key_points (list "要点一" "要点二")
-                               'quotes (list (hasheq 'text "quote" 'translation "引用"))
+                               'key_points (list (hasheq 'text "要点一" 'start 4)
+                                                 (hasheq 'text "要点二"))
+                               'quotes (list (hasheq 'text "quote" 'translation "引用" 'start 6))
                                'topics (list "测试")))]))
   (jsexpr->bytes
    (hasheq 'choices (list (hasheq 'message (hasheq 'role "assistant" 'content content))))))
@@ -182,7 +183,12 @@
 (test-case "summarize stores structured summary"
   (check-true (run-summarize! cfg (episode-get eid) (lambda (p m) (void))))
   (define t (transcript-load eid))
-  (check-equal? (hash-ref (hash-ref t 'summary) 'tldr) "一句总结。"))
+  (define s (hash-ref t 'summary))
+  (check-equal? (hash-ref s 'tldr) "一句总结。")
+  ;; anchored points/quotes are normalized to objects on store
+  (check-equal? (hash-ref (first (hash-ref s 'key-points)) 'start) 4)
+  (check-false (hash-ref (second (hash-ref s 'key-points)) 'start #f))
+  (check-equal? (hash-ref (first (hash-ref s 'quotes)) 'start) 6))
 
 (define episode-two (second (episodes-for-feed feed-id)))
 

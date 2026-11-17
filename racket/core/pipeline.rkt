@@ -339,7 +339,7 @@
            (substring full-text (- (string-length full-text) (inexact->exact (floor (* 0.35 max-chars))))))))
     (define lang (hash-ref cfg 'target-lang))
     (define prompt
-      (format "You are a podcast analyst. Read the transcript and produce, in ~a, JSON: {\"tldr\": \"2-3 sentence overview\", \"key_points\": [\"5-8 concrete takeaways\"], \"quotes\": [{{\"text\": \"a short memorable quote in its original language\", \"translation\": \"the same quote in ~a\"}}], \"topics\": [\"3-6 topic tags\"]}. Quote at most 3 quotes. No commentary outside the JSON."
+      (format "You are a podcast analyst. Read the transcript and produce, in ~a, JSON: {\"tldr\": \"2-3 sentence overview\", \"key_points\": [{{\"text\": \"concrete takeaway\", \"start\": 12}}], \"quotes\": [{{\"text\": \"a short memorable quote in its original language\", \"translation\": \"the same quote in ~a\", \"start\": 12}}], \"topics\": [\"3-6 topic tags\"]}. Produce 5-8 key_points and at most 3 quotes; every start is the start time in seconds of the transcript sentence the point or quote is taken from. No commentary outside the JSON."
               (target-name lang) (target-name lang)))
     (on-progress 30 "summarizing")
     (define result (chat-completion-json cfg prompt text #:temperature 0.3))
@@ -348,10 +348,11 @@
       (error 'run-summarize! "summary response missing 'tldr'"))
     (transcript-save! id
                       (hash-set* t
-                                 'summary (hasheq 'tldr (hash-ref result 'tldr "")
-                                                  'key-points (hash-ref result 'key_points '())
-                                                  'quotes (hash-ref result 'quotes '())
-                                                  'topics (hash-ref result 'topics '()))
+                                 'summary (summary-normalize
+                                           (hasheq 'tldr (hash-ref result 'tldr "")
+                                                   'key-points (hash-ref result 'key_points '())
+                                                   'quotes (hash-ref result 'quotes '())
+                                                   'topics (hash-ref result 'topics '())))
                                  'updated-epoch (now-epoch)))
     (episode-set-status! id 'summary-status "done")
     (on-progress 100 "summary ready")

@@ -32,6 +32,22 @@ enum TranscriptMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// The detail surface's two tabs — the prototype splits transcript and
+/// summary into sibling views instead of stacking them.
+enum DetailTab: String, CaseIterable, Identifiable {
+    case transcript
+    case summary
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .transcript: return L("transcriptTab")
+        case .summary: return L("summaryTab")
+        }
+    }
+}
+
 struct ProviderProbe {
     let ok: Bool
     let message: String
@@ -122,9 +138,17 @@ final class PodLensStore: ObservableObject {
     }
 
     struct Summary {
+        /// A takeaway or quote may carry the sentence it came from, so the
+        /// summary can anchor back to the transcript. Legacy summaries have
+        /// no anchor (start == nil) and render without a jump button.
+        struct Point {
+            let text: String
+            let start: Double?
+        }
+
         let tldr: String
-        let keyPoints: [String]
-        let quotes: [(String, String)]
+        let keyPoints: [Point]
+        let quotes: [(text: String, translation: String, start: Double?)]
         let topics: [String]
     }
 
@@ -191,7 +215,34 @@ final class PodLensStore: ObservableObject {
     }
     @Published var bootStatus = ""
     @Published var transcriptMode: TranscriptMode = .bilingual
-    @Published var followsTranscript = true
+    /// The reading tab of the detail surface; resets to the transcript when
+    /// another episode is selected.
+    @Published var detailTab: DetailTab = .transcript
+
+    /// Summary anchors arrive as sentence seconds; JSON `false` (legacy rows
+    /// with no anchor) bridges to NSNumber and must not read as 00:00.
+    static func anchorStart(_ raw: Any?) -> Double? {
+        guard let number = raw as? NSNumber else { return nil }
+        if CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
+        return number.doubleValue
+    }
+    /// Reading preference persisted through the engine config; seeding from
+    /// a settings reload writes the same value back, which the didSet guards
+    /// make a no-op.
+    @Published var followsTranscript = true {
+        didSet {
+            guard oldValue != followsTranscript else { return }
+            setSetting("follow-transcript", followsTranscript ? "true" : "false")
+        }
+    }
+    /// Interface appearance override ("system" / "light" / "dark"), applied
+    /// at the app root and shared with every host through the engine config.
+    @Published var appearance = "system" {
+        didSet {
+            guard oldValue != appearance else { return }
+            setSetting("appearance", appearance)
+        }
+    }
     @Published var scrollRequest = 0
     @Published var focusMode = false
     @Published var columnVisibility: NavigationSplitViewVisibility = .all
@@ -456,26 +507,48 @@ final class PodLensStore: ObservableObject {
         }
     }
 
-    /// The 待播 lane: episodes in progress first, then each feed's newest
-    /// unplayed episode — what Apple Podcasts means by Up Next for a
-    /// library without an explicit queue.
-    var upNext: [RecentEpisode] {
-        var seenFeeds = Set<String>()
-        var lane: [RecentEpisode] = []
-        for e in recentEpisodes where !e.done {
-            let inProgress = e.positionSec > 5
-            if inProgress {
-                lane.append(e)
-                seenFeeds.insert(e.feedId)
+    /// The home hero source: the episode with listening momentum (the most
+    /// recent in-progress one), else the newest episode in the library.
+    var resumeCandidate: RecentEpisode? {
+        if let inProgress = recentEpisodes.first(where: { $0.positionSec > 5 && !$0.done }) {
+            return inProgress
+        }
+        return recentEpisodes.first
+    }
+
+    /// Home's "recent updates" rows: the newest episodes other than the hero.
+    var recentUpdates: [RecentEpisode] {
+        recentEpisodes.filter { $0.id != resumeCandidate?.id }.prefix(3).map { $0 }
+    }
+
+    @Published private var heroResume: [String: String] = [:]
+    private var heroResumeFailed: Set<String> = []
+
+    /// The sentence the listener last read, for the home resume line: the
+    /// transcript sentence containing the saved playback position.
+    func heroResumeSentence(_ episodeId: String) -> String? {
+        heroResume[episodeId]
+    }
+
+    /// Fetch the resume sentence once per episode; failures are not retried
+    /// for the lifetime of the session.
+    func loadHeroResume(for item: RecentEpisode) {
+        guard item.transcriptStatus == "done" else { return }
+        guard heroResume[item.id] == nil, !heroResumeFailed.contains(item.id) else { return }
+        let position = item.positionSec
+        Task {
+            guard let api else { return }
+            do {
+                let rows = try await api.episode_transcript(id: item.id)
+                var sentence = ""
+                for row in rows where (Double(row[0]) ?? 0) <= position {
+                    sentence = row[3].isEmpty ? row[2] : row[3]
+                }
+                heroResume[item.id] = sentence
+            } catch {
+                heroResumeFailed.insert(item.id)
             }
         }
-        for e in recentEpisodes where !e.done {
-            if !seenFeeds.contains(e.feedId) {
-                lane.append(e)
-                seenFeeds.insert(e.feedId)
-            }
-        }
-        return Array(lane.prefix(12))
     }
 
     /// Feeds with listening momentum first — the home shows grid.
@@ -502,6 +575,7 @@ final class PodLensStore: ObservableObject {
             loadEpisodes(feedId: feed.id)
         }
         selectedEpisode = episode
+        detailTab = .transcript
         loadTranscript(episode)
         loadSummary(episode)
         loadChapters(episode)
@@ -601,6 +675,7 @@ final class PodLensStore: ObservableObject {
 
     func selectEpisode(_ episode: Episode, autoplay: Bool = true) {
         selectedEpisode = episode
+        detailTab = .transcript
         loadTranscript(episode)
         loadSummary(episode)
         loadChapters(episode)
@@ -719,12 +794,18 @@ final class PodLensStore: ObservableObject {
             var parsed: Summary?
             if let data = json.data(using: .utf8),
                let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let keyPoints = ((obj["key-points"] as? [[String: Any]]) ?? []).map {
+                    Summary.Point(text: ($0["text"] as? String) ?? "",
+                                  start: Self.anchorStart($0["start"]))
+                }
                 let quotes = ((obj["quotes"] as? [[String: Any]]) ?? []).map {
-                    (($0["text"] as? String) ?? "", ($0["translation"] as? String) ?? "")
+                    (text: ($0["text"] as? String) ?? "",
+                     translation: ($0["translation"] as? String) ?? "",
+                     start: Self.anchorStart($0["start"]))
                 }
                 parsed = Summary(
                     tldr: obj["tldr"] as? String ?? "",
-                    keyPoints: obj["key-points"] as? [String] ?? [],
+                    keyPoints: keyPoints,
                     quotes: quotes,
                     topics: obj["topics"] as? [String] ?? [])
             }
@@ -1091,6 +1172,40 @@ final class PodLensStore: ObservableObject {
         scrollRequest += 1
     }
 
+    /// A summary anchor: return to the source sentence, start playback there,
+    /// and put the transcript tab back in front.
+    func jumpToAnchor(_ seconds: Double) {
+        detailTab = .transcript
+        followsTranscript = true
+        seek(to: seconds)
+        requestScrollToCurrent()
+    }
+
+    /// Persist one engine setting; the reload also refreshes the settings
+    /// surface rows so what the user sees stays what is stored.
+    func setSetting(_ key: String, _ value: String) {
+        Task {
+            guard let api else { return }
+            _ = try? await api.settings_set(key: key, value: value)
+            await loadSettings()
+        }
+    }
+
+    /// Appearance override; the didSet persists it through the engine config.
+    func setAppearance(_ value: String) {
+        appearance = value
+    }
+
+    /// The SwiftUI override the saved preference maps to; nil follows the
+    /// system appearance.
+    var appearanceScheme: ColorScheme? {
+        switch appearance {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+
 
     // MARK: settings
 
@@ -1099,10 +1214,26 @@ final class PodLensStore: ObservableObject {
         do {
             settingsRows = try await api.settings_list()
             settingsError = nil
+            seedReadingPreferences()
         } catch {
             settingsError = "\(error)"
         }
         await refreshSecurity()
+    }
+
+    /// Seed the in-memory reading preferences from the engine config so the
+    /// UI honors saved values before the settings surface ever opens.
+    private func seedReadingPreferences() {
+        for row in settingsRows where row.count >= 2 {
+            switch row[0] {
+            case "follow-transcript":
+                followsTranscript = (row[1] == "true")
+            case "appearance":
+                appearance = row[1]
+            default:
+                break
+            }
+        }
     }
 
     func refreshSecurity() async {

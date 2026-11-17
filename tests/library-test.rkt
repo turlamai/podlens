@@ -5,6 +5,7 @@
 
 (require rackunit
          racket/file
+         racket/list
          racket/path
          (file "../racket/core/library.rkt"))
 
@@ -83,3 +84,29 @@
   (check-equal? (hash-ref (cadr merged) 'pub-date-epoch) 200)
   ;; the cap is respected
   (check-equal? (length (recent-episodes 1)) 1))
+
+(test-case "summary-normalize anchors points and degrades legacy strings"
+  ;; legacy summaries stored points/quotes as plain strings
+  (define legacy
+    (hasheq 'tldr "一句总结。"
+            'key-points (list "要点一" (hasheq 'text "要点二" 'start 12))
+            'quotes (list (hasheq 'text "quote" 'translation "引用"))
+            'topics (list "测试")))
+  (define s (summary-normalize legacy))
+  (check-equal? (hash-ref s 'tldr) "一句总结。")
+  (check-equal? (hash-ref (first (hash-ref s 'key-points)) 'text) "要点一")
+  (check-false (hash-ref (first (hash-ref s 'key-points)) 'start #f))
+  (check-equal? (hash-ref (second (hash-ref s 'key-points)) 'start) 12)
+  (check-equal? (hash-ref (first (hash-ref s 'quotes)) 'translation) "引用")
+  (check-false (hash-ref (first (hash-ref s 'quotes)) 'start #f))
+  ;; a start that is not a usable sentence time has no anchor; 0 is the
+  ;; first sentence and stays a valid anchor
+  (define bad (summary-normalize
+               (hasheq 'tldr "x"
+                       'key-points (list (hasheq 'text "p" 'start 0)
+                                         (hasheq 'text "q" 'start "nope"))
+                       'quotes '()
+                       'topics '())))
+  (check-equal? (hash-ref (first (hash-ref bad 'key-points)) 'start #f) 0)
+  (check-false (hash-ref (second (hash-ref bad 'key-points)) 'start #f))
+  (check-false (summary-normalize #f)))

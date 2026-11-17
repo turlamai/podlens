@@ -112,6 +112,40 @@ struct SettingsView: View {
                     }
                 }
 
+                settingsGroup(L("settingsReadingGroup"), subtitle: L("settingsReadingHint")) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(L("appearance"))
+                            .font(Typeface.callout.weight(.medium))
+                        SegmentButtons(
+                            options: [("system", L("appearanceSystem")),
+                                      ("light", L("appearanceLight")),
+                                      ("dark", L("appearanceDark"))],
+                            selection: values["appearance"] ?? store.settingValue("appearance")) { value in
+                                store.setAppearance(value)
+                                values["appearance"] = value
+                                invalidateStatus()
+                            }
+                            .frame(width: 294)
+                    }
+
+                    Toggle(isOn: Binding(
+                        get: { (values["follow-transcript"] ?? store.settingValue("follow-transcript")) != "false" },
+                        set: {
+                            store.followsTranscript = $0
+                            values["follow-transcript"] = $0 ? "true" : "false"
+                            invalidateStatus()
+                        })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L("autoFollow"))
+                                .font(Typeface.callout.weight(.medium))
+                            Text(L("autoFollowHint"))
+                                .font(Typeface.micro)
+                                .foregroundStyle(Palette.inkTertiary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                }
+
                 settingsGroup(L("settingsGeneral"), subtitle: L("settingsGeneralHint")) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L("language"))
@@ -402,6 +436,8 @@ struct SettingsView: View {
             || values["chat-model"] != originalValues["chat-model"]
             || values["asr-model"] != originalValues["asr-model"]
             || values["api-base"] != originalValues["api-base"]
+            || values["appearance"] != originalValues["appearance"]
+            || values["follow-transcript"] != originalValues["follow-transcript"]
             || values["target-lang"] != originalValues["target-lang"]
             || values["ui-lang"] != originalValues["ui-lang"]
             || values["check-updates-enabled"] != originalValues["check-updates-enabled"]
@@ -526,7 +562,7 @@ struct SegmentButtons: View {
                 } label: {
                     Text(label)
                         .font(Typeface.caption.weight(.medium))
-                        .foregroundStyle(selection == value ? .white : Palette.inkSecondary)
+                        .foregroundStyle(selection == value ? Palette.onAccent : Palette.inkSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 24)
                         .background(selection == value ? Palette.accent : Color.clear,

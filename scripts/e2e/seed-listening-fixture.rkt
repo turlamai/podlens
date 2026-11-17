@@ -72,12 +72,24 @@
         "键盘用户也应拥有同样直接的路径。"
         "准备好后，回到当前句。")
   'target-lang "zh"
-  'summary #f
+  ;; Mixed legacy/anchored shapes on purpose: the summary RPC normalizes
+  ;; plain strings into unanchored objects, so the reading UI must render
+  ;; the second point and both quotes without jump buttons, the first point
+  ;; and the quote with one.
+  'summary (hasheq 'tldr "A focused player keeps the words in front."
+                   'key-points
+                   (list (hasheq 'text "The player recedes; the transcript leads." 'start 0)
+                         "Legacy points carry no anchor")
+                   'quotes
+                   (list (hasheq 'text "The best player gets out of the way."
+                                 'translation "最好的播放器会隐于内容之后。"
+                                 'start 0)))
   'asr-model "fixture"
   'chat-model "fixture"
   'updated-epoch 1))
 (void (episode-set-download! episode-id (path->string audio-path) (file-size audio-path)))
 (void (episode-set-status! episode-id 'transcript-status "done"))
+(void (episode-set-status! episode-id 'summary-status "done"))
 (void (episode-set-position! episode-id 1))
 
 (call-with-output-file (build-path (data-dir) "listening-fixture.json")
