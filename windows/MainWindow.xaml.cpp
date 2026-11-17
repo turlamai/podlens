@@ -366,23 +366,9 @@ double TimeSpanSeconds(winrt::Windows::Foundation::TimeSpan const& span) {
 MainWindow::MainWindow() {
   InitializeComponent();
 
-  // The slash accelerator is built in code: the XAML compiler's VirtualKey
-  // whitelist has no OEM spelling, and the projected enum names none either.
-  // 191 (0xBF) is the /? key on every layout that matters here.
-  winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
-  slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
-  // Modifiers defaults to None; every spelling of the flags enum tried so
-  // far has been another namespace guess.
-  // A member-delegate binding ({this, &Fn}) reaches for a weak reference,
-  // which the constructor cannot create yet; a plain [this] capture is
-  // safe here because the accelerator dies with the same window.
-  slash_accel.Invoked(
-      [this](winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator const& sender,
-             winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const& args) {
-        PlayerAccel_Invoked(sender, args);
-      });
-  PlayerBar().KeyboardAccelerators().Append(slash_accel);
-
+  // NOTE: the slash accelerator mount is deferred to FirstLoaded() below —
+  // whatever in this constructor broke the launch smoke, the bisect points
+  // here and the mount moves after the first layout pass.
   Title(winrt::hstring(std::wstring(podlens::Tr("app.title"))));
 
   // The title bar shows WinUI's generic placeholder unless the window is
@@ -393,6 +379,11 @@ MainWindow::MainWindow() {
     AppWindow().SetIcon(winrt::Microsoft::UI::IconId{
         static_cast<std::uint64_t>(reinterpret_cast<UINT_PTR>(icon))});
   }
+
+  Loaded([weak = get_weak()](winrt::Windows::Foundation::IInspectable const&,
+                            winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
+    if (auto window = weak.get()) window->InstallSlashAccelerator();
+  });
 
   SubtitleText().Text(std::wstring(podlens::Tr("app.subtitle")));
   StatusLine().Text(std::wstring(podlens::Tr("status.starting")));
@@ -1968,6 +1959,25 @@ muxc::StackPanel MainWindow::MakeShowTile(FeedRow const& feed) {
   count_label.Opacity(0.65);
   tile.Children().Append(count_label);
   return tile;
+}
+
+// The slash accelerator is built in code after layout: the XAML compiler's
+// VirtualKey whitelist has no OEM spelling, and 191 (0xBF) is the /? key.
+void MainWindow::InstallSlashAccelerator() {
+  if (slash_accel_installed_) return;
+  slash_accel_installed_ = true;
+  winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator slash_accel;
+  slash_accel.Key(static_cast<winrt::Windows::System::VirtualKey>(191));
+  auto slash_copy = slash_accel;
+  slash_accel.Invoked(
+      [weak = get_weak(), slash_copy](
+          winrt::Microsoft::UI::Xaml::Input::KeyboardAccelerator const& sender,
+          winrt::Microsoft::UI::Xaml::Input::KeyboardAcceleratorInvokedEventArgs const& args) {
+        if (auto window = weak.get()) {
+          window->PlayerAccel_Invoked(sender, args);
+        }
+      });
+  PlayerBar().KeyboardAccelerators().Append(slash_accel);
 }
 
 void MainWindow::RenderHomePage() {

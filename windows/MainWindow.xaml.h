@@ -143,6 +143,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   void ReloadRecent();
   void RenderRecent(std::vector<std::vector<std::string>> rows);
   void RenderHomePage();
+  void InstallSlashAccelerator();
   void RenderRecentPage();
   void RenderDownloadedPage();
   void RenderShowsPage();
@@ -291,6 +292,7 @@ struct MainWindow : MainWindowT<MainWindow> {
   // XAML fires SelectionChanged while the constructor is still wiring items
   // up; guards keep those early callbacks from touching half-built state.
   bool initialized_ = false;
+  bool slash_accel_installed_ = false;
 
   // playback state; the player is a member so position/rate survive toggles
   winrt::Windows::Media::Playback::MediaPlayer player_{nullptr};
