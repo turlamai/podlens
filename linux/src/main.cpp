@@ -3797,10 +3797,12 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                         G_OBJECT(dialog), "settings-appearance", appearance_fields);
                     carry_data<std::vector<std::pair<std::string, GtkSwitch*>>*>(
                         G_OBJECT(dialog), "settings-switches", switch_fields);
-                    g_signal_connect(
-                        dialog, "response",
-                        G_CALLBACK(+[](GtkDialog* dialog, gint response,
-                                       gpointer) {
+                    // The lambda is bound outside the G_CALLBACK macro: the
+                    // comma inside std::pair<...> would split the macro
+                    // argument list (preprocessing ignores angle brackets).
+                    auto on_settings_response =
+                        +[](GtkDialog* dialog, gint response,
+                            gpointer) {
                           auto* fields = *carried_data<SettingsFields*>(
                               G_OBJECT(dialog), "settings-fields");
                           auto* appearance_fields =
@@ -3841,8 +3843,9 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                           delete appearance_fields;
                           delete switch_fields;
                           save_settings_pairs(pairs, 0);
-                        }),
-                        nullptr);
+                        };
+                    g_signal_connect(dialog, "response",
+                                     G_CALLBACK(on_settings_response), nullptr);
                     gtk_window_present(GTK_WINDOW(dialog));
                   });
       });
