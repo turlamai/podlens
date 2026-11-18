@@ -79,7 +79,10 @@ jobs:
           # engine moved to racket/ on main, published tags still carry the
           # old app/ layout, so overlay the module beside the driver (the
           # N tag's own updater stays in control of the executed behavior).
-          git checkout FETCH_HEAD -- scripts/acceptance/upgrade-qualification.rkt racket/update.rkt
+          # The updater pulls core/paths.rkt and version.rkt relative to the
+          # new layout, so the whole racket/ tree comes with it — the N tag
+          # predates that directory and nothing else claims the path.
+          git checkout FETCH_HEAD -- scripts/acceptance/upgrade-qualification.rkt racket
           echo "OVERLAY_SHA=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
 
       - name: Read the rivet pin the N release was built against
