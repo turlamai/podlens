@@ -207,7 +207,6 @@ char const* tr(char const* key) {
       {"nav.shows", "节目", "Shows"},
       {"nav.downloaded", "已下载", "Downloaded"},
       {"nav.subscriptions", "我的订阅", "Subscriptions"},
-      {"page.upnext", "待播清单", "Up Next"},
       {"page.myshows", "我的节目", "My Shows"},
       {"page.latestepisodes", "最新单集", "Latest Episodes"},
       {"page.home", "主页", "Home"},
@@ -258,6 +257,32 @@ char const* tr(char const* key) {
       {"transcript.seek_hint", "按回车或空格跳播到这句话",
        "Press Enter or Space to seek to this sentence"},
       {"transcript.sentence", "逐句稿句子", "Transcript sentence"},
+      {"detail.tab_transcript", "逐句稿", "Transcript"},
+      {"detail.tab_summary", "总结", "Summary"},
+      {"summary.tldr", "一句话总结", "In one sentence"},
+      {"summary.points", "值得带走的要点", "Key takeaways"},
+      {"summary.quotes", "值得重听的话", "Worth replaying"},
+      {"summary.topics", "话题", "Topics"},
+      {"summary.show_sentence", "查看原句", "Show sentence"},
+      {"summary.replay", "重听", "Replay"},
+      {"home.hero_title", "接着听，慢慢懂。", "Keep listening, take it in."},
+      {"home.hero_subtitle", "让声音与文字，停留在同一个地方。",
+       "Voice and text, staying in one place."},
+      {"home.continue", "继续收听", "Continue listening"},
+      {"home.start", "开始收听", "Start listening"},
+      {"home.back_transcript", "回到逐句稿", "Back to transcript"},
+      {"home.view_episode", "查看单集", "View episode"},
+      {"home.restart", "从头重听", "Restart"},
+      {"home.resume_prefix", "上次读到", "Last read at"},
+      {"home.resume_none", "这集还没有逐句稿", "No transcript for this episode yet"},
+      {"home.resume_none_hint", "可先体验播放控制，再查看生成流程。",
+       "Playback still works; generate the transcript to read along."},
+      {"home.recent_empty", "最近没有可展示的更新。", "Nothing new to show right now."},
+      {"settings.field.appearance", "外观", "Appearance"},
+      {"settings.appearance_system", "跟随系统", "Match system"},
+      {"settings.appearance_light", "浅色", "Light"},
+      {"settings.appearance_dark", "深色", "Dark"},
+      {"settings.field.follow_transcript", "自动跟随当前句", "Follow the current sentence"},
       {"player.play_pause", "播放或暂停", "Play or pause"},
       {"player.back15", "后退 15 秒", "Back 15 seconds"},
       {"player.forward30", "前进 30 秒", "Forward 30 seconds"},
@@ -433,6 +458,9 @@ struct AppState {
   GtkButton* job_cancel_button{nullptr};
   GtkBox* transcript_box{nullptr};
   GtkBox* summary_box{nullptr};
+  GtkScrolledWindow* summary_scroll{nullptr};
+  GtkToggleButton* transcript_tab{nullptr};
+  GtkToggleButton* summary_tab{nullptr};
 
   // Player bar
   GtkBox* player_bar{nullptr};
@@ -545,6 +573,8 @@ EpisodeRow const* selected_episode();
 void update_action_buttons();
 void render_transcript_public();
 void render_summary_public();
+void apply_detail_tab(bool summary);
+void scroll_to_running_segment();
 void start_job(std::string const& kind, std::string const& episode_id);
 void cancel_active_job(GtkButton*, gpointer);
 void fetch_security_status();
@@ -580,8 +610,23 @@ void apply_css() {
   auto* provider = gtk_css_provider_new();
   gtk_css_provider_load_from_string(
       provider,
-      "@define-color podlens_accent #C15F3C;\n"
-      "@define-color podlens_accent_soft #F7E5DD;\n"
+      // Semantic tokens mirror design/prototype/shared.css; accent pairs
+      // change together in dark mode via prefers-color-scheme (GTK 4.8+;
+      // older themes fall back to the light values).
+      "@define-color podlens_accent #AC4B2D;\n"
+      "@define-color podlens_accent_deep #893A23;\n"
+      "@define-color podlens_accent_soft #F6E8E1;\n"
+      "@define-color podlens_on_accent #FFFFFF;\n"
+      "@define-color podlens_positive #276742;\n"
+      "@define-color podlens_danger #A52C2C;\n"
+      "@media (prefers-color-scheme: dark) {\n"
+      "  @define-color podlens_accent #EBAB8A;\n"
+      "  @define-color podlens_accent_deep #F5C1A6;\n"
+      "  @define-color podlens_accent_soft #3B2C25;\n"
+      "  @define-color podlens_on_accent #281B14;\n"
+      "  @define-color podlens_positive #8DD1A3;\n"
+      "  @define-color podlens_danger #F4A09A;\n"
+      "}\n"
       ".pl-title { font-weight: 600; font-size: 15px; }\n"
       ".pl-meta { font-size: 12px; opacity: 0.75; }\n"
       ".pl-caption { font-size: 12px; font-weight: 700; opacity: 0.65; "
@@ -606,19 +651,24 @@ void apply_css() {
       ".pl-page-title { font-size: 26px; font-weight: 700; "
       "letter-spacing: -0.02em; }\n"
       ".pl-storage-note { font-size: 12px; }\n"
-      ".pl-storage-secure { color: #2E7D4F; }\n"
-      ".pl-storage-warning { color: #B25E14; }\n"
+      ".pl-storage-secure { color: @podlens_positive; }\n"
+      ".pl-storage-warning { color: @podlens_danger; }\n"
       ".pl-tile-label { font-size: 12px; }\n"
       ".pl-artwork { border-radius: 6px; background: "
       "alpha(currentColor, 0.10); }\n"
       ".pl-card-art { border-radius: 6px; }\n"
-      ".pl-upnext { border-radius: 12px; overflow: hidden; }\n"
-      ".pl-upnext:hover { filter: brightness(1.08); }\n"
       ".pl-lane { padding: 10px; border-radius: 10px; "
       "background: alpha(currentColor, 0.02); }\n"
       ".pl-lane:hover { background: alpha(currentColor, 0.06); }\n"
       ".pl-flow > child { margin: 6px; }\n"
-      ".pl-progress { min-height: 4px; }\n");
+      ".pl-progress { min-height: 4px; }\n"
+      ".pl-anchor { color: @podlens_accent; padding: 2px 0; }\n"
+      ".pl-hero { padding: 20px; border-radius: 10px; "
+      "background: alpha(currentColor, 0.04); "
+      "border: 1px solid alpha(currentColor, 0.08); }\n"
+      ".pl-hero-title { font-size: 24px; font-weight: 600; }\n"
+      ".pl-hero-eyebrow { font-size: 11px; font-weight: 700; "
+      "color: @podlens_accent_deep; }\n");
   gtk_style_context_add_provider_for_display(
       gdk_display_get_default(), GTK_STYLE_PROVIDER(provider),
       GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -1110,25 +1160,14 @@ void reload_episodes() {
 // The Up Next lane: in-progress episodes first, then each show's newest
 // unplayed episode — Apple Podcasts' queue semantics for a library with
 // no explicit queue.
-std::vector<RecentRow> up_next() {
-  std::vector<RecentRow> lane;
-  std::set<std::string> seen_feeds;
+// The home hero source: the episode with listening momentum (the most
+// recent in-progress one), else the newest episode in the library.
+std::optional<RecentRow> resume_candidate() {
   for (auto const& item : g_state.recents) {
-    if (item.episode.done) continue;
-    if (item.episode.position_sec > 5) {
-      lane.push_back(item);
-      seen_feeds.insert(item.feed_id);
-    }
+    if (item.episode.position_sec > 5 && !item.episode.done) return item;
   }
-  for (auto const& item : g_state.recents) {
-    if (item.episode.done) continue;
-    if (lane.size() >= 12) break;
-    if (seen_feeds.count(item.feed_id) == 0) {
-      lane.push_back(item);
-      seen_feeds.insert(item.feed_id);
-    }
-  }
-  return lane;
+  if (!g_state.recents.empty()) return g_state.recents.front();
+  return std::nullopt;
 }
 
 GtkWidget* make_card_artwork(std::string const& url) {
@@ -1234,67 +1273,146 @@ GtkWidget* make_episode_card(RecentRow const& item, bool show_feed) {
   return card;
 }
 
-GtkWidget* make_up_next_card(RecentRow const& item) {
-  auto* overlay = gtk_overlay_new();
+// The home hero: artwork, eyebrow, a large title, listening progress, one
+// primary action plus a direct return to reading, and the resume line.
+GtkWidget* make_home_hero(RecentRow const& item) {
+  auto* body = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_add_css_class(body, "pl-hero");
+
+  auto* header_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   auto* artwork = gtk_image_new();
+  gtk_image_set_pixel_size(GTK_IMAGE(artwork), 92);
   gtk_widget_add_css_class(artwork, "pl-card-art");
-  gtk_widget_set_size_request(artwork, 200, 200);
-  gtk_widget_set_halign(artwork, GTK_ALIGN_FILL);
-  gtk_widget_set_valign(artwork, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(artwork, GTK_ALIGN_CENTER);
   load_artwork(GTK_IMAGE(artwork), item.artwork);
-  gtk_overlay_set_child(GTK_OVERLAY(overlay), artwork);
+  gtk_box_append(GTK_BOX(header_row), artwork);
 
-  auto* lines = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  gtk_widget_set_margin_top(lines, 100);
-  gtk_widget_set_margin_start(lines, 14);
-  gtk_widget_set_margin_end(lines, 14);
-  gtk_widget_set_margin_bottom(lines, 12);
-  gtk_widget_set_valign(lines, GTK_ALIGN_END);
-  gtk_widget_set_halign(lines, GTK_ALIGN_FILL);
-
-  std::string const lane = item.episode.position_sec > 5
-                               ? std::string("Continue listening")
-                               : std::string("New Episode");
-  std::string const meta_text =
-      item.episode.pub.empty()
-          ? lane
-          : lane + " · " + format_pub_date(item.episode.pub);
-  auto* meta = gtk_label_new(nullptr);
-  gtk_label_set_markup(GTK_LABEL(meta), meta_text.c_str());
-  gtk_label_set_xalign(GTK_LABEL(meta), 0.0f);
-  gtk_widget_add_css_class(meta, "pl-meta");
-  gtk_widget_add_css_class(meta, "pl-scrim");
-  gtk_box_append(GTK_BOX(lines), meta);
-
+  auto* texts = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+  auto* eyebrow = gtk_label_new(item.episode.position_sec > 5
+                                    ? tr("home.continue")
+                                    : tr("home.start"));
+  gtk_label_set_xalign(GTK_LABEL(eyebrow), 0.0f);
+  gtk_widget_add_css_class(eyebrow, "pl-hero-eyebrow");
+  gtk_box_append(GTK_BOX(texts), eyebrow);
   auto* title = gtk_label_new(item.episode.title.c_str());
   gtk_label_set_wrap(GTK_LABEL(title), TRUE);
   gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
   gtk_label_set_lines(GTK_LABEL(title), 2);
   gtk_label_set_ellipsize(GTK_LABEL(title), PANGO_ELLIPSIZE_END);
-  gtk_widget_add_css_class(title, "pl-title");
-  gtk_widget_add_css_class(title, "pl-scrim");
-  gtk_box_append(GTK_BOX(lines), title);
-  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), lines);
-  gtk_overlay_set_measure_overlay(GTK_OVERLAY(overlay), lines, TRUE);
+  gtk_widget_add_css_class(title, "pl-hero-title");
+  gtk_box_append(GTK_BOX(texts), title);
+  auto meta_text = std::string(item.feed_title) + " · " +
+                   format_seconds(item.episode.duration_sec);
+  auto* meta = gtk_label_new(meta_text.c_str());
+  gtk_label_set_xalign(GTK_LABEL(meta), 0.0f);
+  gtk_widget_add_css_class(meta, "pl-meta");
+  gtk_box_append(GTK_BOX(texts), meta);
+  gtk_box_append(GTK_BOX(header_row), texts);
+  gtk_box_append(GTK_BOX(body), header_row);
 
-  auto* frame = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_widget_add_css_class(frame, "pl-upnext");
-  gtk_box_append(GTK_BOX(frame), overlay);
+  if (item.episode.duration_sec > 0 && item.episode.position_sec > 5) {
+    auto* progress_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    auto* progress = gtk_progress_bar_new();
+    gtk_progress_bar_set_fraction(
+        GTK_PROGRESS_BAR(progress),
+        std::clamp(item.episode.position_sec / item.episode.duration_sec, 0.0, 1.0));
+    gtk_widget_add_css_class(progress, "pl-progress");
+    gtk_widget_set_hexpand(progress, TRUE);
+    gtk_widget_set_valign(progress, GTK_ALIGN_CENTER);
+    auto* time_label = gtk_label_new((format_seconds(item.episode.position_sec) +
+                                      " / " + format_seconds(item.episode.duration_sec))
+                                         .c_str());
+    gtk_widget_add_css_class(time_label, "pl-meta");
+    gtk_box_append(GTK_BOX(progress_row), progress);
+    gtk_box_append(GTK_BOX(progress_row), time_label);
+    gtk_box_append(GTK_BOX(body), progress_row);
+  }
+
+  auto* actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  auto* continue_button = gtk_button_new();
+  auto* continue_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  auto* glyph = gtk_label_new(item.episode.position_sec > 5 ? "⏸" : "▶");
+  gtk_box_append(GTK_BOX(continue_box), glyph);
+  gtk_box_append(GTK_BOX(continue_box),
+                 gtk_label_new(tr("home.continue")));
+  gtk_button_set_child(GTK_BUTTON(continue_button), continue_box);
+  gtk_widget_add_css_class(continue_button, "pill");
+  RecentRow const hero_copy = item;
+  carry_data<RecentRow>(G_OBJECT(continue_button), "recent-row", hero_copy);
+  g_signal_connect(
+      continue_button, "clicked",
+      G_CALLBACK(+[](GtkButton* button, gpointer) {
+        auto const* row =
+            carried_data<RecentRow>(G_OBJECT(button), "recent-row");
+        if (row != nullptr) select_recent(*row, true);
+      }),
+      nullptr);
+  gtk_box_append(GTK_BOX(actions), continue_button);
+
+  bool const transcript_ready = item.episode.transcript_status == "done";
+  auto* open_button = gtk_button_new_with_label(
+      transcript_ready ? tr("home.back_transcript") : tr("home.view_episode"));
+  carry_data<RecentRow>(G_OBJECT(open_button), "recent-row", hero_copy);
+  g_signal_connect(
+      open_button, "clicked",
+      G_CALLBACK(+[](GtkButton* button, gpointer) {
+        auto const* row =
+            carried_data<RecentRow>(G_OBJECT(button), "recent-row");
+        if (row != nullptr) select_recent(*row, false);
+      }),
+      nullptr);
+  gtk_box_append(GTK_BOX(actions), open_button);
+
+  auto* restart_button = gtk_button_new_with_label(tr("home.restart"));
+  carry_data<RecentRow>(G_OBJECT(restart_button), "recent-row", hero_copy);
+  g_signal_connect(
+      restart_button, "clicked",
+      G_CALLBACK(+[](GtkButton* button, gpointer) {
+        auto const* row =
+            carried_data<RecentRow>(G_OBJECT(button), "recent-row");
+        if (row != nullptr) {
+          select_recent(*row, true);
+          apply_seek(0.0);
+        }
+      }),
+      nullptr);
+  gtk_box_append(GTK_BOX(actions), restart_button);
+  gtk_box_append(GTK_BOX(body), actions);
+
+  // The resume line: where the listener last read.
+  auto* resume = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  auto* resume_title = gtk_label_new(
+      (transcript_ready
+           ? std::string(tr("home.resume_prefix")) + " " +
+                 format_seconds(item.episode.position_sec)
+           : std::string(tr("home.resume_none")))
+          .c_str());
+  gtk_label_set_xalign(GTK_LABEL(resume_title), 0.0f);
+  gtk_widget_add_css_class(resume_title, "pl-meta");
+  gtk_widget_add_css_class(resume_title, "bold");
+  gtk_box_append(GTK_BOX(resume), resume_title);
+  auto* resume_hint = gtk_label_new(tr("home.resume_none_hint"));
+  gtk_label_set_wrap(GTK_LABEL(resume_hint), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(resume_hint), 0.0f);
+  gtk_widget_add_css_class(resume_hint, "pl-meta");
+  gtk_box_append(GTK_BOX(resume), resume_hint);
+  gtk_box_append(GTK_BOX(body), resume);
+
   RecentRow const row_copy = item;
-  carry_data<RecentRow>(G_OBJECT(frame), "recent-row", row_copy);
+  carry_data<RecentRow>(G_OBJECT(body), "recent-row", row_copy);
   auto* gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_PRIMARY);
   g_signal_connect(
       gesture, "released",
       G_CALLBACK(+[](GtkGestureClick*, int, double, double, gpointer data) {
-        auto* card_widget = GTK_WIDGET(data);
+        auto* hero = GTK_WIDGET(data);
         auto const* row =
-            carried_data<RecentRow>(G_OBJECT(card_widget), "recent-row");
-        if (row != nullptr) select_recent(*row, true);
+            carried_data<RecentRow>(G_OBJECT(hero), "recent-row");
+        if (row != nullptr) select_recent(*row, false);
       }),
-      frame);
-  gtk_widget_add_controller(frame, GTK_EVENT_CONTROLLER(gesture));
-  return frame;
+      body);
+  gtk_widget_add_controller(body, GTK_EVENT_CONTROLLER(gesture));
+  return body;
 }
 
 GtkWidget* make_section_caption(char const* text) {
@@ -1310,19 +1428,38 @@ void render_home() {
     gtk_box_remove(g_state.home_list, child);
   }
 
-  auto const lane = up_next();
-  if (!lane.empty()) {
-    gtk_box_append(g_state.home_list,
-                   make_section_caption(tr("page.upnext")));
-    auto* lane_scroll = gtk_scrolled_window_new();
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(lane_scroll),
-                                   GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
-    auto* lane_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    for (auto const& item : lane) {
-      gtk_box_append(GTK_BOX(lane_row), make_up_next_card(item));
-    }
-    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(lane_scroll), lane_row);
-    gtk_box_append(g_state.home_list, lane_scroll);
+  // Page heading, as in the prototype: one invitation plus the actions.
+  auto* heading = gtk_label_new(tr("home.hero_title"));
+  gtk_label_set_wrap(GTK_LABEL(heading), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(heading), 0.0f);
+  gtk_widget_add_css_class(heading, "pl-page-title");
+  gtk_box_append(g_state.home_list, heading);
+  auto* subheading = gtk_label_new(tr("home.hero_subtitle"));
+  gtk_label_set_xalign(GTK_LABEL(subheading), 0.0f);
+  gtk_widget_add_css_class(subheading, "pl-meta");
+  gtk_box_append(g_state.home_list, subheading);
+
+  if (auto const item = resume_candidate()) {
+    gtk_box_append(g_state.home_list, make_home_hero(*item));
+  }
+
+  // Recent updates follow; the hero episode is already in front.
+  gtk_box_append(g_state.home_list,
+                 make_section_caption(tr("page.latestepisodes")));
+  std::string const hero_id = resume_candidate()
+                                  ? resume_candidate()->episode.id
+                                  : std::string();
+  int shown = 0;
+  for (auto const& item : g_state.recents) {
+    if (item.episode.id == hero_id) continue;
+    gtk_box_append(g_state.home_list, make_episode_card(item, true));
+    if (++shown >= 3) break;
+  }
+  if (shown == 0) {
+    auto* empty = gtk_label_new(tr("home.recent_empty"));
+    gtk_label_set_xalign(GTK_LABEL(empty), 0.0f);
+    gtk_widget_add_css_class(empty, "pl-meta");
+    gtk_box_append(g_state.home_list, empty);
   }
 
   if (!g_state.feeds.empty()) {
@@ -1385,15 +1522,6 @@ void render_home() {
     gtk_box_append(g_state.home_list, shows_flow);
   }
 
-  if (!g_state.recents.empty()) {
-    gtk_box_append(g_state.home_list,
-                   make_section_caption(tr("page.latestepisodes")));
-    int shown = 0;
-    for (auto const& item : g_state.recents) {
-      gtk_box_append(g_state.home_list, make_episode_card(item, true));
-      if (++shown >= 6) break;
-    }
-  }
 }
 
 void render_recent_page() {
@@ -2015,9 +2143,40 @@ std::vector<std::string> json_array_strings(std::string const& json,
   return out;
 }
 
-std::vector<std::pair<std::string, std::string>> json_array_objects(
-    std::string const& json, std::string const& key) {
-  std::vector<std::pair<std::string, std::string>> out;
+// Number value for `key` inside a flat object span, when it is a plain
+// number (JSON false must not read as 0).
+std::optional<double> json_number_value(std::string const& object,
+                                        std::string const& key) {
+  auto const key_pos = object.find("\"" + key + "\"");
+  if (key_pos == std::string::npos) return std::nullopt;
+  auto const colon = object.find(':', key_pos + key.size() + 2);
+  if (colon == std::string::npos) return std::nullopt;
+  auto i = colon + 1;
+  while (i < object.size() && std::isspace(static_cast<unsigned char>(object[i]))) ++i;
+  if (i >= object.size() ||
+      (!std::isdigit(static_cast<unsigned char>(object[i])) && object[i] != '-')) {
+    return std::nullopt;  // false, string or object — no anchor
+  }
+  auto const end = object.find_first_not_of("-0123456789.eE+", i);
+  try {
+    return std::stod(object.substr(i, end == std::string::npos
+                                           ? std::string::npos
+                                           : end - i));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+// Summary anchors: the RPC normalizes every point/quote to an object with
+// `text`, optional `translation` and an optional `start` sentence time.
+struct SummaryPoint {
+  std::string text;
+  std::optional<double> start;
+};
+
+std::vector<SummaryPoint> json_array_points(std::string const& json,
+                                            std::string const& key) {
+  std::vector<SummaryPoint> out;
   size_t begin = 0, end = 0;
   if (!json_array_span(json, key, begin, end)) return out;
   int depth = 0;
@@ -2039,12 +2198,79 @@ std::vector<std::pair<std::string, std::string>> json_array_objects(
       if (depth == 0) {
         std::string const object =
             json.substr(object_start, i - object_start + 1);
-        out.emplace_back(json_string_value(object, "text"),
-                         json_string_value(object, "translation"));
+        out.push_back({json_string_value(object, "text"),
+                       json_number_value(object, "start")});
       }
     }
   }
   return out;
+}
+
+struct SummaryQuote {
+  std::string text;
+  std::string translation;
+  std::optional<double> start;
+};
+
+std::vector<SummaryQuote> json_array_quotes(std::string const& json,
+                                            std::string const& key) {
+  std::vector<SummaryQuote> out;
+  size_t begin = 0, end = 0;
+  if (!json_array_span(json, key, begin, end)) return out;
+  int depth = 0;
+  bool in_string = false;
+  size_t object_start = 0;
+  for (auto i = begin; i < end; ++i) {
+    char const c = json[i];
+    if (in_string) {
+      if (c == '\\') { ++i; continue; }
+      if (c == '"') in_string = false;
+      continue;
+    }
+    if (c == '"') in_string = true;
+    else if (c == '{') {
+      if (depth == 0) object_start = i;
+      ++depth;
+    } else if (c == '}') {
+      --depth;
+      if (depth == 0) {
+        std::string const object =
+            json.substr(object_start, i - object_start + 1);
+        out.push_back({json_string_value(object, "text"),
+                       json_string_value(object, "translation"),
+                       json_number_value(object, "start")});
+      }
+    }
+  }
+  return out;
+}
+
+// A summary anchor jumps to the source sentence and resumes following; the
+// sentence time rides the widget's carried data, like the segment buttons.
+GtkWidget* make_summary_anchor(double start, std::string const& label,
+                               char const* name) {
+  auto* button = gtk_button_new_with_label(label.c_str());
+  gtk_widget_add_css_class(GTK_WIDGET(button), "pl-anchor");
+  gtk_widget_add_css_class(GTK_WIDGET(button), "flat");
+  gtk_widget_set_name(GTK_WIDGET(button), name);
+  gtk_widget_set_tooltip_text(GTK_WIDGET(button), tr("summary.show_sentence"));
+  carry_data<double>(G_OBJECT(button), "anchor-start", start);
+  g_signal_connect(
+      button, "clicked",
+      G_CALLBACK(+[](GtkButton* row, gpointer) {
+        auto const* start_time =
+            carried_data<double>(G_OBJECT(row), "anchor-start");
+        if (start_time != nullptr) {
+          g_state.transcript_follow = true;
+          if (g_state.follow_button != nullptr) {
+            gtk_toggle_button_set_active(g_state.follow_button, TRUE);
+          }
+          apply_seek(*start_time);
+          scroll_to_running_segment();
+        }
+      }),
+      nullptr);
+  return button;
 }
 
 void render_summary_public() {
@@ -2066,40 +2292,72 @@ void render_summary_public() {
 
   auto const tldr = json_string_value(json, "tldr");
   if (!tldr.empty()) {
-    gtk_box_append(box, make_section_label("TL;DR"));
+    gtk_box_append(box, make_section_label(tr("summary.tldr")));
     gtk_box_append(box, make_body_label(tldr));
   }
-  auto const points = json_array_strings(json, "key-points");
+  auto const points = json_array_points(json, "key-points");
   if (!points.empty()) {
-    gtk_box_append(box, make_section_label("Key points"));
+    gtk_box_append(box, make_section_label(tr("summary.points")));
+    int index = 0;
     for (auto const& point : points) {
-      gtk_box_append(box, make_body_label("· " + point));
+      auto* row = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+      gtk_box_append(GTK_BOX(row), make_body_label(point.text));
+      if (point.start) {
+        gtk_box_append(GTK_BOX(row),
+                       make_summary_anchor(*point.start,
+                                           format_seconds(*point.start) + " " +
+                                               tr("summary.show_sentence"),
+                                           ("SummaryAnchor-" + std::to_string(index)).c_str()));
+      }
+      gtk_box_append(box, row);
+      ++index;
     }
   }
-  auto const quotes = json_array_objects(json, "quotes");
+  auto const quotes = json_array_quotes(json, "quotes");
   if (!quotes.empty()) {
-    gtk_box_append(box, make_section_label("Memorable quotes"));
-    for (auto const& [text, translation] : quotes) {
+    gtk_box_append(box, make_section_label(tr("summary.quotes")));
+    int index = 0;
+    for (auto const& quote : quotes) {
       auto* quote_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
       gtk_widget_set_margin_start(quote_box, 12);
-      gtk_box_append(GTK_BOX(quote_box), make_body_label("“" + text + "”"));
-      if (!translation.empty()) {
-        auto* translated = make_body_label(translation);
+      gtk_box_append(GTK_BOX(quote_box), make_body_label("“" + quote.text + "”"));
+      if (!quote.translation.empty()) {
+        auto* translated = make_body_label(quote.translation);
         gtk_widget_add_css_class(translated, "pl-meta");
         gtk_box_append(GTK_BOX(quote_box), translated);
       }
+      if (quote.start) {
+        gtk_box_append(GTK_BOX(quote_box),
+                       make_summary_anchor(*quote.start,
+                                           tr("summary.replay") + std::string(" ") +
+                                               format_seconds(*quote.start),
+                                           ("SummaryQuote-" + std::to_string(index)).c_str()));
+      }
       gtk_box_append(box, quote_box);
+      ++index;
     }
   }
   auto const topics = json_array_strings(json, "topics");
   if (!topics.empty()) {
-    gtk_box_append(box, make_section_label("Topics"));
+    gtk_box_append(box, make_section_label(tr("summary.topics")));
     auto* chip_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     for (auto const& topic : topics) {
       gtk_box_append(GTK_BOX(chip_row), make_chip(topic.c_str()));
     }
     gtk_box_append(box, chip_row);
   }
+}
+
+// Transcript / summary are sibling reading surfaces; the transcript opens
+// first whenever a new episode lands.
+void apply_detail_tab(bool summary) {
+  if (g_state.summary_scroll != nullptr) {
+    gtk_widget_set_visible(GTK_WIDGET(g_state.summary_scroll), summary);
+  }
+  if (g_state.transcript_scroll != nullptr) {
+    gtk_widget_set_visible(GTK_WIDGET(g_state.transcript_scroll), !summary);
+  }
+  if (summary) render_summary_public();
 }
 
 void load_summary() {
@@ -3339,6 +3597,8 @@ char const* setting_label_key(std::string const& key) {
   if (key == "api-key") return "settings.field.api_key";
   if (key == "chat-model") return "settings.field.chat_model";
   if (key == "asr-model") return "settings.field.asr_model";
+  if (key == "appearance") return "settings.field.appearance";
+  if (key == "follow-transcript") return "settings.field.follow_transcript";
   if (key == "target-lang") return "settings.field.target_lang";
   if (key == "ui-lang") return "settings.field.ui_lang";
   if (key == "asr-chunk-seconds") return "settings.field.chunk_seconds";
@@ -3417,6 +3677,11 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                     }
 
                     auto* fields = new SettingsFields();
+                    // Settings that need real controls, not free text.
+                    auto* appearance_fields =
+                        new std::vector<std::pair<std::string, GtkComboBoxText*>>;
+                    auto* switch_fields =
+                        new std::vector<std::pair<std::string, GtkSwitch*>>;
                     for (auto const& row : rows) {
                       if (row.size() < 2) continue;
                       char const* label_key = setting_label_key(row[0]);
@@ -3425,6 +3690,36 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                       gtk_label_set_xalign(key_label, 0.0f);
                       gtk_widget_add_css_class(GTK_WIDGET(key_label),
                                                "pl-title");
+                      if (row[0] == "appearance") {
+                        // A three-way choice, as in the prototype.
+                        auto* picker = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+                        gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(picker),
+                                                  "system", tr("settings.appearance_system"));
+                        gtk_combo_box_text_append(picker, "light",
+                                                  tr("settings.appearance_light"));
+                        gtk_combo_box_text_append(picker, "dark",
+                                                  tr("settings.appearance_dark"));
+                        gtk_combo_box_set_active_id(
+                            GTK_COMBO_BOX(picker), row[1].c_str());
+                        gtk_accessible_update_property(
+                            GTK_ACCESSIBLE(picker), GTK_ACCESSIBLE_PROPERTY_LABEL,
+                            row[0].c_str(), -1);
+                        gtk_box_append(GTK_BOX(panel), GTK_WIDGET(key_label));
+                        gtk_box_append(GTK_BOX(panel), GTK_WIDGET(picker));
+                        appearance_fields->emplace_back(row[0], picker);
+                        continue;
+                      }
+                      if (row[0] == "follow-transcript") {
+                        auto* toggle = GTK_SWITCH(gtk_switch_new());
+                        gtk_switch_set_active(toggle, row[1] != "false");
+                        gtk_accessible_update_property(
+                            GTK_ACCESSIBLE(toggle), GTK_ACCESSIBLE_PROPERTY_LABEL,
+                            row[0].c_str(), -1);
+                        gtk_box_append(GTK_BOX(panel), GTK_WIDGET(key_label));
+                        gtk_box_append(GTK_BOX(panel), GTK_WIDGET(toggle));
+                        switch_fields->emplace_back(row[0], toggle);
+                        continue;
+                      }
                       auto* entry =
                           GTK_ENTRY(gtk_entry_new());
                       gtk_accessible_update_property(
@@ -3498,15 +3793,29 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
 
                     carry_data<SettingsFields*>(G_OBJECT(dialog),
                                                 "settings-fields", fields);
-                    g_signal_connect(
-                        dialog, "response",
-                        G_CALLBACK(+[](GtkDialog* dialog, gint response,
-                                       gpointer) {
+                    carry_data<std::vector<std::pair<std::string, GtkComboBoxText*>>*>(
+                        G_OBJECT(dialog), "settings-appearance", appearance_fields);
+                    carry_data<std::vector<std::pair<std::string, GtkSwitch*>>*>(
+                        G_OBJECT(dialog), "settings-switches", switch_fields);
+                    // The lambda is bound outside the G_CALLBACK macro: the
+                    // comma inside std::pair<...> would split the macro
+                    // argument list (preprocessing ignores angle brackets).
+                    auto on_settings_response =
+                        +[](GtkDialog* dialog, gint response,
+                            gpointer) {
                           auto* fields = *carried_data<SettingsFields*>(
                               G_OBJECT(dialog), "settings-fields");
+                          auto* appearance_fields =
+                              *carried_data<std::vector<std::pair<std::string, GtkComboBoxText*>>*>(
+                                  G_OBJECT(dialog), "settings-appearance");
+                          auto* switch_fields =
+                              *carried_data<std::vector<std::pair<std::string, GtkSwitch*>>*>(
+                                  G_OBJECT(dialog), "settings-switches");
                           gtk_window_destroy(GTK_WINDOW(dialog));
                           if (response != GTK_RESPONSE_ACCEPT) {
                             delete fields;
+                            delete appearance_fields;
+                            delete switch_fields;
                             return;
                           }
                           // The entries must be read on the UI thread before
@@ -3519,10 +3828,24 @@ void on_settings_activated(GSimpleAction*, GVariant*, gpointer) {
                                 key,
                                 gtk_editable_get_text(GTK_EDITABLE(entry)));
                           }
+                          for (auto const& [key, picker] : *appearance_fields) {
+                            auto const* active =
+                                gtk_combo_box_get_active_id(GTK_COMBO_BOX(picker));
+                            if (active == nullptr) continue;
+                            pairs->emplace_back(key, active);
+                          }
+                          for (auto const& [key, toggle] : *switch_fields) {
+                            pairs->emplace_back(key, gtk_switch_get_active(toggle)
+                                                         ? "true"
+                                                         : "false");
+                          }
                           delete fields;
+                          delete appearance_fields;
+                          delete switch_fields;
                           save_settings_pairs(pairs, 0);
-                        }),
-                        nullptr);
+                        };
+                    g_signal_connect(dialog, "response",
+                                     G_CALLBACK(on_settings_response), nullptr);
                     gtk_window_present(GTK_WINDOW(dialog));
                   });
       });
@@ -4267,6 +4590,39 @@ void on_activate(GtkApplication* app, gpointer) {
   gtk_window_set_default_size(GTK_WINDOW(window), 1160, 760);
   gtk_window_set_default_icon_name("podlens");
 
+  // The prototype's single-key shortcuts: F toggles focus reading while an
+  // episode is open, "/" jumps to the discover search. Text entries keep
+  // the keyboard.
+  auto* keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(keys));
+  g_signal_connect(
+      keys, "key-pressed",
+      G_CALLBACK(+[](GtkEventControllerKey*, unsigned keyval, unsigned,
+                     GdkModifierType state, gpointer user_data) -> gboolean {
+        if ((state & (GDK_CONTROL_MASK | GDK_ALT_MASK | GDK_SHIFT_MASK)) != 0) {
+          return FALSE;
+        }
+        auto* focused = gtk_window_get_focus(GTK_WINDOW(user_data));
+        if (focused != nullptr && GTK_IS_EDITABLE(focused)) return FALSE;
+        if (keyval == GDK_KEY_f) {
+          if (g_state.selected_episode_id.empty() ||
+              g_state.focus_button == nullptr) {
+            return FALSE;
+          }
+          gtk_toggle_button_set_active(
+              g_state.focus_button,
+              !gtk_toggle_button_get_active(g_state.focus_button));
+          return TRUE;
+        }
+        if (keyval == GDK_KEY_slash && g_state.current_page == "discover" &&
+            g_state.discover_entry != nullptr) {
+          gtk_widget_grab_focus(GTK_WIDGET(g_state.discover_entry));
+          return TRUE;
+        }
+        return FALSE;
+      }),
+      window);
+
   // Header bar: Add Feed + Refresh All on the left, the primary menu on the
   // right.
   auto* header = gtk_header_bar_new();
@@ -4529,6 +4885,7 @@ void on_activate(GtkApplication* app, gpointer) {
   auto* focus_button = GTK_TOGGLE_BUTTON(
       gtk_toggle_button_new_with_label(tr("focus.enter")));
   gtk_widget_set_tooltip_text(GTK_WIDGET(focus_button), tr("focus.enter_hint"));
+  g_state.focus_button = GTK_TOGGLE_BUTTON(focus_button);
   gtk_box_append(GTK_BOX(actions), GTK_WIDGET(focus_button));
   auto* job_bar = gtk_progress_bar_new();
   gtk_widget_set_hexpand(job_bar, TRUE);
@@ -4639,6 +4996,45 @@ void on_activate(GtkApplication* app, gpointer) {
   gtk_widget_set_margin_top(summary_box, 6);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(summary_scroll),
                                 summary_box);
+  // Transcript / summary tabs, as in the prototype: the two reading surfaces
+  // are siblings, not stacked views. Transcript opens first.
+  {
+    auto* tabs = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_add_css_class(tabs, "linked");
+    auto* transcript_tab =
+        GTK_TOGGLE_BUTTON(gtk_toggle_button_new_with_label(tr("detail.tab_transcript")));
+    auto* summary_tab =
+        GTK_TOGGLE_BUTTON(gtk_toggle_button_new_with_label(tr("detail.tab_summary")));
+    gtk_toggle_button_set_active(transcript_tab, TRUE);
+    gtk_box_append(GTK_BOX(tabs), GTK_WIDGET(transcript_tab));
+    gtk_box_append(GTK_BOX(tabs), GTK_WIDGET(summary_tab));
+    g_state.transcript_tab = transcript_tab;
+    g_state.summary_tab = summary_tab;
+    g_state.summary_scroll = GTK_SCROLLED_WINDOW(summary_scroll);
+    g_signal_connect(
+        transcript_tab, "toggled",
+        G_CALLBACK(+[](GtkToggleButton* tab, gpointer) {
+          if (!gtk_toggle_button_get_active(tab)) return;
+          // Switching the sibling off fires its handler, which returns on
+          // the FALSE branch — no recursion.
+          if (g_state.summary_tab != nullptr) {
+            gtk_toggle_button_set_active(g_state.summary_tab, FALSE);
+          }
+          apply_detail_tab(false);
+        }),
+        nullptr);
+    g_signal_connect(
+        summary_tab, "toggled",
+        G_CALLBACK(+[](GtkToggleButton* tab, gpointer) {
+          if (!gtk_toggle_button_get_active(tab)) return;
+          if (g_state.transcript_tab != nullptr) {
+            gtk_toggle_button_set_active(g_state.transcript_tab, FALSE);
+          }
+          apply_detail_tab(true);
+        }),
+        nullptr);
+    gtk_box_append(GTK_BOX(reading), tabs);
+  }
 
   // one reading surface: summary on top, transcript below
   gtk_box_append(GTK_BOX(reading), GTK_WIDGET(summary_scroll));
@@ -4787,7 +5183,9 @@ void on_activate(GtkApplication* app, gpointer) {
   g_state.transcript_scroll = GTK_SCROLLED_WINDOW(transcript_scroll);
   g_state.transcript_box = GTK_BOX(transcript_box);
   g_state.summary_box = GTK_BOX(summary_box);
+  g_state.summary_scroll = GTK_SCROLLED_WINDOW(summary_scroll);
   g_state.status_text = GTK_LABEL(status_text);
+  apply_detail_tab(false);
 
   add_app_action(app, "add-feed", on_add_feed_activated);
   add_app_action(app, "refresh-all", on_refresh_all_activated);
