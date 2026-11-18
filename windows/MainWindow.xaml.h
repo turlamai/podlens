@@ -88,6 +88,8 @@ struct MainWindow : MainWindowT<MainWindow> {
                               Microsoft::UI::Xaml::RoutedEventArgs const&);
   void ReturnToCurrent_Click(winrt::Windows::Foundation::IInspectable const&,
                              Microsoft::UI::Xaml::RoutedEventArgs const&);
+  void DetailTab_Click(winrt::Windows::Foundation::IInspectable const&,
+                       Microsoft::UI::Xaml::RoutedEventArgs const&);
   void EpisodeList_SelectionChanged(winrt::Windows::Foundation::IInspectable const&,
                                     Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
   void DiscoverSearch_Click(winrt::Windows::Foundation::IInspectable const&,
@@ -141,24 +143,27 @@ struct MainWindow : MainWindowT<MainWindow> {
   void ReloadRecent();
   void RenderRecent(std::vector<std::vector<std::string>> rows);
   void RenderHomePage();
+  void InstallSlashAccelerator();
   void RenderRecentPage();
   void RenderDownloadedPage();
   void RenderShowsPage();
   void SelectRecent(RecentRow const& row, bool autoplay);
   void SelectFeedById(std::string const& feed_id);
-  std::vector<RecentRow> UpNext() const;
+  std::optional<RecentRow> ResumeCandidate() const;
+  Microsoft::UI::Xaml::Controls::Border MakeHomeHero(RecentRow const& item);
+  void LoadHeroResume(RecentRow const& item);
   FeedRow const* FeedById(std::string const& id) const;
   EpisodeRow const* SelectedEpisode() const;
   std::wstring FormatPubDate(std::wstring const& raw) const;
   Microsoft::UI::Xaml::Controls::Border MakeArtwork(std::wstring const& url, double size);
   Microsoft::UI::Xaml::Controls::Border MakeEpisodeCard(RecentRow const& item, bool show_feed);
-  Microsoft::UI::Xaml::Controls::Border MakeUpNextCard(RecentRow const& item);
   Microsoft::UI::Xaml::Controls::TextBlock MakeSectionHeader(std::wstring const& title);
   Microsoft::UI::Xaml::Controls::Button MakeSeeAllButton(wchar_t const* label);
   Microsoft::UI::Xaml::Controls::StackPanel MakeShowTile(FeedRow const& feed);
   void LoadTranscript();
   void RenderTranscript();
   void ApplyMode();
+  void ApplyDetailTab();
   void LoadSummary(std::string const& episode_id);
   void RenderSummary();
   void RenderDetailHeader();
@@ -262,6 +267,8 @@ struct MainWindow : MainWindowT<MainWindow> {
   bool suppress_nav_ = false;
   // 0 bilingual, 1 translation only, 2 original only
   int reading_mode_ = 0;
+  // 0 transcript, 1 summary — the two detail-surface tabs
+  int detail_tab_ = 0;
   bool focus_listening_ = false;
   bool follow_transcript_ = true;
   // job whose progress the detail header is tracking; empty when idle
@@ -277,11 +284,15 @@ struct MainWindow : MainWindowT<MainWindow> {
   std::vector<Microsoft::UI::Xaml::Controls::TextBlock> translation_blocks_;
   std::vector<Microsoft::UI::Xaml::Controls::TextBlock> original_blocks_;
   int highlighted_segment_ = -1;
+  // the home hero's resume-line sentence, filled when the transcript lands;
+  // null whenever the home page re-renders
+  Microsoft::UI::Xaml::Controls::TextBlock hero_resume_line_{nullptr};
   // true while a feed-peek audition owns the player (no library episode)
   bool preview_active_ = false;
   // XAML fires SelectionChanged while the constructor is still wiring items
   // up; guards keep those early callbacks from touching half-built state.
   bool initialized_ = false;
+  bool slash_accel_installed_ = false;
 
   // playback state; the player is a member so position/rate survive toggles
   winrt::Windows::Media::Playback::MediaPlayer player_{nullptr};

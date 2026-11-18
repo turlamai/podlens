@@ -23,6 +23,7 @@
 #include <winrt/Microsoft.UI.Windowing.h>
 
 #include <chrono>
+#include <cwctype>
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
@@ -209,10 +210,40 @@ std::vector<std::wstring> json_array_strings(std::wstring const& json,
   return out;
 }
 
-// Each element of `key` is an object carrying `text` and `translation`.
-std::vector<std::pair<std::wstring, std::wstring>> json_array_objects(
-    std::wstring const& json, std::wstring const& key) {
-  std::vector<std::pair<std::wstring, std::wstring>> out;
+// Number value for `key` inside a flat object span, when it is a plain
+// number (JSON false must not read as 0).
+std::optional<double> json_number_value(std::wstring const& object,
+                                        std::wstring const& key) {
+  auto const key_pos = object.find(L"\"" + key + L"\"");
+  if (key_pos == std::wstring::npos) return std::nullopt;
+  auto const colon = object.find(L':', key_pos + key.size() + 2);
+  if (colon == std::wstring::npos) return std::nullopt;
+  auto i = colon + 1;
+  while (i < object.size() && iswspace(object[i])) ++i;
+  if (i >= object.size() || !iswdigit(object[i]) && object[i] != L'-') {
+    return std::nullopt;  // false, string or object — no anchor
+  }
+  auto const end = object.find_first_not_of(L"-0123456789.eE+", i);
+  try {
+    return std::stod(std::wstring(object, i, end == std::wstring::npos
+                                              ? std::wstring::npos
+                                              : end - i));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+// Each element of `key` is an object carrying `text` and `translation`
+// plus an optional sentence-time anchor.
+struct SummaryQuote {
+  std::wstring text;
+  std::wstring translation;
+  std::optional<double> start;
+};
+
+std::vector<SummaryQuote> json_array_objects(std::wstring const& json,
+                                             std::wstring const& key) {
+  std::vector<SummaryQuote> out;
   size_t begin = 0, end = 0;
   if (!json_array_span(json, key, begin, end)) return out;
   int depth = 0;
@@ -233,8 +264,47 @@ std::vector<std::pair<std::wstring, std::wstring>> json_array_objects(
       --depth;
       if (depth == 0) {
         std::wstring const object = json.substr(object_start, i - object_start + 1);
-        out.emplace_back(json_string_value(object, L"text"),
-                         json_string_value(object, L"translation"));
+        out.push_back({json_string_value(object, L"text"),
+                       json_string_value(object, L"translation"),
+                       json_number_value(object, L"start")});
+      }
+    }
+  }
+  return out;
+}
+
+// Key points: the summary RPC normalizes every element to an object
+// carrying `text` and an optional `start` anchor.
+struct SummaryPoint {
+  std::wstring text;
+  std::optional<double> start;
+};
+
+std::vector<SummaryPoint> json_array_points(std::wstring const& json,
+                                            std::wstring const& key) {
+  std::vector<SummaryPoint> out;
+  size_t begin = 0, end = 0;
+  if (!json_array_span(json, key, begin, end)) return out;
+  int depth = 0;
+  bool in_string = false;
+  size_t object_start = 0;
+  for (auto i = begin; i < end; ++i) {
+    wchar_t const c = json[i];
+    if (in_string) {
+      if (c == L'\\') { ++i; continue; }
+      if (c == L'"') in_string = false;
+      continue;
+    }
+    if (c == L'"') in_string = true;
+    else if (c == L'{') {
+      if (depth == 0) object_start = i;
+      ++depth;
+    } else if (c == L'}') {
+      --depth;
+      if (depth == 0) {
+        std::wstring const object = json.substr(object_start, i - object_start + 1);
+        out.push_back({json_string_value(object, L"text"),
+                       json_number_value(object, L"start")});
       }
     }
   }
@@ -246,6 +316,8 @@ char const* SettingLabelKey(std::string const& key) {
   if (key == "api-key") return "settings.field.api_key";
   if (key == "chat-model") return "settings.field.chat_model";
   if (key == "asr-model") return "settings.field.asr_model";
+  if (key == "appearance") return "settings.field.appearance";
+  if (key == "follow-transcript") return "settings.field.follow_transcript";
   if (key == "target-lang") return "settings.field.target_lang";
   if (key == "ui-lang") return "settings.field.ui_lang";
   if (key == "asr-chunk-seconds") return "settings.field.chunk_seconds";
@@ -294,6 +366,9 @@ double TimeSpanSeconds(winrt::Windows::Foundation::TimeSpan const& span) {
 MainWindow::MainWindow() {
   InitializeComponent();
 
+  // NOTE: the slash accelerator mount is deferred to FirstLoaded() below —
+  // whatever in this constructor broke the launch smoke, the bisect points
+  // here and the mount moves after the first layout pass.
   Title(winrt::hstring(std::wstring(podlens::Tr("app.title"))));
 
   // The title bar shows WinUI's generic placeholder unless the window is
@@ -304,6 +379,7 @@ MainWindow::MainWindow() {
     AppWindow().SetIcon(winrt::Microsoft::UI::IconId{
         static_cast<std::uint64_t>(reinterpret_cast<UINT_PTR>(icon))});
   }
+
 
   SubtitleText().Text(std::wstring(podlens::Tr("app.subtitle")));
   StatusLine().Text(std::wstring(podlens::Tr("status.starting")));
@@ -615,6 +691,39 @@ void MainWindow::UpdateDetailVisibility() {
                                           : Visibility::Collapsed);
   PlayerBar().Visibility(has_episode ? Visibility::Visible
                                      : Visibility::Collapsed);
+  if (has_episode) {
+    // A new selection opens on the transcript, as in the prototype.
+    detail_tab_ = 0;
+  }
+  ApplyDetailTab();
+}
+
+void MainWindow::DetailTab_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                 Microsoft::UI::Xaml::RoutedEventArgs const&) {
+  auto const button = sender.try_as<Microsoft::UI::Xaml::Controls::Button>();
+  if (!button) return;
+  auto const automation_id =
+      winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::GetAutomationId(
+          button);
+  detail_tab_ = automation_id == winrt::hstring(L"DetailTab-summary") ? 1 : 0;
+  ApplyDetailTab();
+}
+
+void MainWindow::ApplyDetailTab() {
+  bool const summary = detail_tab_ == 1;
+  TranscriptTabButton().Content(box_value(winrt::hstring(std::wstring(podlens::Tr("detail.tab_transcript")))));
+  SummaryTabButton().Content(box_value(winrt::hstring(std::wstring(podlens::Tr("detail.tab_summary")))));
+  StyleBrandButton(TranscriptTabButton(), !summary);
+  StyleBrandButton(SummaryTabButton(), summary);
+  winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+      TranscriptTabButton(), winrt::hstring(L"DetailTab-transcript"));
+  winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+      SummaryTabButton(), winrt::hstring(L"DetailTab-summary"));
+  SummaryPanel().Visibility(summary ? Visibility::Visible : Visibility::Collapsed);
+  TranscriptList().Visibility(summary ? Visibility::Collapsed : Visibility::Visible);
+  // Reading modes only make sense with sentences on screen.
+  ReadingModeSelector().Visibility(summary ? Visibility::Collapsed : Visibility::Visible);
+  if (summary) RenderSummary();
 }
 
 // ---- feeds ------------------------------------------------------------------
@@ -1210,10 +1319,11 @@ void MainWindow::RenderSummary() {
   }
 
   auto const json = to_wide(found->second);
+  auto const weak = get_weak();
 
   auto const tldr = json_string_value(json, L"tldr");
   if (!tldr.empty()) {
-    SummaryList().Children().Append(SectionLabel(L"TL;DR"));
+    SummaryList().Children().Append(SectionLabel(std::wstring(podlens::Tr("summary.tldr"))));
     muxc::TextBlock body;
     body.Text(winrt::hstring(tldr));
     body.FontSize(16);
@@ -1221,39 +1331,91 @@ void MainWindow::RenderSummary() {
     SummaryList().Children().Append(body);
   }
 
-  auto const points = json_array_strings(json, L"key-points");
+  auto const points = json_array_points(json, L"key-points");
   if (!points.empty()) {
     SummaryList().Children().Append(SectionLabel(std::wstring(podlens::Tr("summary.points"))));
+    int index = 0;
     for (auto const& point : points) {
+      muxc::StackPanel row;
+      row.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Vertical);
+      row.Spacing(2);
       muxc::TextBlock line;
-      line.Text(winrt::hstring(L"· " + point));
+      line.Text(winrt::hstring(point.text));
       line.FontSize(14);
       line.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
-      SummaryList().Children().Append(line);
+      row.Children().Append(line);
+      if (point.start) {
+        muxc::Button anchor;
+        anchor.Content(box_value(winrt::hstring(
+            FormatTime(*point.start) + L" " + std::wstring(podlens::Tr("summary.show_sentence")))));
+        anchor.FontSize(12);
+        anchor.Padding(winrt::Microsoft::UI::Xaml::Thickness{0, 2, 0, 2});
+        anchor.Background(nullptr);
+        anchor.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0});
+        winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+            anchor,
+            winrt::hstring(std::wstring(L"SummaryAnchor-") + std::to_wstring(index)));
+        auto const seconds = *point.start;
+        anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
+                                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
+          if (auto window = weak.get()) {
+            window->follow_transcript_ = true;
+            window->SeekTo(seconds);
+            window->ScrollToCurrentTranscript();
+          }
+        });
+        row.Children().Append(anchor);
+      }
+      SummaryList().Children().Append(row);
+      ++index;
     }
   }
 
   auto const quotes = json_array_objects(json, L"quotes");
   if (!quotes.empty()) {
     SummaryList().Children().Append(SectionLabel(std::wstring(podlens::Tr("summary.quotes"))));
-    for (auto const& [text, translation] : quotes) {
-      muxc::StackPanel quote;
-      quote.Spacing(2);
-      quote.Margin(winrt::Microsoft::UI::Xaml::Thickness{12, 0, 0, 6});
+    int index = 0;
+    for (auto const& quote : quotes) {
+      muxc::StackPanel quote_box;
+      quote_box.Spacing(2);
+      quote_box.Margin(winrt::Microsoft::UI::Xaml::Thickness{12, 0, 0, 6});
       muxc::TextBlock original;
-      original.Text(winrt::hstring(L"“" + text + L"”"));
+      original.Text(winrt::hstring(L"“" + quote.text + L"”"));
       original.FontSize(15);
       original.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
-      quote.Children().Append(original);
-      if (!translation.empty()) {
+      quote_box.Children().Append(original);
+      if (!quote.translation.empty()) {
         muxc::TextBlock translated;
-        translated.Text(winrt::hstring(translation));
+        translated.Text(winrt::hstring(quote.translation));
         translated.FontSize(13);
         translated.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
         translated.Opacity(0.75);
-        quote.Children().Append(translated);
+        quote_box.Children().Append(translated);
       }
-      SummaryList().Children().Append(quote);
+      if (quote.start) {
+        muxc::Button anchor;
+        anchor.Content(box_value(winrt::hstring(
+            std::wstring(podlens::Tr("summary.replay")) + L" " + FormatTime(*quote.start))));
+        anchor.FontSize(12);
+        anchor.Padding(winrt::Microsoft::UI::Xaml::Thickness{0, 2, 0, 2});
+        anchor.Background(nullptr);
+        anchor.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0});
+        winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetAutomationId(
+            anchor,
+            winrt::hstring(std::wstring(L"SummaryQuote-") + std::to_wstring(index)));
+        auto const seconds = *quote.start;
+        anchor.Click([weak, seconds](winrt::Windows::Foundation::IInspectable const&,
+                                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const&) {
+          if (auto window = weak.get()) {
+            window->follow_transcript_ = true;
+            window->SeekTo(seconds);
+            window->ScrollToCurrentTranscript();
+          }
+        });
+        quote_box.Children().Append(anchor);
+      }
+      SummaryList().Children().Append(quote_box);
+      ++index;
     }
   }
 
@@ -1319,25 +1481,14 @@ void MainWindow::RenderRecent(std::vector<std::vector<std::string>> rows) {
 // The Up Next lane: in-progress episodes first, then each show's newest
 // unplayed episode — Apple Podcasts' queue semantics for a library with
 // no explicit queue.
-std::vector<MainWindow::RecentRow> MainWindow::UpNext() const {
-  std::vector<RecentRow> lane;
-  std::set<std::string> seen_feeds;
+// The home hero source: the episode with listening momentum (the most
+// recent in-progress one), else the newest episode in the library.
+std::optional<MainWindow::RecentRow> MainWindow::ResumeCandidate() const {
   for (auto const& item : recent_) {
-    if (item.episode.done) continue;
-    if (item.episode.position_sec > 5) {
-      lane.push_back(item);
-      seen_feeds.insert(item.feed_id);
-    }
+    if (item.episode.position_sec > 5 && !item.episode.done) return item;
   }
-  for (auto const& item : recent_) {
-    if (item.episode.done) continue;
-    if (seen_feeds.count(item.feed_id) == 0) {
-      lane.push_back(item);
-      seen_feeds.insert(item.feed_id);
-    }
-    if (lane.size() >= 12) break;
-  }
-  return lane;
+  if (!recent_.empty()) return recent_.front();
+  return std::nullopt;
 }
 
 MainWindow::FeedRow const* MainWindow::FeedById(std::string const& id) const {
@@ -1573,71 +1724,195 @@ void MainWindow::SelectEpisodeContext(std::string const& feed_id,
   if (autoplay) StartPlayback();
 }
 
-// Up Next card: full-bleed cover, gradient scrim, lane meta + title; the
-// whole card plays.
-muxc::Border MainWindow::MakeUpNextCard(RecentRow const& item) {
-  muxc::Image artwork;
-  artwork.Stretch(Microsoft::UI::Xaml::Media::Stretch::UniformToFill);
-  if (!item.artwork.empty()) {
-    try {
-      artwork.Source(winrt::Microsoft::UI::Xaml::Media::Imaging::BitmapImage(
-          winrt::Windows::Foundation::Uri(to_wide(item.artwork))));
-    } catch (...) {
-    }
-  }
+// The home hero: artwork, eyebrow, a large serif title, listening progress,
+// one primary action plus a direct return to reading, and the resume line
+// recalling where the listener last read.
+muxc::Border MainWindow::MakeHomeHero(RecentRow const& item) {
+  auto const resources = Microsoft::UI::Xaml::Application::Current().Resources();
+  auto const brush = [&resources](wchar_t const* key) {
+    return resources.Lookup(box_value(winrt::hstring(key)))
+        .as<Microsoft::UI::Xaml::Media::Brush>();
+  };
 
-  std::wstring const lane = item.episode.position_sec > 5
-                                ? std::wstring(podlens::Tr("meta.continue"))
-                                : std::wstring(podlens::Tr("meta.new_episode"));
+  muxc::TextBlock eyebrow;
+  eyebrow.Text(winrt::hstring(std::wstring(item.episode.position_sec > 5
+                                              ? podlens::Tr("home.continue")
+                                              : podlens::Tr("home.start"))));
+  eyebrow.FontSize(11);
+  eyebrow.Foreground(brush(L"AppAccentDeepBrush"));
+
+  muxc::TextBlock title;
+  title.Text(winrt::hstring(to_wide(item.episode.title)));
+  title.FontSize(22);
+  title.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
+  title.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+  title.MaxLines(2);
+
   std::wstring const meta_text =
-      item.episode.pub.empty()
-          ? lane
-          : lane + L" · " + FormatPubDate(to_wide(item.episode.pub));
-
-  muxc::StackPanel overlay;
-  overlay.Padding(winrt::Microsoft::UI::Xaml::Thickness{12});
-  overlay.VerticalAlignment(Microsoft::UI::Xaml::VerticalAlignment::Bottom);
+      to_wide(item.feed_title) + L" · " + FormatSeconds(item.episode.duration_sec);
   muxc::TextBlock meta;
   meta.Text(winrt::hstring(meta_text));
   meta.FontSize(12);
-  meta.Foreground(Microsoft::UI::Xaml::Media::SolidColorBrush(
-      winrt::Windows::UI::Color{0xFF, 0xFF, 0xFF, 0xFF}));
-  muxc::TextBlock title;
-  title.Text(winrt::hstring(to_wide(item.episode.title)));
-  title.FontSize(14);
-  title.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
-  title.Foreground(Microsoft::UI::Xaml::Media::SolidColorBrush(
-      winrt::Windows::UI::Color{0xFF, 0xFF, 0xFF, 0xFF}));
-  title.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
-  title.MaxLines(2);
-  overlay.Children().Append(meta);
-  overlay.Children().Append(title);
+  meta.Foreground(brush(L"AppInkSoftBrush"));
 
-  Microsoft::UI::Xaml::Media::LinearGradientBrush scrim;
-  Microsoft::UI::Xaml::Media::GradientStop top;
-  top.Color(winrt::Windows::UI::Color{0x00, 0x00, 0x00, 0x00});
-  top.Offset(0.0);
-  Microsoft::UI::Xaml::Media::GradientStop bottom;
-  bottom.Color(winrt::Windows::UI::Color{0xC8, 0x00, 0x00, 0x00});
-  bottom.Offset(1.0);
-  scrim.GradientStops().Append(top);
-  scrim.GradientStops().Append(bottom);
-  overlay.Background(scrim);
+  muxc::StackPanel texts;
+  texts.Spacing(4);
+  texts.Children().Append(eyebrow);
+  texts.Children().Append(title);
+  texts.Children().Append(meta);
 
-  muxc::Grid card_grid;
-  card_grid.Width(230);
-  card_grid.Height(230);
-  card_grid.Children().Append(artwork);
-  card_grid.Children().Append(overlay);
+  muxc::StackPanel header_row;
+  header_row.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Horizontal);
+  header_row.Spacing(12);
+  header_row.Children().Append(MakeArtwork(to_wide(item.artwork), 92));
+  header_row.Children().Append(texts);
+
+  muxc::StackPanel body;
+  body.Spacing(10);
+  body.Children().Append(header_row);
+
+  if (item.episode.duration_sec > 0 && item.episode.position_sec > 5) {
+    muxc::StackPanel progress_row;
+    progress_row.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Horizontal);
+    progress_row.Spacing(10);
+    muxc::ProgressBar progress;
+    progress.Maximum(item.episode.duration_sec);
+    progress.Value(item.episode.position_sec);
+    progress.Width(220);
+    progress.VerticalAlignment(Microsoft::UI::Xaml::VerticalAlignment::Center);
+    muxc::TextBlock time_label;
+    time_label.Text(winrt::hstring(FormatTime(item.episode.position_sec) + L" / " +
+                                   FormatSeconds(item.episode.duration_sec)));
+    time_label.FontSize(11);
+    time_label.Foreground(brush(L"AppInkSoftBrush"));
+    progress_row.Children().Append(progress);
+    progress_row.Children().Append(time_label);
+    body.Children().Append(progress_row);
+  }
+
+  muxc::StackPanel actions;
+  actions.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Horizontal);
+  actions.Spacing(8);
+
+  bool const is_playing =
+      player_ && player_.Source() &&
+      player_.PlaybackSession().PlaybackState() ==
+          winrt::Windows::Media::Playback::MediaPlaybackState::Playing;
+  muxc::Button continue_button;
+  StyleBrandButton(continue_button, true, true);
+  continue_button.Padding(winrt::Microsoft::UI::Xaml::Thickness{12, 5, 12, 5});
+  continue_button.Content(box_value(winrt::hstring(
+      (is_playing ? L"⏸ " : L"▶ ") + std::wstring(podlens::Tr("home.continue")))));
+  continue_button.Click([weak = get_weak(), item](auto&&, auto&&) {
+    if (auto window = weak.get()) window->SelectRecent(item, true);
+  });
+  actions.Children().Append(continue_button);
+
+  bool const transcript_ready = item.episode.transcript_status == "done";
+  muxc::Button open_button;
+  StyleBrandButton(open_button, true, false);
+  open_button.Padding(winrt::Microsoft::UI::Xaml::Thickness{12, 5, 12, 5});
+  open_button.Content(box_value(winrt::hstring(std::wstring(
+      transcript_ready ? podlens::Tr("home.back_transcript")
+                       : podlens::Tr("home.view_episode")))));
+  open_button.Click([weak = get_weak(), item](auto&&, auto&&) {
+    if (auto window = weak.get()) window->SelectRecent(item, false);
+  });
+  actions.Children().Append(open_button);
+
+  muxc::Button restart_button;
+  StyleBrandButton(restart_button, true, false);
+  restart_button.Padding(winrt::Microsoft::UI::Xaml::Thickness{12, 5, 12, 5});
+  restart_button.Content(box_value(
+      winrt::hstring(std::wstring(podlens::Tr("home.restart")))));
+  restart_button.Click([weak = get_weak(), item](auto&&, auto&&) {
+    if (auto window = weak.get()) {
+      window->SelectRecent(item, true);
+      window->SeekTo(0);
+    }
+  });
+  actions.Children().Append(restart_button);
+  body.Children().Append(actions);
+
+  // The resume line: where the listener last read, plus the sentence once
+  // the transcript fetch lands (the text block is filled asynchronously).
+  muxc::StackPanel resume;
+  resume.Spacing(2);
+  muxc::TextBlock resume_title;
+  resume_title.Text(winrt::hstring(
+      transcript_ready
+          ? std::wstring(podlens::Tr("home.resume_prefix")) + L" " +
+                FormatTime(item.episode.position_sec)
+          : std::wstring(podlens::Tr("home.resume_none"))));
+  resume_title.FontSize(13);
+  resume_title.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
+  resume.Children().Append(resume_title);
+  if (transcript_ready) {
+    auto resume_sentence = muxc::TextBlock();
+    resume_sentence.FontSize(12);
+    resume_sentence.Foreground(brush(L"AppInkSoftBrush"));
+    resume_sentence.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+    resume_sentence.MaxLines(2);
+    resume_sentence.Text(winrt::hstring(std::wstring(podlens::Tr("home.resume_none_hint"))));
+    resume.Children().Append(resume_sentence);
+    hero_resume_line_ = std::move(resume_sentence);
+    LoadHeroResume(item);
+  } else {
+    muxc::TextBlock resume_hint;
+    resume_hint.Text(winrt::hstring(std::wstring(podlens::Tr("home.resume_none_hint"))));
+    resume_hint.FontSize(12);
+    resume_hint.Foreground(brush(L"AppInkSoftBrush"));
+    resume.Children().Append(resume_hint);
+  }
+  body.Children().Append(resume);
+
   muxc::Border card;
-  card.Child(card_grid);
-  card.CornerRadius(winrt::Microsoft::UI::Xaml::CornerRadius{12});
-  card.Margin(winrt::Microsoft::UI::Xaml::Thickness{0, 4, 8, 4});
+  card.Child(body);
+  card.CornerRadius(winrt::Microsoft::UI::Xaml::CornerRadius{10});
+  card.Padding(winrt::Microsoft::UI::Xaml::Thickness{20});
+  card.Margin(winrt::Microsoft::UI::Xaml::Thickness{0, 8, 0, 0});
+  card.Background(brush(L"AppSurfaceBrush"));
+  card.BorderBrush(brush(L"AppLineBrush"));
+  card.BorderThickness(winrt::Microsoft::UI::Xaml::Thickness{0.7});
   RecentRow const row_copy = item;
   card.Tapped([weak = get_weak(), row_copy](auto&&, auto&&) {
-    if (auto window = weak.get()) window->SelectRecent(row_copy, true);
+    if (auto window = weak.get()) window->SelectRecent(row_copy, false);
   });
   return card;
+}
+
+// Fetch the hero's last-read sentence; the home card shows the translation
+// line once the transcript arrives.
+void MainWindow::LoadHeroResume(RecentRow const& item) {
+  if (!api_ || item.episode.transcript_status != "done") return;
+  std::string const episode_id = item.episode.id;
+  double const position = item.episode.position_sec;
+  auto const dispatcher = DispatcherQueue();
+  auto const weak = get_weak();
+  (void)api_->episode_transcript_async(
+      episode_id, [dispatcher, weak, episode_id, position](
+                      rivet_app::Result<std::vector<std::vector<std::string>>> result) {
+        dispatcher.TryEnqueue([weak, episode_id, position, result]() mutable {
+          if (auto window = weak.get()) {
+            if (!window->hero_resume_line_) return;
+            std::wstring sentence;
+            try {
+              for (auto const& row : result.get()) {
+                if (row.size() < 4) continue;
+                try {
+                  if (std::stod(row[0]) <= position) {
+                    sentence = to_wide(row[3].empty() ? row[2] : row[3]);
+                  }
+                } catch (...) {
+                }
+              }
+            } catch (...) {
+              return;
+            }
+            window->hero_resume_line_.Text(winrt::hstring(sentence));
+          }
+        });
+      });
 }
 
 muxc::TextBlock MainWindow::MakeSectionHeader(std::wstring const& title) {
@@ -1684,25 +1959,80 @@ muxc::StackPanel MainWindow::MakeShowTile(FeedRow const& feed) {
 
 void MainWindow::RenderHomePage() {
   HomeList().Children().Clear();
+  hero_resume_line_ = nullptr;
   if (recent_.empty() && feeds_.empty()) return;
 
-  auto const lane = UpNext();
-  if (!lane.empty()) {
-    HomeList().Children().Append(
-        MakeSectionHeader(std::wstring(podlens::Tr("home.up_next"))));
-    muxc::ScrollViewer lane_scroller;
-    lane_scroller.HorizontalScrollBarVisibility(
-        Microsoft::UI::Xaml::Controls::ScrollBarVisibility::Auto);
-    lane_scroller.VerticalScrollBarVisibility(
-        Microsoft::UI::Xaml::Controls::ScrollBarVisibility::Disabled);
-    muxc::StackPanel lane_row;
-    lane_row.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Horizontal);
-    lane_scroller.Content(lane_row);
-    lane_scroller.Margin(winrt::Microsoft::UI::Xaml::Thickness{0, 4, 0, 6});
-    for (auto const& item : lane) {
-      lane_row.Children().Append(MakeUpNextCard(item));
-    }
-    HomeList().Children().Append(lane_scroller);
+  // Page heading, as in the prototype: one invitation plus add-subscription.
+  muxc::TextBlock heading;
+  heading.Text(winrt::hstring(std::wstring(podlens::Tr("home.hero_title"))));
+  heading.FontSize(24);
+  heading.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
+  heading.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+  muxc::TextBlock subheading;
+  subheading.Text(winrt::hstring(std::wstring(podlens::Tr("home.hero_subtitle"))));
+  subheading.FontSize(13);
+  subheading.Foreground(Microsoft::UI::Xaml::Application::Current()
+                            .Resources()
+                            .Lookup(box_value(winrt::hstring(L"AppInkSoftBrush")))
+                            .as<Microsoft::UI::Xaml::Media::Brush>());
+  muxc::Button add_button;
+  StyleBrandButton(add_button, true, false);
+  add_button.Padding(winrt::Microsoft::UI::Xaml::Thickness{10, 4, 10, 4});
+  add_button.Content(box_value(
+      winrt::hstring(L"+ " + std::wstring(podlens::Tr("nav.add_feed")))));
+  add_button.Click([weak = get_weak()](auto&&, auto&&) {
+    if (auto window = weak.get()) window->AddFeed_Click(nullptr, nullptr);
+  });
+  muxc::Grid heading_row;
+  heading_row.ColumnSpacing(12);
+  heading_row.ColumnDefinitions().Append(muxc::ColumnDefinition());
+  heading_row.ColumnDefinitions().Append(muxc::ColumnDefinition());
+  heading_row.ColumnDefinitions().GetAt(0).Width({1, Microsoft::UI::Xaml::GridUnitType::Star});
+  heading_row.ColumnDefinitions().GetAt(1).Width({0, Microsoft::UI::Xaml::GridUnitType::Auto});
+  muxc::StackPanel heading_stack;
+  heading_stack.Spacing(2);
+  heading_stack.Children().Append(heading);
+  heading_stack.Children().Append(subheading);
+  muxc::Grid::SetColumn(heading_stack, 0);
+  muxc::Grid::SetColumn(add_button, 1);
+  heading_row.Children().Append(heading_stack);
+  heading_row.Children().Append(add_button);
+  HomeList().Children().Append(heading_row);
+
+  if (auto const item = ResumeCandidate()) {
+    HomeList().Children().Append(MakeHomeHero(*item));
+  }
+
+  // Recent updates follow, drawn from subscriptions; the hero episode is
+  // already in front, so it does not repeat here.
+  muxc::StackPanel recent_header;
+  recent_header.Orientation(Microsoft::UI::Xaml::Controls::Orientation::Horizontal);
+  recent_header.Spacing(8);
+  recent_header.Margin(winrt::Microsoft::UI::Xaml::Thickness{0, 14, 0, 0});
+  recent_header.Children().Append(
+      MakeSectionHeader(std::wstring(podlens::Tr("home.latest"))));
+  auto see_recent = MakeSeeAllButton(podlens::Tr("library.recent").data());
+  see_recent.Click([weak = get_weak()](auto&&, auto&&) {
+    if (auto window = weak.get()) window->ShowPage(Page::Recent);
+  });
+  recent_header.Children().Append(see_recent);
+  HomeList().Children().Append(recent_header);
+
+  std::string const hero_id = ResumeCandidate()
+                                  ? ResumeCandidate()->episode.id
+                                  : std::string();
+  int shown = 0;
+  for (auto const& item : recent_) {
+    if (item.episode.id == hero_id) continue;
+    HomeList().Children().Append(MakeEpisodeCard(item, true));
+    if (++shown >= 3) break;
+  }
+  if (shown == 0) {
+    muxc::TextBlock empty;
+    empty.Text(winrt::hstring(std::wstring(podlens::Tr("home.recent_empty"))));
+    empty.Opacity(0.65);
+    empty.Margin(winrt::Microsoft::UI::Xaml::Thickness{0, 6, 0, 0});
+    HomeList().Children().Append(empty);
   }
 
   muxc::StackPanel shows_header;
@@ -1736,16 +2066,6 @@ void MainWindow::RenderHomePage() {
     shows_row.Children().Append(tile);
   }
   HomeList().Children().Append(shows_scroller);
-
-  if (!recent_.empty()) {
-    HomeList().Children().Append(
-        MakeSectionHeader(std::wstring(podlens::Tr("home.latest"))));
-    int shown = 0;
-    for (auto const& item : recent_) {
-      HomeList().Children().Append(MakeEpisodeCard(item, true));
-      if (++shown >= 6) break;
-    }
-  }
 }
 
 void MainWindow::RenderRecentPage() {
@@ -2230,8 +2550,10 @@ void MainWindow::SetStatus(bool ok, std::wstring const& message) {
                                 .Lookup(box_value(winrt::hstring(L"AppInkSoftBrush")))
                                 .as<Microsoft::UI::Xaml::Media::Brush>());
   } else {
-    StatusLine().Foreground(
-        Microsoft::UI::Xaml::Media::SolidColorBrush(winrt::Windows::UI::Color{0xFF, 0xB3, 0x26, 0x1E}));
+    StatusLine().Foreground(Microsoft::UI::Xaml::Application::Current()
+                                .Resources()
+                                .Lookup(box_value(winrt::hstring(L"AppDangerBrush")))
+                                .as<Microsoft::UI::Xaml::Media::Brush>());
     ErrorBar().Message(winrt::hstring(message));
     ErrorBar().IsOpen(true);
     error_bar_timer_.Stop();
@@ -2976,10 +3298,66 @@ void MainWindow::PlayPause_Click(winrt::Windows::Foundation::IInspectable const&
 
 void MainWindow::Pipeline_Click(winrt::Windows::Foundation::IInspectable const&,
                                 Microsoft::UI::Xaml::RoutedEventArgs const&) {
-  // Runs the real episode-pipeline RPC; the cost estimate is already shown
-  // inline in the detail pane (LoadEstimate), so there is no extra confirm
-  // dialog like on Linux. Progress rides the shared poll-until-done loop.
-  StartJob("pipeline", SelectedEpisodeId());
+  // The prototype's confirm-first flow: state what will be generated and
+  // roughly what it costs before spending the user's provider tokens.
+  auto const episode_id = SelectedEpisodeId();
+  auto const episode = SelectedEpisode();
+  if (episode_id.empty() || !episode || !api_) return;
+
+  std::wstring const title = to_wide(episode->title);
+  auto const minutes = std::max(1L, std::lround(episode->duration_sec / 60.0));
+  wchar_t body_buffer[512];
+  swprintf(body_buffer, 512, podlens::Tr("confirm.body").data(), title.c_str(),
+           static_cast<int>(minutes));
+
+  muxc::StackPanel content;
+  content.Spacing(8);
+  muxc::TextBlock body_label;
+  body_label.Text(winrt::hstring(std::wstring(body_buffer)));
+  body_label.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+  content.Children().Append(body_label);
+  muxc::TextBlock estimate_label;
+  estimate_label.Opacity(0.7);
+  estimate_label.FontSize(12);
+  estimate_label.TextWrapping(Microsoft::UI::Xaml::TextWrapping::Wrap);
+  estimate_label.Text(winrt::hstring(std::wstring(podlens::Tr("confirm.loading"))));
+  content.Children().Append(estimate_label);
+
+  muxc::ContentDialog dialog;
+  dialog.Title(box_value(
+      winrt::hstring(std::wstring(podlens::Tr("confirm.title")))));
+  dialog.Content(content);
+  dialog.PrimaryButtonText(winrt::hstring(std::wstring(podlens::Tr("confirm.start"))));
+  dialog.CloseButtonText(winrt::hstring(std::wstring(podlens::Tr("confirm.cancel"))));
+  dialog.DefaultButton(muxc::ContentDialogButton::Primary);
+  dialog.XamlRoot(Content().XamlRoot());
+
+  // Provider-derived estimate fills in while the dialog is up; the confirm
+  // button is live either way (a failed estimate never blocks the run).
+  auto const weak_dialog = get_weak();
+  auto const dispatcher = DispatcherQueue();
+  (void)api_->episode_estimate_async(
+      episode_id, [dispatcher, estimate_label](rivet_app::Result<std::string> result) {
+        dispatcher.TryEnqueue([estimate_label, result] {
+          if (!result.value) return;
+          auto const json = to_wide(*result.value);
+          auto const chars = json_number_value(json, L"chars");
+          if (!chars || *chars <= 0) return;
+          wchar_t line[160];
+          swprintf(line, 160, podlens::Tr("confirm.estimate").data(),
+                   std::to_wstring(static_cast<long long>(*chars)).c_str());
+          estimate_label.Text(winrt::hstring(std::wstring(line)));
+        });
+      });
+
+  auto op = dialog.ShowAsync();
+  op.Completed([weak_dialog, episode_id](
+                   winrt::Windows::Foundation::IAsyncOperation<
+                       muxc::ContentDialogResult> const& sender,
+                   winrt::Windows::Foundation::AsyncStatus) {
+    if (sender.GetResults() != muxc::ContentDialogResult::Primary) return;
+    if (auto window = weak_dialog.get()) window->StartJob("pipeline", episode_id);
+  });
 }
 
 void MainWindow::RemoveAudio_Click(winrt::Windows::Foundation::IInspectable const&,
@@ -3122,6 +3500,18 @@ void MainWindow::PlayerAccel_Invoked(
     if (player_ && player_.PlaybackSession()) {
       SeekTo(TimeSpanSeconds(player_.PlaybackSession().Position()) + 30.0);
     }
+    args.Handled(true);
+  } else if (key == winrt::Windows::System::VirtualKey::F &&
+             modifiers == Mods::None) {
+    // The prototype's single-key focus reading, only when an episode is open.
+    if (!selected_episode_id_.empty()) {
+      FocusMode_Click(nullptr, nullptr);
+      args.Handled(true);
+    }
+  } else if (key == static_cast<winrt::Windows::System::VirtualKey>(191) &&
+             modifiers == Mods::None && page_ == Page::Discover) {
+    // The prototype's "/" lands in the discover search field.
+    DiscoverSearchBox().Focus(Microsoft::UI::Xaml::FocusState::Programmatic);
     args.Handled(true);
   }
 }
@@ -3307,6 +3697,10 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
     panel.Children().Append(storage_note);
   }
 
+  // Settings that need real controls, not a free-text field.
+  std::vector<std::pair<std::string, muxc::ComboBox>> appearance_fields;
+  std::vector<std::pair<std::string, muxc::ToggleSwitch>> switch_fields;
+
   for (auto const& row : rows) {
     if (row.size() < 2) continue;
 
@@ -3318,15 +3712,52 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
     key_label.FontSize(13);
     key_label.FontWeight(Microsoft::UI::Text::FontWeights::SemiBold());
 
+    muxc::StackPanel line;
+    line.Spacing(4);
+    line.Children().Append(key_label);
+
+    if (row[0] == "appearance") {
+      // A three-way choice, as in the prototype's theme setting.
+      muxc::ComboBox picker;
+      picker.MinWidth(180);
+      char const* const option_keys[] = {
+          "settings.appearance_system", "settings.appearance_light",
+          "settings.appearance_dark"};
+      wchar_t const* const option_values[] = {L"system", L"light", L"dark"};
+      int selected = 0;
+      for (int i = 0; i < 3; ++i) {
+        muxc::ComboBoxItem item;
+        item.Content(box_value(
+            winrt::hstring(std::wstring(podlens::Tr(option_keys[i])))));
+        item.Tag(box_value(winrt::hstring(option_values[i])));
+        picker.Items().Append(item);
+        if (to_wide(row[1]) == option_values[i]) selected = i;
+      }
+      picker.SelectedIndex(selected);
+      winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetName(
+          picker, winrt::hstring(to_wide(row[0])));
+      line.Children().Append(picker);
+      panel.Children().Append(line);
+      appearance_fields.emplace_back(row[0], picker);
+      continue;
+    }
+    if (row[0] == "follow-transcript") {
+      muxc::ToggleSwitch toggle;
+      toggle.IsOn(row[1] != "false");
+      winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetName(
+          toggle, winrt::hstring(to_wide(row[0])));
+      line.Children().Append(toggle);
+      panel.Children().Append(line);
+      switch_fields.emplace_back(row[0], toggle);
+      continue;
+    }
+
     muxc::TextBox input;
     input.Text(winrt::hstring(to_wide(row[1])));
     input.Width(380);
     winrt::Microsoft::UI::Xaml::Automation::AutomationProperties::SetName(
         input, winrt::hstring(to_wide(row[0])));
 
-    muxc::StackPanel line;
-    line.Spacing(4);
-    line.Children().Append(key_label);
     line.Children().Append(input);
     if (row.size() >= 3 && !row[2].empty()) {
       muxc::TextBlock description;
@@ -3390,7 +3821,9 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
 
   auto const weak = get_weak();
   auto op = dialog.ShowAsync();
-  op.Completed([weak, fields = std::move(fields)](
+  op.Completed([weak, fields = std::move(fields),
+                appearance_fields = std::move(appearance_fields),
+                switch_fields = std::move(switch_fields)](
                    winrt::Windows::Foundation::IAsyncOperation<
                        muxc::ContentDialogResult> const& sender,
                    winrt::Windows::Foundation::AsyncStatus) {
@@ -3400,6 +3833,16 @@ void MainWindow::ShowSettingsDialog(std::vector<std::vector<std::string>> rows,
     try {
       for (auto const& [key, input] : fields) {
         window->api_->settings_set(key, to_utf8(std::wstring(input.Text()))).get();
+      }
+      for (auto const& [key, picker] : appearance_fields) {
+        auto const item = picker.SelectedItem().try_as<muxc::ComboBoxItem>();
+        if (!item) continue;
+        auto const tag =
+            winrt::unbox_value_or<winrt::hstring>(item.Tag(), winrt::hstring());
+        window->api_->settings_set(key, to_utf8(std::wstring(tag))).get();
+      }
+      for (auto const& [key, toggle] : switch_fields) {
+        window->api_->settings_set(key, toggle.IsOn() ? "true" : "false").get();
       }
       window->SetStatus(true, std::wstring(podlens::Tr("status.saved")));
     } catch (std::exception const& e) {
