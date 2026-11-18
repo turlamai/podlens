@@ -17,7 +17,7 @@ concurrency:
 # Single source of truth for the rivet pin; every install step below
 # references this so a bump is one edit, not a grep-replace across jobs.
 env:
-  RIVET_PIN: e1e6d9ad71831689604af54cfad95e46fd6587c0
+  RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
 jobs:
   backend:
     name: Backend tests (${{ matrix.os }})
