@@ -15,7 +15,7 @@ concurrency:
 
 # Single source of truth for the rivet pin (matches ci.yml).
 env:
-  RIVET_PIN: 994047c310c749d3e16d873f33fc073dca0c6521
+  RIVET_PIN: e1e6d9ad71831689604af54cfad95e46fd6587c0
 jobs:
   validate:
     name: Validate release tag
