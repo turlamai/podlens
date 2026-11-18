@@ -89,8 +89,11 @@ struct MainWindow: View {
                     .frame(width: sidebarWidth)
                     .clipped()
 
-                    Divider()
-                        .opacity(store.focusMode ? 0 : 1)
+                    // Prototype: pane separation is the hairline token, not a
+                    // system divider (whose neutral gray reads as a bright
+                    // seam on the warm palette in dark mode).
+                    Rectangle()
+                        .fill(Palette.hairline)
                         .frame(width: store.focusMode ? 0 : 0.7)
 
                     Group {
@@ -103,8 +106,8 @@ struct MainWindow: View {
                     .frame(width: contentWidth)
                     .clipped()
 
-                    Divider()
-                        .opacity(store.focusMode ? 0 : 1)
+                    Rectangle()
+                        .fill(Palette.hairline)
                         .frame(width: store.focusMode ? 0 : 0.7)
 
                     DetailView(columnVisibility: focusBinding)
@@ -273,6 +276,12 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        // The prototype pins the sidebar to the surface token (warm, a hair
+        // lighter than canvas), not the system sidebar material: in dark mode
+        // the stock material is a neutral gray that bands between the warm
+        // canvas panes. Hide it and paint the contract color instead.
+        .scrollContentBackground(.hidden)
+        .background(Palette.surface)
         .navigationTitle("PodLens")
     }
 
