@@ -25,6 +25,12 @@ name: Published upgrade qualification (N -> N+1)
 on:
   workflow_dispatch:
 
+# Fallback so the file is self-consistent for the release gate's static pin
+# check; the "Read the rivet pin" step below always overwrites this with the
+# pin the published N release was actually built against.
+env:
+  RIVET_PIN: 994047c310c749d3e16d873f33fc073dca0c6521
+
 permissions:
   contents: read
 

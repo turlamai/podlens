@@ -3,6 +3,47 @@
 All notable changes to PodLens are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is SemVer.
 
+## 0.8.0 - 2026-11-18
+
+### Added
+
+- **Summary anchors.** Key points and quotes now carry the transcript
+  sentence they came from. The summary surface renders numbered takeaways
+  and serif quotes, each with a jump-back button that seeks to the sentence,
+  resumes following and scrolls it into view; legacy summaries without
+  anchors render without the button. The summarizer prompt asks for sentence
+  times and the stored payload is normalized, so old libraries keep working.
+- **Transcript/Summary tabs on every platform.** The two reading surfaces
+  are siblings now — macOS, Windows and Linux all present Transcript and
+  Summary as separate tabs with the transcript opening first; a new episode
+  selection always lands back on the transcript.
+- **Appearance preference shared by every host.** System / Light / Dark is
+  one engine setting (`appearance`) surfaced as a menu toggle (⇧⌘T) plus a
+  three-way choice on macOS and a settings control on Windows and Linux.
+  Light and dark accent pairs change together, matching the prototype.
+- **Follow-transcript preference.** Whether playback keeps the current
+  sentence in view (`follow-transcript`) is now an engine setting seeded
+  into the UI, not just an in-memory toggle.
+- **Confirm before generating (Windows).** One-click understanding on
+  Windows now opens the same confirm dialog the other platforms have —
+  scope, provider estimate, start or not now — before spending tokens.
+- **Home rebuilt around the current episode.** One hero with listening
+  progress, a resume line recalling the last-read sentence, three recent
+  updates and the subscribed shows; the former Up Next lane is retired with
+  the prototype revision. All three platforms follow the same layout.
+- **Reading shortcuts.** F toggles focus reading and / focuses the Discover
+  search on macOS and Linux. Windows ships F; the single-key slash shortcut
+  is a known gap on that leg this release.
+- **Palette aligned with the prototype.** The terracotta accent, warm
+  canvas and ink tokens match `design/prototype/shared.css` 1:1 on all
+  three platforms, replacing the previous Windows and Linux approximations.
+
+### Fixed
+
+- Windows status-line errors and accent-filled controls no longer use
+  hardcoded colors that ignored dark mode; summary payload objects no
+  longer leak their JSON key names into the rendered points.
+
 ## 0.5.0 - 2026-10-30
 
 ### Added
