@@ -20,10 +20,12 @@
          racket/port
          racket/runtime-path
          racket/string
+         racket/system
          "backend/main.rkt")
 
 (define-runtime-path frontend-dist "apps/desktop/dist")
 (define-runtime-path evidence-dir ".glaze/verify")
+(define-runtime-path seed-script "scripts/e2e/seed-listening-fixture.rkt")
 
 ;; Isolation: the verifier never touches the real ~/.podlens.
 (define home (make-temporary-file "podlens-verify-~a" 'directory))
@@ -32,7 +34,20 @@
 ;; Open the in-page journey harness gate for this verifier only.
 (putenv "PODLENS_E2E" "1")
 
+;; The seeded journeys start media from synthetic clicks; WebView2 /
+;; WKWebView / WebKitGTK reject play() without a real user gesture (even
+;; muted). Acceptance-only escape hatch, default off in shipped apps
+;; (glaze#143).
+(putenv "GLAZE_ALLOW_PROGRAMMATIC_PLAYBACK" "1")
+
+;; Seed the offline listening fixture (same data the native acceptance
+;; uses): one feed, an 8s silent wav, a 4-sentence bilingual transcript and
+;; a mixed anchored/legacy summary. Separate process, same isolated home.
+(define seed-exit
+  (system*/exit-code (find-executable-path "racket") (path->string seed-script)))
+
 (define verdicts '())
+(define journey-reports (box '()))
 
 ;; Start the engine transport (the app's module+ main does the same).
 (start-engine!)
@@ -171,6 +186,7 @@
             rs]
            [(>= (current-inexact-milliseconds) journey-deadline) rs]
            [else (sleep 0.25) (loop)])))
+     (set-box! journey-reports reports)
      (define (step-ok? id)
        (for/or ([r (in-list (if (list? reports) reports '()))])
          (and (hash? r) (equal? (hash-ref r 'id #f) id) (eq? #t (hash-ref r 'ok #f)))))
@@ -190,7 +206,7 @@
                  (cons 'health-ok (and (hash? health) (equal? "true" (hash-ref health 'ok #f))))
                  (cons 'engine-health (and (string? engine-health)
                                            (string-contains? engine-health "podlens")))
-                 (cons 'feed-list (equal? feeds '()))
+                 (cons 'feed-list (and (list? feeds) (= 1 (length feeds))))
                  (cons 'catalog (and (list? catalog) (>= (length catalog) 1)))
                  (cons 'settings (and (list? settings) (>= (length settings) 5)))
                  (cons 'settings-set (eq? #t set-ok))
@@ -199,7 +215,8 @@
                                              (hash? (with-handlers ([exn:fail? (lambda (_) #f)])
                                                       (string->jsexpr sec)))))
                  (cons 'update-state (and (hash? us) (equal? "idle" (hash-ref us 'phase #f))))
-                 (cons 'resume-empty (equal? resume '()))
+                 (cons 'resume-fixture (and (list? resume) (= 3 (length resume))
+                                            (equal? (caddr resume) "1")))
                  (cons 'position-unknown (eq? #f pos-unknown))
                  (cons 'error-message (and (hash? bad-setting)
                                            (string? (hash-ref bad-setting 'error #f))
@@ -240,6 +257,14 @@
                  (cons 'journey-settings (step-ok? "nav-settings"))
                  (cons 'journey-theme (step-ok? "theme-toggle"))
                  (cons 'journey-home (step-ok? "nav-home"))
+                 (cons 'fixture-seeded (and (zero? seed-exit)
+                                            (file-exists? (build-path home "listening-fixture.json"))))
+                 (cons 'journey-open-episode (step-ok? "journey-open-episode"))
+                 (cons 'journey-sentence-seek (step-ok? "journey-sentence-seek"))
+                 (cons 'journey-play-mediasession (step-ok? "journey-play-mediasession"))
+                 (cons 'journey-follow-sync (step-ok? "journey-follow-sync"))
+                 (cons 'journey-summary-anchors (step-ok? "journey-summary-anchors"))
+                 (cons 'journey-pause-position (step-ok? "journey-pause-position"))
                  (cons 'journey-complete (step-ok? "journey-complete"))
                  (cons 'e2e-capture (and saved-e2e-shot (> (file-size saved-e2e-shot) 0)))))
      (webview-close wv))))
@@ -250,5 +275,9 @@
   (printf "[verify] ~a = ~a\n" (car verdict) (cdr verdict)))
 (unless (and (pair? verdicts) (andmap cdr verdicts))
   (eprintf "[verify] native UI verification failed\n")
+  (for ([r (in-list (if (list? (unbox journey-reports)) (unbox journey-reports) '()))])
+    (when (and (hash? r) (not (eq? #t (hash-ref r 'ok #f))))
+      (eprintf "[verify] harness ~a failed: ~a\n"
+               (hash-ref r 'id "?") (hash-ref r 'detail ""))))
   (exit 1))
 (displayln "[verify] ALL PASS")

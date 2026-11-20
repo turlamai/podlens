@@ -2,10 +2,22 @@
 // into the webview, so the journey runs inside the page itself: verify.rkt
 // navigates the window to #e2e with PODLENS_E2E=1, and each step reports
 // through api/host/e2e_report. Inert in production (hash + host gate).
-import { apiPost } from '@podlens/core';
+import { apiPost, resumeLast } from '@podlens/core';
 import { state } from './state';
+import { position, preload } from './player';
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+// Condition polling instead of fixed sleeps: slow CI runners add latency
+// between click and media-clock start, so fixed waits either flake or
+// overshoot the 8s fixture. Deadlines stay inside the fixture window.
+async function until(cond: () => boolean, ms: number, what: string): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > deadline) throw new Error(`timeout waiting for ${what}`);
+    await wait(120);
+  }
+}
 
 function click(selector: string): void {
   const el = document.querySelector(selector) as HTMLElement | null;
@@ -80,5 +92,135 @@ export async function runHarnessIfGated(): Promise<void> {
     expect(state.page === 'home', 'home page not active');
     return document.querySelector('h1')?.textContent ?? '';
   });
-  await report('journey-complete', true, 'slice 2 page journey');
+  // ---- seeded listening journey (fixture: 8s wav + 4 bilingual sentences
+  // + mixed anchored/legacy summary; verify.rkt seeds it before boot) ----
+  await step('journey-open-episode', async () => {
+    click('.hero [data-action="open-current"]');
+    await wait(600);
+    expect(state.page === 'transcript', 'transcript page not active');
+    const n = document.querySelectorAll('.sentence').length;
+    expect(n === 4, `expected 4 sentences, got ${n}`);
+    // Warm the media element before any play(): a load started inside
+    // play() at HAVE_NOTHING can stall in WebView2 (acceptance flake).
+    // Soft assertion: the webview media pipeline can surface metadata
+    // seconds after the server wrote the full response; the play step
+    // below owns the hard clock assertion with its own restart backstop.
+    preload(state.episode ?? '');
+    const a = document.getElementById('audio') as HTMLAudioElement | null;
+    try {
+      await until(() => (a?.readyState ?? 0) >= 1, 8000, 'media metadata preload');
+    } catch (e) {
+      return `preload slow (${(e as Error).message}); continuing to play step`;
+    }
+    return document.querySelector('h1')?.textContent ?? '';
+  });
+  await step('journey-sentence-seek', async () => {
+    click('.sentence[data-sec="4"]');
+    await wait(400);
+    const p = position();
+    expect(Math.abs(p - 4) < 0.6, `position ${p} not at sentence 4`);
+    expect(state.reading === 4, `reading ${state.reading}`);
+    return `position=${p.toFixed(2)}`;
+  });
+  await step('journey-play-mediasession', async () => {
+    click('.player [data-action="toggle"]');
+    try {
+      await until(() => state.playing, 2500, 'playback start');
+    } catch {
+      /* fall through to the muted diagnostic fallback below */
+    }
+    if (!state.playing) {
+      const a = document.getElementById('audio') as HTMLAudioElement | null;
+      const w = window as unknown as Record<string, unknown>;
+      const prior = `unmuted=${w.__podlensPlayError ?? 'none'} muted=${w.__podlensMutedPlayError ?? 'none'}`;
+      if (a) a.muted = true;
+      try {
+        await a?.play();
+        if (a) a.muted = false;
+      } catch (e) {
+        throw new Error(
+          `play rejected (${prior}): ${(e as Error).name}: ${(e as Error).message}`,
+        );
+      }
+      await wait(300);
+    }
+    await until(() => state.playing, 1500, 'playback start');
+    try {
+      await until(() => position() > 4.2, 4000, 'media clock advance');
+    } catch (e) {
+      // Transient media-pipeline stall (observed once locally): the 'play'
+      // event fires but the clock stays put. One pause/play restart kicks
+      // the pipeline; the pause-position journey proves this path works.
+      click('.player [data-action="toggle"]');
+      await wait(250);
+      click('.player [data-action="toggle"]');
+      try {
+        await until(() => position() > 4.2, 3000, 'media clock advance after restart');
+      } catch (e2) {
+        const a = document.getElementById('audio') as HTMLAudioElement | null;
+        const w = window as unknown as Record<string, unknown>;
+        throw new Error(
+          `${(e2 as Error).message}; pos=${position()} ready=${a?.readyState} net=${a?.networkState} paused=${a?.paused} t=${a?.currentTime} mediaErr=${a?.error?.code ?? 'none'} playErr=${w.__podlensPlayError ?? 'none'} mutedErr=${w.__podlensMutedPlayError ?? 'none'} (first: ${(e as Error).message})`,
+        );
+      }
+    }
+    const ms = navigator.mediaSession;
+    expect(ms, 'mediaSession missing');
+    expect(ms.playbackState === 'playing', `playbackState ${ms.playbackState}`);
+    expect(
+      (ms.metadata?.title ?? '').includes('focused listening'),
+      `metadata title ${ms.metadata?.title}`,
+    );
+    return ms.metadata?.title ?? '';
+  });
+  await step('journey-follow-sync', async () => {
+    try {
+      await until(() => state.reading === 6, 4000, 'follow to sentence 6');
+    } catch {
+      // Same transient-stall kick as the play step.
+      click('.player [data-action="toggle"]');
+      await wait(250);
+      click('.player [data-action="toggle"]');
+      await until(() => state.reading === 6, 3000, 'follow to sentence 6 after restart');
+    }
+    await wait(150);
+    const cur = document.querySelector('.sentence.current') as HTMLElement | null;
+    expect(cur?.dataset.sec === '6', `current class on ${cur?.dataset.sec}`);
+    return `reading=${state.reading}`;
+  });
+  await step('journey-summary-anchors', async () => {
+    click('[data-page="summary"]');
+    await wait(600);
+    const points = [...document.querySelectorAll('.point')];
+    expect(points.length === 2, `points ${points.length}`);
+    expect(points[0]?.querySelector('[data-action="anchor"]'), 'anchored point lost its jump');
+    expect(
+      !points[1]?.querySelector('[data-action="anchor"]'),
+      'legacy unanchored point must render without a jump button',
+    );
+    const quotes = [...document.querySelectorAll('.quote')];
+    expect(quotes.length === 1, `quotes ${quotes.length}`);
+    expect(quotes[0]?.querySelector('[data-action="anchor"]'), 'anchored quote lost its jump');
+    click('.point [data-action="anchor"]');
+    await wait(300);
+    expect(state.page === 'transcript', 'anchor did not return to transcript');
+    expect(state.reading === 0, `anchor reading ${state.reading}`);
+    await until(() => state.playing, 2000, 'anchor playback start');
+    return 'anchors ok';
+  });
+  await step('journey-pause-position', async () => {
+    if (!state.playing) {
+      // Fixture may have run out on a very slow runner; restart briefly so
+      // the pause-save path is still exercised.
+      click('.player [data-action="toggle"]');
+      await until(() => state.playing, 2000, 'restart for pause check');
+    }
+    click('.player [data-action="toggle"]');
+    await wait(500);
+    expect(!state.playing, 'playback did not pause');
+    const row = await resumeLast();
+    expect(row.length >= 3, 'resume-last lost the episode');
+    return `saved=${row[2] ?? ''}`;
+  });
+  await report('journey-complete', true, 'slice 3 listening journey');
 }

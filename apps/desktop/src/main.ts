@@ -163,6 +163,7 @@ async function openEpisode(id: string): Promise<void> {
     contentFor = null;
   }
   await navigate('transcript');
+  player.preload(id);
 }
 
 function setFollow(on: boolean, announce: boolean): void {
@@ -426,7 +427,10 @@ async function onAction(el: HTMLElement): Promise<void> {
       await openEpisode(id);
       break;
     case 'open-current':
-      if (state.episode) await navigate('transcript');
+      if (state.episode) {
+        await navigate('transcript');
+        player.preload(state.episode);
+      }
       break;
     case 'toggle':
       player.toggle();

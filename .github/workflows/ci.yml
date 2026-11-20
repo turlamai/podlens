@@ -170,6 +170,10 @@ jobs:
   glaze-adapter:
     name: Glaze adapter (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # GPU-less hosted runners have no DRI3 device; WebKitGTK must fall back
+    # to the software path or webview startup crashes (glaze docs/ci.md).
+    env:
+      WEBKIT_DISABLE_DMABUF_RENDERER: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -204,7 +208,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio
+      # The seeded listening journeys play real media; WebKitGTK needs an
+      # audio sink or the media clock stalls. Headless runners have none,
+      # so give PulseAudio a null sink for the verify step.
+      - name: Linux audio null sink
+        if: runner.os == 'Linux'
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=ci
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'

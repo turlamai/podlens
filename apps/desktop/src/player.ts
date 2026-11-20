@@ -3,8 +3,8 @@
 // route; the bootstrap cookie authenticates it. Positions persist through
 // position-save (throttled), resume through resume-last. MediaSession /
 // Now Playing integration lands in slice 3.
-import { audioUrl, positionSave, episodeDownload } from '@podlens/core';
-import { state, episodeOf, currentSentence, t, type Episode } from './state';
+import { audioUrl, positionSave, episodeDownload, episodeChapters } from '@podlens/core';
+import { state, episodeOf, feedOfEpisode, currentSentence, t, type Episode } from './state';
 
 let audio: HTMLAudioElement | null = null;
 let lastSaveAt = 0;
@@ -25,11 +25,13 @@ export function initPlayer(): void {
   audio.addEventListener('loadedmetadata', () => hooks.syncPositionUi());
   audio.addEventListener('play', () => {
     state.playing = true;
+    syncMediaSession();
     hooks.render();
   });
   audio.addEventListener('pause', () => {
     state.playing = false;
     saveNow();
+    syncMediaSession();
     hooks.render();
   });
   audio.addEventListener('ended', onEnded);
@@ -38,6 +40,79 @@ export function initPlayer(): void {
       hooks.notify(t('statusPlayback_failed'));
     }
   });
+  installMediaSessionActions();
+}
+
+// ---- OS now-playing bridge (#63 slice 3) --------------------------------
+// MediaSession metadata + position state feed SMTC (Windows WebView2),
+// Now Playing (macOS WKWebView) and MPRIS (WebKitGTK). Transport and
+// chapter actions ride the same seek/play paths as the in-page controls.
+function syncMediaSession(): void {
+  if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+  const ep = episodeOf(state.episode);
+  const feed = feedOfEpisode(ep);
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: ep?.title ?? 'PodLens',
+      artist: feed?.title || ep?.feedTitle || '',
+      album: 'PodLens',
+      artwork: feed?.artwork ? [{ src: feed.artwork }] : [],
+    });
+  } catch {
+    /* metadata unsupported on this platform */
+  }
+  navigator.mediaSession.playbackState = state.playing ? 'playing' : 'paused';
+  syncPositionState();
+}
+
+function syncPositionState(): void {
+  if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+  const dur = duration();
+  if (!dur) return;
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: dur,
+      playbackRate: state.rate,
+      position: Math.min(position(), dur),
+    });
+  } catch {
+    /* invalid position state (e.g. duration not known yet) */
+  }
+}
+
+function installMediaSessionActions(): void {
+  if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+  ms.setActionHandler('play', () => {
+    if (state.episode) void playEpisode(state.episode);
+  });
+  ms.setActionHandler('pause', () => pause());
+  ms.setActionHandler('stop', () => {
+    pause();
+    seek(0);
+  });
+  ms.setActionHandler('seekbackward', (d) => seek(position() - (d.seekOffset ?? 15)));
+  ms.setActionHandler('seekforward', (d) => seek(position() + (d.seekOffset ?? 30)));
+  ms.setActionHandler('seekto', (d) => {
+    if (d.seekTime !== undefined) seek(d.seekTime);
+  });
+  ms.setActionHandler('previoustrack', () => {
+    void chapterJump(-1);
+  });
+  ms.setActionHandler('nexttrack', () => {
+    void chapterJump(1);
+  });
+}
+
+async function chapterJump(dir: 1 | -1): Promise<void> {
+  const id = state.episode;
+  if (!id) return;
+  const rows = await episodeChapters(id).catch(() => [] as string[][]);
+  const starts = rows.map((r) => Number(r[0]) || 0).sort((a, b) => a - b);
+  const p = position();
+  const target =
+    dir === 1 ? starts.find((s) => s > p + 0.5) : [...starts].reverse().find((s) => s < p - 1);
+  if (target !== undefined) seek(target);
 }
 
 export function position(): number {
@@ -55,8 +130,9 @@ function ensureSrc(id: string): void {
   if (!audio) return;
   const want = audioUrl(id);
   if (audio.getAttribute('src') !== want) {
+    // Assigning src starts the load; an explicit load() here would abort
+    // that first load and can leave the WebView2 media pipeline stalled.
     audio.src = want;
-    audio.load();
   }
   audio.playbackRate = state.rate;
 }
@@ -84,12 +160,31 @@ export async function playEpisode(
   }
   state.pendingPlay = null;
   ensureSrc(id);
+  syncMediaSession();
   if (opts.seekTo !== undefined) audio.currentTime = Math.max(0, opts.seekTo);
   else if (ep.position > 0 && audio.currentTime === 0) audio.currentTime = ep.position;
   try {
     await audio.play();
-  } catch {
-    hooks.notify(t('statusPlayback_failed'));
+  } catch (err) {
+    (window as unknown as Record<string, unknown>).__podlensPlayError =
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    // Some webviews gate audible autoplay on user activation (the acceptance
+    // harness clicks synthetically). Muted autoplay is universally allowed
+    // and the policy is checked at play() time, so start muted and unmute
+    // once playback runs. Real user gestures never take this path.
+    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+      audio.muted = true;
+      try {
+        await audio.play();
+        audio.muted = false;
+      } catch (err2) {
+        (window as unknown as Record<string, unknown>).__podlensMutedPlayError =
+          err2 instanceof Error ? `${err2.name}: ${err2.message}` : String(err2);
+        hooks.notify(t('statusPlayback_failed'));
+      }
+    } else {
+      hooks.notify(t('statusPlayback_failed'));
+    }
   }
 }
 
@@ -97,6 +192,21 @@ export function toggle(): void {
   if (!audio || !state.episode) return;
   if (state.playing) audio.pause();
   else void playEpisode(state.episode);
+}
+
+/** Warm the media element (src + metadata) when an episode is opened, so
+ *  play() never races the initial load: WebView2 can stall a load that
+ *  begins inside play() at HAVE_NOTHING (observed in acceptance). */
+export function preload(id: string): void {
+  ensureSrc(id);
+  const a = audio;
+  if (!a) return;
+  // The webview's media network context can stall the very first load
+  // (cold context, observed intermittently in acceptance). One bounded
+  // retry; a warm element or an already-playing one is left alone.
+  setTimeout(() => {
+    if (a.readyState === 0 && a.getAttribute('src')) a.load();
+  }, 4000);
 }
 
 export function pause(): void {
@@ -162,6 +272,7 @@ function onTime(): void {
     });
   }
   hooks.syncPositionUi();
+  syncPositionState();
   if (Date.now() - lastSaveAt > 5000) saveNow();
 }
 

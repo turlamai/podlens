@@ -98,11 +98,17 @@ function jobChip(ep: Episode): string {
     if (job.kind === 'cancelled') return `<span class="chip pending">${esc(t('jobCancelled'))}</span>`;
     return `<span class="chip pending">${esc(t(stageKey(job)))}<span class="pct">${Math.round(job.pct)}%</span></span>`;
   }
-  if (ep.transcriptStatus === 'ready') {
+  if (ep.transcriptStatus === 'done') {
     return `<span class="chip ready">${icon('check')} ${esc(t('ui-chip-ready'))}</span>`;
   }
-  if (ep.transcriptStatus === 'failed' || ep.summaryStatus === 'failed') {
+  if (ep.transcriptStatus === 'error' || ep.summaryStatus === 'error') {
     return `<span class="chip pending">${esc(t('jobFailed'))}</span>`;
+  }
+  if (ep.transcriptStatus === 'cancelled') {
+    return `<span class="chip pending">${esc(t('jobCancelled'))}</span>`;
+  }
+  if (ep.transcriptStatus === 'running') {
+    return `<span class="chip pending">${esc(t('transcribing'))}</span>`;
   }
   return `<span class="chip">${esc(t('ui-chip-none'))}</span>`;
 }
@@ -112,7 +118,7 @@ export function row(ep: Episode): string {
   const current = state.episode === ep.id;
   const job = state.jobs[ep.id];
   const mins = Math.round(ep.duration / 60);
-  return `<article class="episode-row">${cover(feed)}<div class="od-fill"><button type="button" class="episode-title" data-action="open" data-id="${esc(ep.id)}">${esc(ep.title)}</button><div class="meta">${esc(feed?.title ?? ep.feedTitle)} · ${esc(ep.date)} · ${esc(t('ui-duration-minutes', mins))}${ep.done ? ' · ' + esc(t('done')) : ''}</div><div class="chips">${ep.downloaded ? `<span class="chip">${esc(t('tooltipDownloaded'))}</span>` : ''}${jobChip(ep)}</div></div><div class="row-actions">${job && job.kind !== 'cancelled' ? button(esc(t('cancel')), 'cancel-job', '', `data-id="${esc(ep.id)}"`) : ''}${button(icon(current && state.playing ? 'pause' : 'play'), 'play-episode', '', `data-id="${esc(ep.id)}" aria-label="${esc(current && state.playing ? t('pause') : t('play'))} ${esc(ep.title)}"`)}${ep.transcriptStatus === 'ready' ? button(esc(t('transcriptTab')), 'open', 'text', `data-id="${esc(ep.id)}"`) : button(esc(t('pipeline')), 'generate', 'text', `data-id="${esc(ep.id)}"`)}${button(icon('menu'), 'episode-more', '', `data-id="${esc(ep.id)}" aria-label="${esc(t('detailActions'))}"`)}</div></article>`;
+  return `<article class="episode-row">${cover(feed)}<div class="od-fill"><button type="button" class="episode-title" data-action="open" data-id="${esc(ep.id)}">${esc(ep.title)}</button><div class="meta">${esc(feed?.title ?? ep.feedTitle)} · ${esc(ep.date)} · ${esc(t('ui-duration-minutes', mins))}${ep.done ? ' · ' + esc(t('done')) : ''}</div><div class="chips">${ep.downloaded ? `<span class="chip">${esc(t('tooltipDownloaded'))}</span>` : ''}${jobChip(ep)}</div></div><div class="row-actions">${job && job.kind !== 'cancelled' ? button(esc(t('cancel')), 'cancel-job', '', `data-id="${esc(ep.id)}"`) : ''}${button(icon(current && state.playing ? 'pause' : 'play'), 'play-episode', '', `data-id="${esc(ep.id)}" aria-label="${esc(current && state.playing ? t('pause') : t('play'))} ${esc(ep.title)}"`)}${ep.transcriptStatus === 'done' ? button(esc(t('transcriptTab')), 'open', 'text', `data-id="${esc(ep.id)}"`) : button(esc(t('pipeline')), 'generate', 'text', `data-id="${esc(ep.id)}"`)}${button(icon('menu'), 'episode-more', '', `data-id="${esc(ep.id)}" aria-label="${esc(t('detailActions'))}"`)}</div></article>`;
 }
 
 function showTiles(): string {
@@ -128,7 +134,7 @@ export function home(): string {
   const p = state.episode === ep.id ? position() : ep.position;
   const dur = state.episode === ep.id ? duration() || ep.duration : ep.duration;
   const sentence = state.episode === ep.id ? currentSentence(p) : undefined;
-  const ready = ep.transcriptStatus === 'ready';
+  const ready = ep.transcriptStatus === 'done';
   return `<div class="page-heading"><div><h1>${esc(t('homeHeroTitle'))}</h1><p>${esc(t('homeHeroSubtitle'))}</p></div>${button(`${icon('plus')} ${esc(t('addFeed'))}`, 'add-feed')}</div>
  <section class="hero"><div><div class="eyebrow">${esc(t('continueListening'))}</div><h2>${esc(ep.title)}</h2><div class="meta">${esc(feed?.title ?? ep.feedTitle)} · ${esc(t('ui-duration-minutes', Math.round(dur / 60)))}</div><div class="progress-line"><progress data-hero-progress max="${dur}" value="${p}" aria-label="${esc(t('playbackPosition'))}"></progress><small data-hero-time>${time(p)} / ${time(dur)}</small></div>
  <div class="actions">${button(`${icon(state.playing && state.episode === ep.id ? 'pause' : 'play')} <span data-toggle-label>${esc(state.playing && state.episode === ep.id ? t('pause') : t('continueListening'))}</span>`, 'toggle', 'primary')}${button(`${icon('book')} ${esc(ready ? t('backToTranscript') : t('viewEpisode'))}`, 'open-current')}${button(`${icon('replay')} ${esc(t('restartFromStart'))}`, 'restart', 'text')}</div>
@@ -152,7 +158,7 @@ function detailHeader(): string {
   const ep = episodeOf(state.episode);
   const feed = feedOfEpisode(ep);
   if (!ep) return `<div class="empty"><h2>${esc(t('selectEpisodeTitle'))}</h2><p>${esc(t('detailHint'))}</p></div>`;
-  const ready = ep.transcriptStatus === 'ready';
+  const ready = ep.transcriptStatus === 'done';
   return `<div class="detail-heading">${cover(feed)}<div class="od-fill"><div class="eyebrow">${esc(feed?.title ?? ep.feedTitle)}</div><h1>${esc(ep.title)}</h1><div class="meta">${esc(ep.date)} · ${esc(t('ui-duration-minutes', Math.round(ep.duration / 60)))} · ${esc(ready ? t('ui-detail-ready') : t('ui-detail-not-ready'))}</div></div><button type="button" class="icon-btn" data-action="focus" aria-label="${esc(state.focus ? t('focusExit') : t('focusEnter'))}" title="${esc(t('ui-focus-hint'))}">${icon(state.focus ? 'close' : 'focus')}</button></div>`;
 }
 
@@ -162,7 +168,7 @@ const detailTabs = (active: 'transcript' | 'summary'): string =>
 export function transcript(): string {
   const ep = episodeOf(state.episode);
   if (!ep) return detailHeader();
-  const ready = ep.transcriptStatus === 'ready';
+  const ready = ep.transcriptStatus === 'done';
   return `${detailHeader()}<div class="detail-tools">${detailTabs('transcript')}<div class="segmented" aria-label="${esc(t('readingMode'))}">${(['bilingual', 'translation', 'original'] as const).map((id) => `<button type="button" data-action="language" data-language="${id}" aria-pressed="${state.language === id}" class="${state.language === id ? 'active' : ''}">${esc(t(id === 'bilingual' ? 'modeBilingual' : id === 'translation' ? 'modeTranslation' : 'modeOriginal'))}</button>`).join('')}</div><div class="tool-end">${button(`${esc(t('followTranscript'))} ${esc(state.follow ? t('ui-on') : t('ui-off'))}`, 'follow', '', `aria-pressed="${state.follow}" title="${esc(t('followTranscriptHint'))}"`)}${button(esc(t('returnToCurrent')), 'current', 'text', `title="${esc(t('returnToCurrentHint'))}"`)}</div></div>
  ${ready ? `<div class="reading" data-language="${state.language}"><p class="reading-note">${esc(t('ui-reading-note'))} ${esc(t('transcriptSeekHint'))}</p>${state.transcript.map((row) => `<div class="sentence ${row.start === state.reading ? 'current' : ''}" role="button" tabindex="0" data-action="sentence" data-sec="${row.start}" aria-label="${esc(t('playbackPosition'))} ${time(row.start)} ${esc(row.translation || row.text)}"><span class="stamp">${time(row.start)}</span><div><div class="en" lang="en">${esc(row.text)}</div><div class="zh">${esc(row.translation)}</div></div></div>`).join('')}<div class="reading-footer"><span><kbd>Space</kbd> ${esc(t('keyboardSpaceHint'))}</span><span><kbd>Ctrl / ⌘ ← →</kbd> ${esc(t('ui-keyboard-seek'))}</span><span><kbd>F</kbd> ${esc(t('keyboardFocusHint'))}</span></div></div>` : `<div class="empty"><h2>${esc(t('ui-empty-transcript-title'))}</h2><p>${esc(t('ui-empty-transcript-body'))}</p>${button(esc(t('understandFlow')), 'generate', '', `data-id="${esc(ep.id)}"`)}</div>`}`;
 }
