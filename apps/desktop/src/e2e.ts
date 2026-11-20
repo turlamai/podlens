@@ -123,6 +123,20 @@ export async function runHarnessIfGated(): Promise<void> {
     return `position=${p.toFixed(2)}`;
   });
   await step('journey-play-mediasession', async () => {
+    // Media-event counters: on a dead pipeline play() can resolve while no
+    // media event ever fires; the counters tell load stalls from clock stalls.
+    const a0 = document.getElementById('audio') as HTMLAudioElement | null;
+    const w0 = window as unknown as Record<string, unknown>;
+    if (a0 && !w0.__podlensMediaEvents) {
+      const counts: Record<string, number> = {};
+      w0.__podlensMediaEvents = counts;
+      for (const ev of [
+        'loadstart', 'loadedmetadata', 'canplay', 'play', 'playing',
+        'timeupdate', 'error', 'stalled', 'suspend', 'waiting', 'emptied', 'abort',
+      ]) {
+        a0.addEventListener(ev, () => { counts[ev] = (counts[ev] ?? 0) + 1; });
+      }
+    }
     click('.player [data-action="toggle"]');
     try {
       await until(() => state.playing, 2500, 'playback start');
@@ -144,7 +158,15 @@ export async function runHarnessIfGated(): Promise<void> {
       }
       await wait(300);
     }
-    await until(() => state.playing, 1500, 'playback start');
+    try {
+      await until(() => state.playing, 1500, 'playback start');
+    } catch (e) {
+      const a = document.getElementById('audio') as HTMLAudioElement | null;
+      const w = window as unknown as Record<string, unknown>;
+      throw new Error(
+        `${(e as Error).message}; ready=${a?.readyState} net=${a?.networkState} paused=${a?.paused} t=${a?.currentTime} src=${a?.currentSrc ?? 'none'} mediaErr=${a?.error?.code ?? 'none'} events=${JSON.stringify(w.__podlensMediaEvents ?? {})} playErr=${w.__podlensPlayError ?? 'none'} mutedErr=${w.__podlensMutedPlayError ?? 'none'}`,
+      );
+    }
     try {
       await until(() => position() > 4.2, 4000, 'media clock advance');
     } catch (e) {
