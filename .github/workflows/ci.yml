@@ -17,10 +17,9 @@ concurrency:
 # Single source of truth for the rivet pin; every install step below
 # references this so a bump is one edit, not a grep-replace across jobs.
 env:
+  # The engine (racket/) still builds and tests against rivet; the UI
+  # carrier is glaze (#63 slice 4 retired the three native host legs).
   RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
-  # Glaze-line adapter pins (#63): the adapter job builds against current
-  # upstream main heads verified locally; the native-host jobs above keep
-  # their historical RIVET_PIN until the native legs retire (slice 4).
   GLAZE_RIVET_PIN: bf7a62b9a3331bd5d6df48d1b7fe77be0cfed90d
   GLAZE_PIN: 2ec4533c4663cd058018c669af56b85c137a4a2a
 jobs:
@@ -84,88 +83,6 @@ jobs:
           racket racket/cli.rkt --json version
           racket racket/cli.rkt doctor
           racket racket/cli.rkt bad-command 2>/dev/null && exit 1 || test $? -eq 2
-
-  macos-host:
-    name: macOS host build
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Racket (CS, arm64)
-        uses: Bogdanp/setup-racket@v1.15
-        with:
-          version: stable
-          distribution: full
-          architecture: arm64
-      - name: Install Rivet (catalog)
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
-      - name: Build + package + verify
-        run: raco rivet package
-      - name: Launch smoke (ad-hoc build)
-        run: |
-          open dist/podlens.app
-          sleep 10
-          pgrep -f "podlens.app" >/dev/null || { echo "::error::app did not stay running"; exit 1; }
-          pkill -f "podlens.app" || true
-
-  linux-host:
-    name: Linux host (GTK4 build)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install GTK toolchain + GStreamer dev packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config \
-            libgtk-4-dev libadwaita-1-dev libjson-glib-dev \
-            libsecret-1-dev libglib2.0-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      # Builds and caches the embeddable Racket CS runtime and exports
-      # RIVET_RACKET_* (rivet's own composite action) — the Linux host links
-      # a static libracketcs, which the distro Racket does not ship.
-      - name: Set up embeddable Racket CS
-        uses: turlamai/rivet/.github/actions/setup-embed-racket@994047c310c749d3e16d873f33fc073dca0c6521
-      # Installed after the embeddable runtime so the catalog dependency
-      # closure (cext-lib, crypto-lib, keel) resolves against the minimal
-      # build — it ships no packages of its own. crypto backs the updater.
-      - name: Install Rivet (catalog) and backend packages
-        run: |
-          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
-          raco pkg install --auto --no-docs crypto
-      - name: Build host (generates linux/GeneratedBackend.hpp + compiles)
-        run: raco rivet build
-      - name: Headless boot smoke
-        run: |
-          sudo apt-get install -y xvfb
-          xvfb-run -a ./.rivet/stage/RivetHost &
-          APP_PID=$!
-          sleep 8
-          kill -0 $APP_PID
-          kill $APP_PID
-
-  windows-host:
-    name: Windows host build
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Racket (CS)
-        uses: Bogdanp/setup-racket@v1.15
-        with:
-          version: stable
-          distribution: full
-      - name: Install Rivet (catalog)
-        # raco's HTTPS goes through Racket's OpenSSL, whose Windows
-        # certificate-store loader crashes on runner images that ship a
-        # certificate d2i_X509 cannot parse (issue seen intermittently
-        # killing this exact step). git's own TLS is stable, so clone the
-        # pinned checkout and install from the directory.
-        run: |
-          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
-          git -C rivet-src checkout ${{ env.RIVET_PIN }}
-          raco pkg install --auto --no-docs ./rivet-src
-        shell: bash
-      - name: Build + package + verify
-        run: raco rivet package
-        shell: bash
 
   glaze-adapter:
     name: Glaze adapter (${{ matrix.os }})

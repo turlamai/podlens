@@ -1,5 +1,16 @@
 name: Product Acceptance
 
+# Glaze-stack product acceptance (#63 slice 4): the native WinUI/SwiftUI/GTK4
+# legs retired, so acceptance is the single shared web UI exercised in a real
+# native window on every supported platform. verify.rkt is the acceptance
+# owner (glaze docs/product-acceptance.md): seeded listening journeys, real
+# media clock, persisted-effect assertions and PNG evidence. The framework
+# envelope (`raco glaze acceptance`: doctor + compliance) rides along, and a
+# final matrix job folds the per-platform reports fail-closed.
+#
+# Packaged-artifact evidence (install shapes, N->N+1 upgrade, rollback) lives
+# in the release path: release.yml + appimage-upgrade-qualification.yml.
+
 on:
   push:
     branches: [main]
@@ -16,122 +27,136 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
-  KEEL_PIN: 76a5b9fdd01bde284d310ff5c05ec73972f64201
-
 jobs:
-  windows:
-    name: Windows packaged WinUI acceptance
-    runs-on: windows-latest
+  verify:
+    name: Real-window acceptance (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Bogdanp/setup-racket@v1.15
-        with:
-          architecture: x64
-          distribution: full
-          variant: CS
-          version: stable
-      - name: Export trusted Mozilla CA roots for Windows Racket
-        shell: pwsh
-        run: |
-          # Racket's Windows ROOT-store loader may throw X509*->C on hosted images.
-          # Node bundles independent Mozilla roots; do not bypass TLS validation.
-          $bundle = Join-Path $env:RUNNER_TEMP 'podlens-mozilla-roots.pem'
-          $js = 'const tls=require("node:tls"),fs=require("node:fs"); if(tls.rootCertificates.length<50) process.exit(2); fs.writeFileSync(process.argv[1],tls.rootCertificates.join("\n")+"\n",{flag:"wx"});'
-          node -e $js $bundle
-          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $bundle -PathType Leaf)) {
-            throw "Unable to export trusted CA roots; refusing insecure TLS fallback"
-          }
-          "PODLENS_CI_CA_BUNDLE=$bundle" >> $env:GITHUB_ENV
-      - name: Install pinned dependencies with verified TLS
-        shell: pwsh
-        run: racket scripts/ci-install-windows-deps.rkt --acceptance
-      - name: Run executable acceptance contract
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force .rivet\acceptance | Out-Null
-          $report = & raco rivet acceptance --json
-          $status = $LASTEXITCODE
-          $report | Tee-Object -FilePath .rivet\acceptance\report.json
-          exit $status
-      - name: Upload Windows evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: podlens-acceptance-windows
-          path: .rivet/acceptance
-          if-no-files-found: warn
-
-  macos:
-    name: macOS packaged SwiftUI acceptance (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    # GPU-less hosted runners have no DRI3 device; WebKitGTK must fall back
+    # to the software path or webview startup crashes (glaze docs/ci.md).
+    env:
+      WEBKIT_DISABLE_DMABUF_RENDERER: '1'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { arch: arm64, runner: macos-15, racket-arch: arm64 }
-          - { arch: x64, runner: macos-15-intel, racket-arch: x64 }
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Read the carrier pins from ci.yml (single source of truth)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in RIVET_PIN GLAZE_RIVET_PIN GLAZE_PIN; do
+            pin="$(grep -m1 -E "^ *${key}:" .github/workflows/ci.yml | sed -E "s/.*${key}:[[:space:]]*//")"
+            test -n "$pin"
+            echo "${key}=$pin" >> "$GITHUB_ENV"
+          done
       - uses: Bogdanp/setup-racket@v1.15
         with:
-          architecture: ${{ matrix.racket-arch }}
-          distribution: full
-          variant: CS
           version: stable
-      - name: Install pinned dependencies
-        run: |
-          raco pkg install --auto --no-docs "https://github.com/turlamai/keel.git#${KEEL_PIN}"
-          raco pkg install --auto --no-docs "https://github.com/turlamai/rivet.git#${RIVET_PIN}"
-          raco pkg install --auto --no-docs --skip-installed crypto
-      - name: Run executable acceptance contract
+          distribution: full
+      # raco's HTTPS goes through Racket's OpenSSL, whose Windows
+      # certificate-store loader crashes on some runner images; git's own
+      # TLS is stable, so clone the pinned checkouts and install from disk.
+      - name: Install pinned Rivet + Glaze (Windows, git TLS)
+        if: runner.os == 'Windows'
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p .rivet/acceptance
-          raco rivet acceptance --json | tee .rivet/acceptance/report.json
-      - name: Upload macOS evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
+          git -C rivet-src checkout "$GLAZE_RIVET_PIN"
+          raco pkg install --auto --no-docs ./rivet-src
+          git clone --no-checkout https://github.com/turlamai/glaze.git glaze-src
+          git -C glaze-src checkout "$GLAZE_PIN"
+          raco pkg install --auto --no-docs ./glaze-src
+      - name: Install pinned Rivet + Glaze (catalog)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          raco pkg install --auto --no-docs "https://github.com/turlamai/rivet.git#${GLAZE_RIVET_PIN}"
+          raco pkg install --auto --no-docs "https://github.com/turlamai/glaze.git#${GLAZE_PIN}"
+      - name: Linux webview runtime deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio
+      # The seeded listening journeys play real media; WebKitGTK needs an
+      # audio sink or the media clock stalls. Headless runners have none,
+      # so give PulseAudio a null sink for the verify step.
+      - name: Linux audio null sink
+        if: runner.os == 'Linux'
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=ci
+      - uses: actions/setup-python@v5
         with:
-          name: podlens-acceptance-macos-${{ matrix.arch }}
-          path: .rivet/acceptance
+          python-version: '3.x'
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Web typecheck + build
+        shell: bash
+        run: |
+          pnpm check
+          pnpm build
+      - name: Real-window acceptance (Linux, Xvfb)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: xvfb-run -a racket verify.rkt
+      - name: Real-window acceptance
+        if: runner.os != 'Linux'
+        shell: bash
+        run: racket verify.rkt
+      - name: Framework acceptance envelope (doctor + compliance)
+        shell: bash
+        run: |
+          mkdir -p .glaze/acceptance
+          raco glaze acceptance --json --out .glaze/acceptance/report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: podlens-acceptance-${{ matrix.os }}
+          path: |
+            .glaze/verify/*.png
+            .glaze/acceptance/report.json
           if-no-files-found: warn
 
-  linux:
-    name: Linux packaged GTK4 acceptance
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+  matrix:
+    name: Cross-platform acceptance matrix
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Set up embeddable Racket CS
-        uses: turlamai/rivet/.github/actions/setup-embed-racket@994047c310c749d3e16d873f33fc073dca0c6521
-      - name: Install native and pinned Racket dependencies
+      - name: Read the glaze pin from ci.yml
         shell: bash
         run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes at-spi2-core dbus-x11 libgtk-4-dev \
-            libadwaita-1-dev libjson-glib-dev libsecret-1-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            python3-pyatspi weston
-          raco pkg install --auto --no-docs "https://github.com/turlamai/keel.git#${KEEL_PIN}"
-          raco pkg install --auto --no-docs "https://github.com/turlamai/rivet.git#${RIVET_PIN}"
-          raco pkg install --auto --no-docs --skip-installed crypto
-      - name: Run executable acceptance contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .rivet/acceptance
-          dbus-run-session -- bash -c \
-            'set -euo pipefail; raco rivet acceptance --json | tee .rivet/acceptance/report.json'
-      - name: Upload Linux evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+          pin="$(grep -m1 -E '^ *GLAZE_PIN:' .github/workflows/ci.yml | sed -E 's/.*GLAZE_PIN:[[:space:]]*//')"
+          test -n "$pin"
+          echo "GLAZE_PIN=$pin" >> "$GITHUB_ENV"
+      - uses: Bogdanp/setup-racket@v1.15
         with:
-          name: podlens-acceptance-linux
-          path: .rivet/acceptance
+          version: stable
+          distribution: full
+      - name: Install pinned Glaze (catalog)
+        run: raco pkg install --auto --no-docs "https://github.com/turlamai/glaze.git#${GLAZE_PIN}"
+      - uses: actions/download-artifact@v4
+        with:
+          path: reports
+          pattern: podlens-acceptance-*
+      - name: Fold the per-platform reports (fail-closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .glaze/acceptance
+          raco glaze matrix reports/*/report.json --json | tee .glaze/acceptance/matrix.json
+          jq -e '.ok == true' .glaze/acceptance/matrix.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: podlens-acceptance-matrix
+          path: .glaze/acceptance/matrix.json
           if-no-files-found: warn

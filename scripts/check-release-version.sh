@@ -3,7 +3,7 @@
 # version (taskly-family gate). Runs without racket, so CI and every release
 # job can call it before any packaging step.
 #
-#   scripts/check-release-version.sh [tag]     e.g. scripts/check-release-version.sh v0.7.5
+#   scripts/check-release-version.sh [tag]     e.g. scripts/check-release-version.sh v0.1.0
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,34 +25,11 @@ if [[ -n "$TAG" ]]; then
     fail "tag '$TAG' does not match VERSION '$VERSION'"
 fi
 
-# The Rivet app manifest carries the product version on this tree.
-RIVET_RKTD_VERSION="$(grep -o '"[0-9]*\.[0-9]*\.[0-9]*"' "$ROOT/rivet.rktd" | head -n1 | tr -d '"')"
-[[ "$RIVET_RKTD_VERSION" == "$VERSION" ]] || \
-  fail "rivet.rktd version '$RIVET_RKTD_VERSION' does not match VERSION '$VERSION'"
-
 # The backend version module embeds the release identity for the RPC, the
-# CLI and the update feed.
+# CLI and the update feed. The glaze carrier takes its installer identity
+# from the release workflow's --version flag, which reads this same VERSION
+# file (glaze.rktd only declares the schema contract, not the version).
 grep -qF "(define app-version \"$VERSION\")" "$ROOT/racket/version.rkt" || \
   fail "racket/version.rkt app-version does not match VERSION '$VERSION'"
 
-# The generated native clients embed the same release identity. These files
-# are marked do-not-edit: a mismatch means the tree forgot to regenerate
-# them after the version bump (regenerate with `raco rivet build`, never
-# hand-edit).
-check_generated_version() {
-  local file="$1" pattern="$2" found
-  found="$(grep -oE "$pattern" "$ROOT/$file" | head -n1 | grep -oE '"[^"]*"' | tr -d '"')"
-  [[ "$found" == "$VERSION" ]] || \
-    fail "generated file '$file' version '${found:-missing}' does not match VERSION '$VERSION' (regenerate, do not hand-edit)"
-}
-check_generated_version \
-  "macos-host/Sources/RivetHost/GeneratedBackend.swift" \
-  'public static let version = "[^"]+"'
-check_generated_version \
-  "windows/GeneratedBackend.hpp" \
-  'kVersion\[\] = "[^"]+"'
-check_generated_version \
-  "linux/GeneratedBackend.hpp" \
-  'kVersion\[\] = "[^"]+"'
-
-echo "release preflight: version $VERSION is aligned (VERSION == rivet.rktd == racket/version.rkt == generated clients)"
+echo "release preflight: version $VERSION is aligned (VERSION == racket/version.rkt == glaze build --version)"
