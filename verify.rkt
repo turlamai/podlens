@@ -176,9 +176,10 @@ SW1
 
 (define nowplaying-result (box (cons #f "probe not run")))
 
-;; swiftc -O cold-compiles the probe in ~30-60s on hosted macOS runners;
-;; compile once in the background at app-ready so the probe thread only
-;; executes the binary while playback is live.
+;; swiftc cold-compiles the probe on hosted macOS runners; compile once in
+;; the background at module load (no -O: the probe is I/O-bound, and -O
+;; tripled the cold compile) so the probe thread only executes the binary
+;; while playback is live.
 (define swift-bin-box (box #f))
 (define (precompile-swift-probe!)
   (thread
@@ -188,13 +189,14 @@ SW1
        (define bin (build-path home "nowplaying-probe"))
        (call-with-output-file src
          (lambda (out) (display swift-nowplaying-probe out)) #:exists 'truncate/replace)
-       (define-values (cc _) (run-capture "swiftc" "-O" (path->string src) "-o" (path->string bin)))
+       (define-values (cc _) (run-capture "swiftc" (path->string src) "-o" (path->string bin)))
        (when (zero? cc) (set-box! swift-bin-box bin))))))
 (define (wait-swift-probe-bin)
-  (let wait ([n 75])
+  (let wait ([n 90])
     (cond [(unbox swift-bin-box)]
           [(> n 0) (sleep 1) (wait (sub1 n))]
           [else #f])))
+(when (eq? (system-type) 'macosx) (precompile-swift-probe!))
 (define (start-nowplaying-probe!)
   (thread
    (lambda ()
@@ -255,7 +257,6 @@ SW1
    #:height 800
    #:on-ready
    (lambda (wv url)
-     (when (eq? (system-type) 'macosx) (precompile-swift-probe!))
      ;; Wait for the page (its <title> starts with PodLens). WebView2 cold
      ;; starts on loaded runners can exceed 20s before the title lands.
      (define deadline (+ (current-inexact-milliseconds) 45000))
@@ -361,7 +362,7 @@ SW1
      ;; Give the OS probe its own budget after the journeys finish; playback
      ;; stays live until webview-close below.
      (when probe-started?
-       (define probe-deadline (+ (current-inexact-milliseconds) 45000))
+       (define probe-deadline (+ (current-inexact-milliseconds) 60000))
        (let wait-probe ()
          (unless (or (car (unbox nowplaying-result))
                      (>= (current-inexact-milliseconds) probe-deadline))
