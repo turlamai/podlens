@@ -143,7 +143,7 @@ SW1
          (define src (build-path home "nowplaying-probe.swift"))
          (define bin (build-path home "nowplaying-probe"))
          (call-with-output-file src
-           (lambda (out) (display swift-nowplaying-probe out)) #:exists-ok? #t)
+           (lambda (out) (display swift-nowplaying-probe out)) #:exists 'truncate/replace)
          (define-values (cc _) (run-capture "swiftc" "-O" (path->string src) "-o" (path->string bin)))
          (if (zero? cc)
              (run-capture (path->string bin))
@@ -171,7 +171,7 @@ SW1
                             "org.freedesktop.DBus.Properties.Get"
                             "string:org.mpris.MediaPlayer2.Player" "string:PlaybackStatus"))
              (string-append name "\n" meta "\n" status)))
-         (values 0 (string-join outs "\n"))]
+         (values 0 (string-append names "\n" (string-join outs "\n")))]
         [else (values 1 "unsupported platform")]))
     (cond
       [(string-contains? text fixture-title) (cons #t text)]
