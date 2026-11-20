@@ -29,13 +29,29 @@ function expect(cond: unknown, message: string): void {
   if (!cond) throw new Error(message);
 }
 
+// WebView2 intermittently aborts keep-alive connections (win_err=10053 server
+// noise); a single failed gate/report fetch must not silently skip the whole
+// harness. Retry harness-only POSTs with a short backoff.
+async function postRetry(path: string, body: unknown, tries = 5): Promise<unknown> {
+  let last: unknown = new Error('no attempt');
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await apiPost(path, body);
+    } catch (e) {
+      last = e;
+      await wait(150 * (i + 1));
+    }
+  }
+  throw last;
+}
+
 let harnessStarted = false;
 
 export async function runHarnessIfGated(): Promise<void> {
   if (harnessStarted || location.hash !== '#e2e') return;
   let gate: { enabled?: boolean };
   try {
-    gate = (await apiPost('api/host/e2e', {})) as { enabled?: boolean };
+    gate = (await postRetry('api/host/e2e', {})) as { enabled?: boolean };
   } catch {
     return;
   }
@@ -46,7 +62,7 @@ export async function runHarnessIfGated(): Promise<void> {
   // gesture; acceptance asserts the clock/bridge, not audibility).
   (window as unknown as Record<string, unknown>).__podlensE2E = true;
   const report = (id: string, ok: boolean, detail: string): Promise<unknown> =>
-    apiPost('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
+    postRetry('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
   const step = async (id: string, fn: () => Promise<string | void>): Promise<void> => {
     try {
       const detail = await fn();
