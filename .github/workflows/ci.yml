@@ -32,7 +32,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
-      - name: Version preflight (VERSION == rivet.rktd == racket/version.rkt)
+      - name: Version preflight (VERSION == racket/version.rkt)
         run: bash scripts/check-release-version.sh
         shell: bash
       - name: Install Racket (CS)
@@ -57,9 +57,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: racket scripts/ci-install-windows-deps.rkt
-      - name: Install Rivet (catalog)
+      - name: Install Rivet + Glaze (catalog)
         if: runner.os != 'Windows'
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ env.GLAZE_PIN }}'
         shell: bash
       - name: Compile backend
         run: raco make racket/core/*.rkt racket/update.rkt racket/backend.rkt racket/cli.rkt
@@ -147,7 +149,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Schema compat gate (zero breaking)
         shell: bash
-        run: raco rivet schema check rivet-schema.json --json
+        run: raco glaze schema check --json
       - name: Compile adapter
         shell: bash
         run: raco make backend/main.rkt

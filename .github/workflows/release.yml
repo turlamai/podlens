@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       glaze-pin: ${{ steps.pin.outputs.glaze-pin }}
+      rivet-pin: ${{ steps.pin.outputs.rivet-pin }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,12 +43,15 @@ jobs:
             echo "::error::UPDATE_ED25519_PRIVATE_KEY missing; skipping expensive platform builds rather than publishing without a signed feed"
             exit 1
           fi
-      - name: Read glaze pin from ci.yml
+      - name: Read glaze + rivet pins from ci.yml
         id: pin
         run: |
           pin="$(grep -m1 -E '^ *GLAZE_PIN:' .github/workflows/ci.yml | sed -E 's/.*GLAZE_PIN:[[:space:]]*//')"
           test -n "$pin"
           echo "glaze-pin=$pin" >> "$GITHUB_OUTPUT"
+          rpin="$(grep -m1 -E '^ *RIVET_PIN:' .github/workflows/ci.yml | sed -E 's/.*RIVET_PIN:[[:space:]]*//')"
+          test -n "$rpin"
+          echo "rivet-pin=$rpin" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macOS build (${{ matrix.arch }})
@@ -81,8 +85,10 @@ jobs:
           version: stable
           distribution: full
           architecture: ${{ matrix.racket-arch }}
-      - name: Install Glaze (catalog)
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
+      - name: Install Rivet + Glaze (catalog)
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ needs.validate.outputs.rivet-pin }}'
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
       - name: Provision Developer ID certificate
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
         env:
@@ -199,12 +205,15 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install Glaze (pinned clone)
+      - name: Install Rivet + Glaze (pinned clones)
         # raco's HTTPS goes through Racket's OpenSSL, whose Windows
         # certificate-store loader crashes on runner images that ship a
         # certificate d2i_X509 cannot parse. git's own TLS is stable, so
-        # clone the pinned checkout and install from the directory.
+        # clone the pinned checkouts and install from the directory.
         run: |
+          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
+          git -C rivet-src checkout ${{ needs.validate.outputs.rivet-pin }}
+          raco pkg install --auto --no-docs ./rivet-src
           git clone --no-checkout https://github.com/turlamai/glaze.git glaze-src
           git -C glaze-src checkout ${{ needs.validate.outputs.glaze-pin }}
           raco pkg install --auto --no-docs ./glaze-src
@@ -292,8 +301,9 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install Glaze (catalog)
+      - name: Install Rivet + Glaze (catalog)
         run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ needs.validate.outputs.rivet-pin }}'
           raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
       - name: Install packaging tooling
         run: |
@@ -466,7 +476,8 @@ jobs:
           version: stable
           distribution: full
       - name: Install Glaze (catalog; glaze/update signs and gates the feed)
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
       - name: Install OpenSSL 3
         run: brew install openssl@3
       - uses: actions/download-artifact@v4
