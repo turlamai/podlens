@@ -125,7 +125,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio \
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio dbus \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       # The seeded listening journeys play real media; WebKitGTK needs an
       # audio sink or the media clock stalls. Headless runners have none,
@@ -168,7 +168,8 @@ jobs:
       - name: Real-window verify (Linux, Xvfb)
         if: runner.os == 'Linux'
         shell: bash
-        run: xvfb-run -a racket verify.rkt
+        # Session bus for WebKitGTK's MediaSession->MPRIS bridge + OS probe.
+        run: xvfb-run -a dbus-run-session -- racket verify.rkt
       - name: Real-window verify
         if: runner.os != 'Linux'
         shell: bash

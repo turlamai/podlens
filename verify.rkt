@@ -49,6 +49,144 @@
 (define verdicts '())
 (define journey-reports (box '()))
 
+;; ---- slice 5: OS-level Now Playing probes -------------------------------
+;; The in-page journey asserts the MediaSession contract; these probes assert
+;; the OS surface each platform derives from it: Windows SMTC (Chromium /
+;; WebView2 bridge), macOS Now Playing (WKWebView / MediaRemote), Linux MPRIS
+;; (WebKitGTK bridges MediaSession to org.mpris.MediaPlayer2). Probe-only code:
+;; nothing here ships in the product.
+(define fixture-title "A small episode about focused listening")
+
+(define (run-capture exe . args)
+  ;; process* pipes: system* neither searches PATH nor writes into a
+  ;; parameterized string port (it inherits the OS-level stdout).
+  ;; Racket 9.x returns one list value; 8.x returned five values.
+  (define resolved (or (find-executable-path exe) exe))
+  (define parts
+    (call-with-values (lambda () (apply process* resolved args))
+      (lambda vs (if (and (= 1 (length vs)) (list? (car vs))) (car vs) vs))))
+  (define in (list-ref parts 0))
+  (define out (list-ref parts 1))
+  (define err (list-ref parts 3))
+  (define ctrl (list-ref parts 4))
+  (define text (port->string in))
+  (define etext (port->string err))
+  (close-input-port in)
+  (close-output-port out)
+  (close-input-port err)
+  (ctrl 'wait)
+  (values (ctrl 'exit-code) (string-append text etext)))
+
+(define powershell-smtc-probe
+  #<<PS1
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime]
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
+function Await($Op, $ResultType) {
+  $m = $asTaskGeneric.MakeGenericMethod($ResultType)
+  $t = $m.Invoke($null, @($Op))
+  $t.Wait()
+  $t.Result
+}
+$mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+foreach ($s in $mgr.GetSessions()) {
+  $p = Await ($s.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+  Write-Output ("TITLE=" + $p.Title)
+  Write-Output ("SOURCE=" + $s.SourceAppUserModelId)
+}
+PS1
+  )
+
+(define swift-nowplaying-probe
+  #<<SW1
+import Foundation
+// Probe-only: MediaRemote is a private framework; read-only Now Playing info.
+guard let h = dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote", RTLD_NOW) else {
+  print("NOLIB"); exit(0)
+}
+typealias GetInfoFn = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
+guard let sym = dlsym(h, "MRMediaRemoteGetNowPlayingInfo") else { print("NOSYM"); exit(0) }
+let getInfo = unsafeBitCast(sym, to: GetInfoFn.self)
+func key(_ name: String) -> String {
+  guard let k = dlsym(h, name) else { return name }
+  return k.assumingMemoryBound(to: Optional<CFString>.self).pointee.map { $0 as String } ?? name
+}
+let titleKey = key("kMRMediaRemoteNowPlayingInfoTitle")
+let rateKey = key("kMRMediaRemoteNowPlayingInfoPlaybackRate")
+let sem = DispatchSemaphore(value: 0)
+var info: [String: Any]? = nil
+getInfo(DispatchQueue.global()) { d in
+  info = d
+  sem.signal()
+}
+_ = sem.wait(timeout: .now() + 8)
+if let d = info {
+  print("TITLE=\(d[titleKey] as? String ?? "")")
+  print("RATE=\(d[rateKey] as? Double ?? -1)")
+} else {
+  print("NOINFO")
+}
+SW1
+  )
+
+;; Poll the platform surface until the fixture title shows up (the bridges
+;; publish shortly after playback starts) or the budget runs out.
+(define (probe-nowplaying)
+  (define deadline (+ (current-inexact-milliseconds) 20000))
+  (let loop ()
+    (define-values (ok text)
+      (case (system-type)
+        [(windows)
+         (run-capture "powershell" "-NoProfile" "-Command" powershell-smtc-probe)]
+        [(macosx)
+         (define src (build-path home "nowplaying-probe.swift"))
+         (define bin (build-path home "nowplaying-probe"))
+         (call-with-output-file src
+           (lambda (out) (display swift-nowplaying-probe out)) #:exists-ok? #t)
+         (define-values (cc _) (run-capture "swiftc" "-O" (path->string src) "-o" (path->string bin)))
+         (if (zero? cc)
+             (run-capture (path->string bin))
+             (values cc "swiftc failed"))]
+        [(unix)
+         (define-values (_lc names)
+           (run-capture "dbus-send" "--session" "--print-reply"
+                        "--dest=org.freedesktop.DBus" "/org/freedesktop/DBus"
+                        "org.freedesktop.DBus.ListNames"))
+         (define mpris
+           (filter (lambda (s) (string-prefix? s "org.mpris.MediaPlayer2."))
+                   (map (lambda (line)
+                          (string-trim (string-trim line) "\""))
+                        (string-split names "\n"))))
+         (define outs
+           (for/list ([name (in-list mpris)])
+             (define-values (_c meta)
+               (run-capture "dbus-send" "--session" "--print-reply"
+                            (string-append "--dest=" name) "/org/mpris/MediaPlayer2"
+                            "org.freedesktop.DBus.Properties.Get"
+                            "string:org.mpris.MediaPlayer2.Player" "string:Metadata"))
+             (define-values (_s status)
+               (run-capture "dbus-send" "--session" "--print-reply"
+                            (string-append "--dest=" name) "/org/mpris/MediaPlayer2"
+                            "org.freedesktop.DBus.Properties.Get"
+                            "string:org.mpris.MediaPlayer2.Player" "string:PlaybackStatus"))
+             (string-append name "\n" meta "\n" status)))
+         (values 0 (string-join outs "\n"))]
+        [else (values 1 "unsupported platform")]))
+    (cond
+      [(string-contains? text fixture-title) (cons #t text)]
+      [(>= (current-inexact-milliseconds) deadline) (cons #f text)]
+      [else (sleep 1.0) (loop)])))
+
+(define nowplaying-result (box (cons #f "probe not run")))
+(define (start-nowplaying-probe!)
+  (thread
+   (lambda ()
+     (with-handlers ([exn:fail? (lambda (e)
+                                  (set-box! nowplaying-result
+                                            (cons #f (exn-message e))))])
+       (set-box! nowplaying-result (probe-nowplaying))))))
+
 ;; Start the engine transport (the app's module+ main does the same).
 (start-engine!)
 
@@ -176,11 +314,21 @@
      ;; glaze exposes no JS injection, so the journey runs inside the page:
      ;; navigate to #e2e and collect the harness reports over the host gate.
      (webview-navigate wv (string-append url "#e2e"))
-     (define journey-deadline (+ (current-inexact-milliseconds) 30000))
+     (define journey-deadline (+ (current-inexact-milliseconds) 75000))
+     (define probe-started? #f)
      (define reports
        (let loop ()
          (define st (post-json url "api/host/e2e" (hasheq)))
          (define rs (if (hash? st) (hash-ref st 'reports '()) '()))
+         ;; Once playback is live, probe the OS Now Playing surface in parallel
+         ;; (SMTC / MediaRemote / MPRIS) without stalling the journey clock.
+         (when (and (not probe-started?)
+                    (for/or ([r (in-list (if (list? rs) rs '()))])
+                      (and (hash? r)
+                           (equal? (hash-ref r 'id #f) "journey-play-mediasession")
+                           (eq? #t (hash-ref r 'ok #f)))))
+           (set! probe-started? #t)
+           (start-nowplaying-probe!))
          (cond
            [(for/or ([r (in-list (if (list? rs) rs '()))])
               (and (hash? r) (equal? (hash-ref r 'id #f) "journey-complete")))
@@ -188,6 +336,15 @@
            [(>= (current-inexact-milliseconds) journey-deadline) rs]
            [else (sleep 0.25) (loop)])))
      (set-box! journey-reports reports)
+     ;; Give the OS probe its own budget after the journeys finish; playback
+     ;; stays live until webview-close below.
+     (when probe-started?
+       (define probe-deadline (+ (current-inexact-milliseconds) 25000))
+       (let wait-probe ()
+         (unless (or (car (unbox nowplaying-result))
+                     (>= (current-inexact-milliseconds) probe-deadline))
+           (sleep 0.25)
+           (wait-probe))))
      (define (step-ok? id)
        (for/or ([r (in-list (if (list? reports) reports '()))])
          (and (hash? r) (equal? (hash-ref r 'id #f) id) (eq? #t (hash-ref r 'ok #f)))))
@@ -267,6 +424,7 @@
                  (cons 'journey-summary-anchors (step-ok? "journey-summary-anchors"))
                  (cons 'journey-pause-position (step-ok? "journey-pause-position"))
                  (cons 'journey-complete (step-ok? "journey-complete"))
+                 (cons 'nowplaying-os (car (unbox nowplaying-result)))
                  (cons 'e2e-capture (and saved-e2e-shot (> (file-size saved-e2e-shot) 0)))))
      (webview-close wv))))
 
@@ -274,6 +432,9 @@
 (host-teardown!)
 (for ([verdict (in-list verdicts)])
   (printf "[verify] ~a = ~a\n" (car verdict) (cdr verdict)))
+(define np-detail (cdr (unbox nowplaying-result)))
+(printf "[verify] nowplaying detail: ~a\n"
+        (substring np-detail 0 (min 900 (string-length np-detail))))
 (unless (and (pair? verdicts) (andmap cdr verdicts))
   (eprintf "[verify] native UI verification failed\n")
   (for ([r (in-list (if (list? (unbox journey-reports)) (unbox journey-reports) '()))])

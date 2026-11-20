@@ -81,7 +81,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio \
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio dbus \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       # The seeded listening journeys play real media; WebKitGTK needs an
       # audio sink or the media clock stalls. Headless runners have none,
@@ -109,7 +109,10 @@ jobs:
       - name: Real-window acceptance (Linux, Xvfb)
         if: runner.os == 'Linux'
         shell: bash
-        run: xvfb-run -a racket verify.rkt
+        # dbus-run-session gives WebKitGTK's MediaSession->MPRIS bridge a
+        # session bus (headless runners have none); the slice-5 OS probe
+        # reads org.mpris.MediaPlayer2 over the same bus.
+        run: xvfb-run -a dbus-run-session -- racket verify.rkt
       - name: Real-window acceptance
         if: runner.os != 'Linux'
         shell: bash
@@ -156,7 +159,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .glaze/acceptance
-          raco glaze matrix reports/*/report.json --json | tee .glaze/acceptance/matrix.json
+          raco glaze matrix reports/*/acceptance/report.json --json | tee .glaze/acceptance/matrix.json
           jq -e '.ok == true' .glaze/acceptance/matrix.json
       - uses: actions/upload-artifact@v4
         if: always()
