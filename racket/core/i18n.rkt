@@ -484,6 +484,9 @@
    'ui-check-updates-now '("立即检查更新" . "Check for updates now")
    'ui-open-releases '("打开发布页" . "Open releases page")
    'ui-about-links '("关于" . "About")
+   'ui-autostart '("开机自动启动" . "Launch at login")
+   'ui-autostart-hint '("登录系统后自动运行 PodLens" . "Start PodLens when you sign in")
+   'ui-appearance-hint '("亮暗模式使用独立的对比色" . "Light and dark use separate contrast palettes")
    ))
 
 ;; {0} {1} placeholders

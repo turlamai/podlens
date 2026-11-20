@@ -86,12 +86,12 @@
    #:height 800
    #:on-ready
    (lambda (wv url)
-     ;; Wait for the page (its <title> is PodLens).
+     ;; Wait for the page (its <title> starts with PodLens).
      (define deadline (+ (current-inexact-milliseconds) 20000))
      (define loaded?
        (let loop ()
          (cond
-           [(equal? (webview-title wv) "PodLens") #t]
+           [(string-prefix? (webview-title wv) "PodLens") #t]
            [(>= (current-inexact-milliseconds) deadline) #f]
            [else (sleep 0.1) (loop)])))
      (sleep 1.5)
@@ -155,8 +155,34 @@
      (install-host! wv url)
      (define autostart (post-json url "api/host/autostart" (hasheq)))
      (define autostart-dev (post-json url "api/host/autostart_set" (hasheq 'enabled #t)))
-     ;; ---- acceptance harness gate (page harness lands in slice 5) ----
+     ;; ---- acceptance harness gate + in-page journey (#e2e, slice 2) ----
      (define e2e-state (post-json url "api/host/e2e" (hasheq)))
+     ;; glaze exposes no JS injection, so the journey runs inside the page:
+     ;; navigate to #e2e and collect the harness reports over the host gate.
+     (webview-navigate wv (string-append url "#e2e"))
+     (define journey-deadline (+ (current-inexact-milliseconds) 30000))
+     (define reports
+       (let loop ()
+         (define st (post-json url "api/host/e2e" (hasheq)))
+         (define rs (if (hash? st) (hash-ref st 'reports '()) '()))
+         (cond
+           [(for/or ([r (in-list (if (list? rs) rs '()))])
+              (and (hash? r) (equal? (hash-ref r 'id #f) "journey-complete")))
+            rs]
+           [(>= (current-inexact-milliseconds) journey-deadline) rs]
+           [else (sleep 0.25) (loop)])))
+     (define (step-ok? id)
+       (for/or ([r (in-list (if (list? reports) reports '()))])
+         (and (hash? r) (equal? (hash-ref r 'id #f) id) (eq? #t (hash-ref r 'ok #f)))))
+     (define e2e-shot (webview-capture! wv))
+     (define saved-e2e-shot
+       (cond
+         [(and e2e-shot (file-exists? e2e-shot))
+          (make-directory* evidence-dir)
+          (define dest (build-path evidence-dir "podlens-e2e.png"))
+          (copy-file e2e-shot dest #:exists-ok? #t)
+          dest]
+         [else #f]))
      (set! verdicts
            (list (cons 'page-loaded loaded?)
                  (cons 'url url-ok?)
@@ -207,7 +233,15 @@
                                                  (string-contains? (hash-ref autostart-dev 'error "")
                                                                    "installed build")))
                  (cons 'tray (or (not (tray-supported?)) (host-tray-live?)))
-                 (cons 'e2e-gate (and (hash? e2e-state) (eq? #t (hash-ref e2e-state 'enabled #f))))))
+                 (cons 'e2e-gate (and (hash? e2e-state) (eq? #t (hash-ref e2e-state 'enabled #f))))
+                 (cons 'journey-boot (step-ok? "boot-loaded"))
+                 (cons 'journey-episodes (step-ok? "nav-episodes"))
+                 (cons 'journey-discover (step-ok? "nav-discover"))
+                 (cons 'journey-settings (step-ok? "nav-settings"))
+                 (cons 'journey-theme (step-ok? "theme-toggle"))
+                 (cons 'journey-home (step-ok? "nav-home"))
+                 (cons 'journey-complete (step-ok? "journey-complete"))
+                 (cons 'e2e-capture (and saved-e2e-shot (> (file-size saved-e2e-shot) 0)))))
      (webview-close wv))))
 
 (stop)

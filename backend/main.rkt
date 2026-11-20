@@ -386,12 +386,15 @@
   (raise (exn:fail:glaze:bad-param message (current-continuation-marks))))
 
 ;; Show a folder in the system file manager (settings → data folder).
+;; An empty path means the engine data directory (the web UI does not
+;; know the absolute path; the host does).
 (define (reveal-path path)
+  (define target (if (string=? path "") (path->string (podlens-data-dir)) path))
   (define dir
-    (if (directory-exists? path)
-        path
-        (let-values ([(base name dir?) (split-path path)])
-          (if (path? base) (path->string base) path))))
+    (if (directory-exists? target)
+        target
+        (let-values ([(base name dir?) (split-path target)])
+          (if (path? base) (path->string base) target))))
   (with-handlers ([exn:fail? (lambda (_) #f)])
     (case (system-type 'os)
       [(windows) (shell-spawn! "explorer.exe" (list dir)) #t]
