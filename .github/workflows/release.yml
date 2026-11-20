@@ -144,6 +144,8 @@ jobs:
             --identifier site.jrtx.podlens \
             --entry main.rkt \
             --installer \
+            --icon assets/branding/app.icns \
+            --dmg-background assets/branding/dmg-background.png \
             --sign "$MACOS_SIGN_IDENTITY" \
             --notarize ASC_NOTARY
       - name: Build (ad-hoc dispatch smoke)
@@ -155,7 +157,9 @@ jobs:
             --publisher "Turing Lambda" \
             --identifier site.jrtx.podlens \
             --entry main.rkt \
-            --installer
+            --installer \
+            --icon assets/branding/app.icns \
+            --dmg-background assets/branding/dmg-background.png
       - name: Build requires signing credentials
         if: env.MACOS_SIGNING_CONFIGURED != 'true' && env.IS_TAG_RELEASE == 'true'
         run: |
@@ -237,7 +241,11 @@ jobs:
             --publisher "Turing Lambda" \
             --identifier site.jrtx.podlens \
             --entry main.rkt \
-            --installer
+            --installer \
+            --icon assets/branding/app.ico \
+            --installer-license LICENSE \
+            --installer-banner assets/branding/wizard-banner.bmp \
+            --installer-dialog assets/branding/wizard-dialog.bmp
           test -s dist/podlens.msi
       - name: Collect MSI + portable zip + checksums
         shell: pwsh
@@ -382,11 +390,16 @@ jobs:
             'ls /usr/lib/*/libwebkit2gtk-4.1.so* /usr/lib/*/libgtk-3.so*'
           # The manifest template carries version/arch/sha placeholders so
           # the archive source's checksum is exact per release. The archive
-          # is the glaze portable tree (bin/ + lib/ + public/).
+          # is the glaze portable tree (bin/ + lib/ + public/). The generated
+          # manifest lives at the repo root, so file sources are re-pointed
+          # at flatpak/ and the brand icon; the archive stays root-relative.
           tar -czf "podlens-${VERSION}-linux-${ARCH}.tar.gz" -C dist bin lib public
           SHA="$(sha256sum "podlens-${VERSION}-linux-${ARCH}.tar.gz" | cut -d' ' -f1)"
           sed -e "s/__VERSION__/${VERSION}/" -e "s/__ARCH__/${ARCH}/" \
               -e "s/__SHA256__/${SHA}/" \
+              -e 's|path: podlens.sh|path: flatpak/podlens.sh|' \
+              -e 's|path: site.jrtx.podlens.desktop|path: flatpak/site.jrtx.podlens.desktop|' \
+              -e 's|path: app.png|path: assets/branding/app.png|' \
               flatpak/site.jrtx.podlens.yml > site.jrtx.podlens.gen.yml
           # --disable-rofiles-fuse: runners have no /dev/fuse.
           flatpak-builder --user --force-clean --disable-rofiles-fuse \
@@ -398,7 +411,7 @@ jobs:
           flatpak --user install -y --noninteractive \
             "podlens-${VERSION}-linux-${ARCH}.flatpak"
           flatpak run --command=sh site.jrtx.podlens -c \
-            'test -x /app/podlens/bin/podlens && test -d /app/podlens/public'
+            'test -x /app/podlens/bin/podlens && test -d /app/podlens/public && test -f /app/share/icons/hicolor/512x512/apps/site.jrtx.podlens.png'
           rm -rf flatpak-build flatpak-repo "podlens-${VERSION}-linux-${ARCH}.tar.gz"
           mv "podlens-${VERSION}-linux-${ARCH}.flatpak" dist/
           test -s "dist/podlens-${VERSION}-linux-${ARCH}.flatpak"

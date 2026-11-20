@@ -28,6 +28,7 @@ modules:
       - cp -a bin lib public /app/podlens/
       - install -Dm755 podlens.sh /app/bin/podlens
       - install -Dm644 site.jrtx.podlens.desktop /app/share/applications/site.jrtx.podlens.desktop
+      - install -Dm644 app.png /app/share/icons/hicolor/512x512/apps/site.jrtx.podlens.png
     sources:
       - type: archive
         url: podlens-__VERSION__-linux-__ARCH__.tar.gz
@@ -36,3 +37,5 @@ modules:
         path: podlens.sh
       - type: file
         path: site.jrtx.podlens.desktop
+      - type: file
+        path: app.png

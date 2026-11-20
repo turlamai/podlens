@@ -1,32 +1,30 @@
 # PodLens Update Contract
 
 PodLens uses the family scheme: the update feed travels as a GitHub Release
-asset, trust comes from an Ed25519 signature, never from HTTPS alone.
+asset, trust comes from an Ed25519 signature, never from HTTPS alone. The
+client is `racket/update.rkt` on top of `glaze/update` (OpenSSL 3 libcrypto
+FFI); the web UI owns consent and presentation, the backend owns check,
+download and verification.
 
 ## Release trust and publisher signing
 
-The release pipeline must **fail closed** if the Ed25519 private key is missing,
-invalid, or does not match the pinned public keys in the Racket backend and
-macOS host. A nonempty signed `update-manifest.json` is required before
-publishing any installers. The manifest contains SHA-256 hashes of update
-payloads; OS code signing is a separate trust layer.
-
-Today macOS artifacts are **ad-hoc signed, not Developer ID signed or Apple
-notarized**. Developer ID signing, hardened runtime, notarization and stapling
-require future Apple credentials and independent release validation; their
-success must never be inferred from an ad-hoc build. Windows MSI and portable
-ZIP are unsigned by default; Authenticode may be added independently later.
-Linux DEB/RPM/AppImage packaging does not require a paid developer account.
-No formal release is performed by changing this contract.
+The release pipeline must **fail closed** if the Ed25519 private key is
+missing, invalid, or does not match the public key embedded in
+`racket/update.rkt`. A nonempty signed `update-manifest.json` is required
+before publishing anything. The manifest carries SHA-256 hashes and byte
+sizes of the update payloads; OS code signing is a separate trust layer
+(macOS Developer ID + notarization when credentials are configured,
+otherwise the release refuses to publish macOS artifacts; Windows MSI and
+Linux packages are unsigned by default).
 
 ## Feed layout
 
 Every release uploads one special asset alongside the installers:
 
 - `update-manifest.json` — the self-contained **signed wrapper** (the
-  `rivet/distribution` family format): the inner manifest travels
-  base64-encoded inside a JSON envelope, so the Ed25519 signature covers
-  the exact payload bytes every client verifies.
+  `glaze/update` family format): the inner manifest travels base64-encoded
+  inside a JSON envelope, so the Ed25519 signature covers the exact payload
+  bytes every client verifies.
 
 The client fetches
 `https://github.com/turlamai/podlens/releases/latest/download/update-manifest.json`
@@ -43,7 +41,7 @@ then parses the inner manifest.
 }
 ```
 
-Inner manifest (decoded `payload`) — rivet's manifest schema:
+Inner manifest (decoded `payload`) — the glaze manifest schema:
 
 ```json
 {
@@ -52,7 +50,7 @@ Inner manifest (decoded `payload`) — rivet's manifest schema:
   "version": "0.1.0",
   "build": 1,
   "channel": "stable",
-  "published_at": "2026-10-10T12:00:00Z",
+  "published_at": "2026-11-20T12:00:00Z",
   "minimum_version": "0.0.0",
   "previous_version": null,
   "rollback_allowed": true,
@@ -61,69 +59,71 @@ Inner manifest (decoded `payload`) — rivet's manifest schema:
     { "platform": "macos", "architecture": "arm64",
       "url": "https://github.com/…/podlens-0.1.0-macos-arm64.zip",
       "sha256": "<lowercase hex>", "size": 12345678,
-      "installer": "zip", "arguments": [] },
+      "installer": "zip", "arguments": [], "signature": null },
     { "platform": "macos", "architecture": "x64", "…": "…" },
-    { "platform": "windows", "architecture": "x64", "…": "…" }
+    { "platform": "windows", "architecture": "x64", "…": "…" },
+    { "platform": "linux", "architecture": "x64",
+      "url": "https://github.com/…/podlens-0.1.0-linux-x64.tar.gz",
+      "installer": "tar.gz", "…": "…" },
+    { "platform": "linux", "architecture": "arm64", "…": "…" }
   ]
 }
 ```
 
 - `version` — release version without the `v` prefix; must equal the root
-  `VERSION` file (release preflight checks it, along with `rivet.rktd` and
-  `racket/version.rkt`)
-- `artifacts` carries one entry per platform × architecture; there is no
-  Linux entry yet (no Linux host ships today — the GTK4 host is planned,
-  and a feed entry follows when it exists)
-- asset naming: `podlens-<version>-{macos-arm64,macos-x64,windows-x64}.zip`
-  are the update archives (all lowercase, arch-suffixed). Human installers
-  ship beside them: `podlens-<version>-macos-<arch>.dmg` and
-  `podlens-<version>-windows-x64.msi` (WiX, per-machine, start-menu +
-  desktop shortcuts; MSI MajorUpgrade covers upgrades). The DMG and MSI
-  are not feed entries.
+  `VERSION` file and `racket/version.rkt` (`scripts/check-release-version.sh`
+  enforces the alignment on every release)
+- `artifacts` carries exactly the five **portable** payloads: macOS
+  arm64/x64 `.zip`, Windows x64 `.zip`, Linux x64/arm64 `.tar.gz`. Human
+  installers ship beside them and are **not** feed entries:
+  `podlens-<version>-macos-<arch>.dmg`, `podlens-<version>-windows-x64.msi`
+  (WiX, per-machine, start-menu + desktop shortcuts; MSI MajorUpgrade
+  covers upgrades), `podlens-<version>-linux-<arch>.deb` / `.rpm` /
+  `.AppImage`, and the `podlens-<version>-linux-<arch>.flatpak` bundle
+  (app id `site.jrtx.podlens`)
 - generated by `scripts/make-update-manifest.sh`, which signs via
-  `rivet/distribution`'s `write-signed-manifest` (it validates the manifest
-  against the schema before signing, so a malformed manifest fails the
-  release instead of shipping something every client would reject)
+  `raco glaze manifest-sign` (schema validation happens before signing, so
+  a malformed manifest fails the release instead of shipping something
+  every client would reject); the release job re-verifies every listed
+  artifact with `raco glaze verify-release-assets` before publishing
 
 ## Trust model, in verify order
 
 1. Wrapper schema (1) + `key_id` must equal the expected key id, then the
-   Ed25519 signature over the exact payload bytes (embedded public key;
-   CryptoKit on macOS, OpenSSL 3 for the CLI/backend/Windows path)
+   Ed25519 signature over the exact payload bytes (embedded public key,
+   `glaze/update` over OpenSSL 3)
 2. Semver comparison — numeric per dot segment, missing segments are 0;
-   downgrades report "up to date"
-3. SHA-256 of the complete downloaded archive against the signed value
-4. (macOS) the swapped-in bundle's `CFBundleShortVersionString` must equal
-   `manifest.version` before the old bundle is replaced
+   downgrades report "up to date"; the rollout bucket (sticky per
+   installation, persisted in `updater-state.json`) gates gradual rollouts
+3. SHA-256 **and byte size** of the complete downloaded archive against the
+   signed values; a mismatch deletes the partial file and reports an error
 
-Failed installs roll back: the macOS updater swaps atomically via a shell
-script (`mv` old aside → `mv` new in → relaunch; on failure the old bundle
-is restored); on Windows the handoff script keeps a `.old` copy of the
-previous install for the same reason. `~/.podlens/` is never touched by an
-update.
+Nothing is executed from the download. Installation is user-driven per
+install form (below); `~/.podlens/` (library, config, audio cache) is never
+touched by an update.
 
-## Host status
+## Install forms and the upgrade path
 
-| Platform | Feed entry | Install | Integrity | Status |
-|---|---|---|---|---|
-| macOS Apple silicon | `macos`/`arm64` zip | zip → sha256 → `UpdateService.swift` swap: verify bundle version → old aside → new in → relaunch; rollback on failure | Ed25519 wrapper signature (CryptoKit) + artifact sha256 | 已换装 since 1.0 |
-| macOS Intel | `macos`/`x64` zip | same swap on the x64 build (hosts match their compile-time architecture) | same | 已换装 since 1.4.0 |
-| Windows x64 | `windows`/`x64` zip | backend downloads + verifies (size + sha256) → host `update-install.cmd` handoff: wait for app exit → `tar -xf` extract → swap install dir in place (`.old` fallback) → relaunch; failure marker (`%TEMP%\podlens-update\update-failed.txt`) reported on next launch. MSI installs under Program Files and dev copies get guidance to the releases page instead of a swap they cannot make | Ed25519 wrapper signature (backend, OpenSSL 3) + artifact sha256 | 已换装 since 0.1.0 (guidance-only in 1.4.0) |
-| Linux | — | no host exists yet — a GTK4 shell is on the product roadmap (scheduled after the Windows in-app update work); there is nothing to feed, download, or install today | — | 规划中 / planned |
+| Platform | Feed entry | Portable install form | Upgrade path |
+|---|---|---|---|
+| macOS arm64 / x64 | `macos`/`arm64` / `x64` zip | `.app` bundle from the DMG, or the zip tree | in-app check + verified download, then replace the app with the newer DMG/zip (the UI links the releases page); the data dir survives |
+| Windows x64 | `windows`/`x64` zip | `podlens.exe` + `lib/` + `public/` tree, or the MSI install | in-app check + verified download; portable tree: extract the newer zip over the install dir; MSI: re-run the newer installer (the UI points you to it) |
+| Linux x64 / arm64 | `linux`/`x64` / `arm64` tar.gz | extracted tree `bin/` + `lib/` + `public/`, launcher `bin/podlens`; or deb/rpm/AppImage/Flatpak | tar.gz tree: extract the newer tarball over the app directory (the documented path, qualified end-to-end by `.github/workflows/appimage-upgrade-qualification.yml`); deb/rpm: package manager; AppImage/Flatpak: replace the file / install the newer bundle |
 
-The macOS host picks its feed entry by compile-time architecture
-(`arch(x86_64)` → `x64`, `arch(arm64)` → `arm64`), so an Intel build never
-installs the arm64 archive. The Windows host's check and download run in
-the backend (the same OpenSSL 3 path as the CLI); the host drives download
-consent, 400 ms `update-state` progress polling and the install handoff.
+The web carrier deliberately does not swap binaries behind the user's
+back: after a verified download the UI shows the artifact location and the
+releases link, and the documented per-form upgrade path above applies.
+Rollback is the same path in reverse (keep the previous tree/installer);
+the qualification workflow executes it and boots the older version on the
+same data directory.
 
 ## Keys
 
 - Generation: `scripts/update-keys.sh` → `~/.podlens/update-signing-key.pem`
   (OpenSSL 3 Ed25519; refuses to overwrite; prints the base64 raw public key)
-- The **public key** is embedded in hosts: `UpdateService.swift`
-  (`publicKeyBase64`) and `racket/update.rkt`
-  (`current-update-public-key-hex`, base64 of the raw 32 bytes)
+- The **public key** is embedded once, in `racket/update.rkt`
+  (`update-public-key-b64`, base64 of the raw 32 bytes); the release job
+  compares the signing key against this embedded value before signing
 - The **private key** lives outside any repository (keys vault) and reaches
   CI only as the `UPDATE_ED25519_PRIVATE_KEY` secret (PEM), consumed by
   `scripts/make-update-manifest.sh` in the release job
@@ -133,25 +133,26 @@ consent, 400 ms `update-state` progress polling and the install handoff.
 
 ## Client behavior
 
-- Manual check: menu "检查更新…" / CLI `check-updates` — always reports the outcome
-- Silent check (macOS and Windows): at most once per 4 h after launch
-  (persisted as the `last-update-check` config key, unix epoch seconds;
-  Windows also honors `check-updates-enabled`); never nags; a found update
-  shows a confirm dialog before downloading
+- Manual check: Settings "Check for updates" / CLI `check-updates` — always
+  reports the outcome
+- Silent check: at most once per 4 h after launch (persisted as the
+  `last-update-check` config key, unix epoch seconds; honors
+  `check-updates-enabled`); never nags; a found update shows a confirm
+  dialog before downloading
 - Download: backend-side only (`start-download` RPC, worker thread) after
-  the user consents; hosts poll `update-state` (phase: idle | checking |
-  downloading | downloaded | error) and show progress
-- Install: host-owned — macOS swaps the bundle in place; Windows hands off
-  to `update-install.cmd` ("退出并安装" consent first)
-- Developer builds (no embedded key, app not in /Applications, or a dev
-  layout without `res/core.zo`) report honestly that updates are
-  unavailable instead of pretending to check
+  the user consents; the UI polls `update-state` (phase: idle | checking |
+  downloading | downloaded | error) and shows progress
+- Install: user-driven per the table above; the `open-releases` RPC sends
+  the user to the releases page
+- Developer builds (no embedded key match, dev layout without the packaged
+  `public/` tree) report honestly that updates are unavailable instead of
+  pretending to check
 
-## Migration note (v1.4.0)
+## Version line restart (#63)
 
-Versions ≤ 1.3.2 shipped the old two-asset format
-(`update-manifest.json` + `manifest.sig`, plain manifest JSON). The single
-wrapper replaces both under the same asset name, so those clients cannot
-parse the v1.4.0+ feed — their updater reports a missing manifest instead
-of a false "up to date". Users of 1.3.2 and older update manually once
-(download the DMG/MSI); from 1.4.0 on the in-app updater is self-healing.
+The glaze rewrite restarted the version line at 0.1.0 per the family
+stack-change rule: all pre-rewrite releases and tags were deleted. There
+is no migration path from pre-rewrite installs and none is promised; a
+pre-rewrite install is replaced by a fresh 0.1.0+ install (the data
+directory format is unchanged, so an existing `~/.podlens/` library keeps
+working).
