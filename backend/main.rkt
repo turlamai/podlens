@@ -600,7 +600,19 @@
     (now-playing-set-command-handler!
      (lambda (cmd arg)
        (bus-broadcast! bus 'now-playing-command
-                       (hasheq 'cmd (symbol->string cmd) 'arg arg))))))
+                       (hasheq 'cmd (symbol->string cmd) 'arg arg)))))
+  ;; Carrier diagnostics: a silently degraded backend must be visible in
+  ;; the verify log, never inferred from a missing probe surface.
+  (log-warning "now-playing supported?=~s" (now-playing-supported?))
+  (unless (now-playing-supported?)
+    (with-handlers ([exn:fail? (lambda (e)
+                                 (log-warning "now-playing backend load error: ~a"
+                                              (exn-message e)))])
+      (dynamic-require (case (system-type 'os)
+                         [(macosx) 'glaze/now-playing/now-playing-macos]
+                         [(unix) 'glaze/now-playing/now-playing-linux]
+                         [else 'glaze/now-playing/now-playing-stub])
+                       'supported?))))
 
 (define (host-teardown!)
   (define t (unbox tray-handle))

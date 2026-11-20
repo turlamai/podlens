@@ -218,7 +218,17 @@ export async function runHarnessIfGated(): Promise<void> {
     // Host-owned OS Now Playing bridge (glaze#153): the page sync must
     // reach the host surface. The Windows stub answers {} (web SMTC is
     // the verified path there); macOS/Linux read the published state back.
-    const os = (await apiPost('api/host/now-playing_os', {})) as Record<string, unknown>;
+    // The host surface can lag the page sync by the bus name-acquisition
+    // round trip; poll briefly instead of reading once (inert carriers
+    // answer {} and fall through after the cap).
+    let os: Record<string, unknown> = {};
+    const hostDeadline = Date.now() + 4000;
+    for (;;) {
+      os = (await apiPost('api/host/now-playing_os', {})) as Record<string, unknown>;
+      if (typeof os.title === 'string' && os.title) break;
+      if (Date.now() > hostDeadline) break;
+      await wait(400);
+    }
     const hostTitle = typeof os.title === 'string' ? os.title : '';
     let hostNote = 'host=inert';
     if (hostTitle || typeof os.playing === 'boolean') {
