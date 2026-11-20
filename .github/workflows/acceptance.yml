@@ -109,10 +109,10 @@ jobs:
       - name: Real-window acceptance (Linux, Xvfb)
         if: runner.os == 'Linux'
         shell: bash
-        # dbus-run-session gives WebKitGTK's MediaSession->MPRIS bridge a
-        # session bus (headless runners have none); the slice-5 OS probe
-        # reads org.mpris.MediaPlayer2 over the same bus.
-        run: xvfb-run -a dbus-run-session -- racket verify.rkt
+        # Session bus on /run/user: WebKitGTK's sandboxed web process reaches
+        # the bus via xdg-dbus-proxy, which only sees /run (WebKit bug
+        # 246159); a /tmp dbus-run-session socket starves the MPRIS bridge.
+        run: bash scripts/acceptance/linux-verify.sh
       - name: Real-window acceptance
         if: runner.os != 'Linux'
         shell: bash
