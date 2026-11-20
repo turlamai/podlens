@@ -80,8 +80,8 @@ jobs:
       - name: Linux webview runtime deps
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio dbus \
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio dbus \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       # The seeded listening journeys play real media; WebKitGTK needs an
       # audio sink or the media clock stalls. Headless runners have none,
@@ -113,6 +113,14 @@ jobs:
         # the bus via xdg-dbus-proxy, which only sees /run (WebKit bug
         # 246159); a /tmp dbus-run-session socket starves the MPRIS bridge.
         run: bash scripts/acceptance/linux-verify.sh
+      - name: Precompile macOS Now Playing probe
+        if: runner.os == 'macOS'
+        shell: bash
+        # Hosted macOS swiftc cold-compiles slower than the in-verify probe
+        # budget; build once here so the probe thread only executes it.
+        run: |
+          swiftc scripts/acceptance/nowplaying-probe.swift -o "$RUNNER_TEMP/nowplaying-probe"
+          echo "PODLENS_NOWPLAYING_PROBE_BIN=$RUNNER_TEMP/nowplaying-probe" >> "$GITHUB_ENV"
       - name: Real-window acceptance
         if: runner.os != 'Linux'
         shell: bash
