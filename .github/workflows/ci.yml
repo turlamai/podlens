@@ -21,7 +21,7 @@ env:
   # carrier is glaze (#63 slice 4 retired the three native host legs).
   RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
   GLAZE_RIVET_PIN: bf7a62b9a3331bd5d6df48d1b7fe77be0cfed90d
-  GLAZE_PIN: f2b234e9120df8354c9cfca1876ec0f9ab6666ae
+  GLAZE_PIN: 30a0414952e8bf8ea186f3c2b54889b875927784
 jobs:
   backend:
     name: Backend tests (${{ matrix.os }})

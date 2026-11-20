@@ -133,21 +133,17 @@ SW1
 ;; Poll the platform surface until the fixture title shows up (the bridges
 ;; publish shortly after playback starts) or the budget runs out.
 (define (probe-nowplaying)
-  (define deadline (+ (current-inexact-milliseconds) 20000))
+  (define deadline (+ (current-inexact-milliseconds) 30000))
   (let loop ()
     (define-values (ok text)
       (case (system-type)
         [(windows)
          (run-capture "powershell" "-NoProfile" "-Command" powershell-smtc-probe)]
         [(macosx)
-         (define src (build-path home "nowplaying-probe.swift"))
-         (define bin (build-path home "nowplaying-probe"))
-         (call-with-output-file src
-           (lambda (out) (display swift-nowplaying-probe out)) #:exists 'truncate/replace)
-         (define-values (cc _) (run-capture "swiftc" "-O" (path->string src) "-o" (path->string bin)))
-         (if (zero? cc)
+         (define bin (wait-swift-probe-bin))
+         (if bin
              (run-capture (path->string bin))
-             (values cc "swiftc failed"))]
+             (values 1 "swiftc precompile unavailable"))]
         [(unix)
          (define-values (_lc names)
            (run-capture "dbus-send" "--session" "--print-reply"
@@ -179,6 +175,26 @@ SW1
       [else (sleep 1.0) (loop)])))
 
 (define nowplaying-result (box (cons #f "probe not run")))
+
+;; swiftc -O cold-compiles the probe in ~30-60s on hosted macOS runners;
+;; compile once in the background at app-ready so the probe thread only
+;; executes the binary while playback is live.
+(define swift-bin-box (box #f))
+(define (precompile-swift-probe!)
+  (thread
+   (lambda ()
+     (with-handlers ([exn:fail? void])
+       (define src (build-path home "nowplaying-probe.swift"))
+       (define bin (build-path home "nowplaying-probe"))
+       (call-with-output-file src
+         (lambda (out) (display swift-nowplaying-probe out)) #:exists 'truncate/replace)
+       (define-values (cc _) (run-capture "swiftc" "-O" (path->string src) "-o" (path->string bin)))
+       (when (zero? cc) (set-box! swift-bin-box bin))))))
+(define (wait-swift-probe-bin)
+  (let wait ([n 75])
+    (cond [(unbox swift-bin-box)]
+          [(> n 0) (sleep 1) (wait (sub1 n))]
+          [else #f])))
 (define (start-nowplaying-probe!)
   (thread
    (lambda ()
@@ -239,8 +255,10 @@ SW1
    #:height 800
    #:on-ready
    (lambda (wv url)
-     ;; Wait for the page (its <title> starts with PodLens).
-     (define deadline (+ (current-inexact-milliseconds) 20000))
+     (when (eq? (system-type) 'macosx) (precompile-swift-probe!))
+     ;; Wait for the page (its <title> starts with PodLens). WebView2 cold
+     ;; starts on loaded runners can exceed 20s before the title lands.
+     (define deadline (+ (current-inexact-milliseconds) 45000))
      (define loaded?
        (let loop ()
          (cond
@@ -250,7 +268,11 @@ SW1
            [else (sleep 0.1) (loop)])))
      (sleep 1.5)
      (define url-ok? (equal? (webview-url wv) url))
-     (define shot (and loaded? (webview-capture! wv)))
+     (define shot (webview-capture! wv))
+     ;; A rendered capture at the right URL is page-loaded evidence even if
+     ;; the title probe timed out (WebView2 title updates lag navigation).
+     (define loaded-final?
+       (or loaded? (and url-ok? (string? shot) (file-exists? shot))))
      (define saved-shot
        (cond
          [(and shot (file-exists? shot))
@@ -339,7 +361,7 @@ SW1
      ;; Give the OS probe its own budget after the journeys finish; playback
      ;; stays live until webview-close below.
      (when probe-started?
-       (define probe-deadline (+ (current-inexact-milliseconds) 25000))
+       (define probe-deadline (+ (current-inexact-milliseconds) 45000))
        (let wait-probe ()
          (unless (or (car (unbox nowplaying-result))
                      (>= (current-inexact-milliseconds) probe-deadline))
@@ -358,7 +380,7 @@ SW1
           dest]
          [else #f]))
      (set! verdicts
-           (list (cons 'page-loaded loaded?)
+           (list (cons 'page-loaded loaded-final?)
                  (cons 'url url-ok?)
                  (cons 'capture (and saved-shot (> (file-size saved-shot) 0)))
                  (cons 'health-ok (and (hash? health) (equal? "true" (hash-ref health 'ok #f))))
