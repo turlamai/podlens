@@ -1,37 +1,32 @@
 #lang racket/base
 
-;; Online update support for PodLens, built on rivet/distribution — the
-;; family pattern (taskly/brainfuel/payback/syncpilot): the backend
-;; verifies and downloads the signed update artifact; the native host owns
-;; installation. A check fetches and verifies the Ed25519-signed channel
-;; manifest (the signed wrapper in docs/UPDATE.md); the artifact download
-;; runs on a background thread with progress published to a state box that
-;; hosts poll through the `update-state` RPC (RVT1 events are thread-local,
-;; so a background thread cannot emit them directly).
+;; Online update support for PodLens, built on glaze/update — the family
+;; pattern for the glaze carrier (infra-first): the backend verifies and
+;; downloads the signed update artifact; the host owns installation. A check
+;; fetches and verifies the Ed25519-signed channel manifest (the signed
+;; wrapper in glaze docs/release-and-updates.md); the artifact download runs
+;; on a background thread with progress published to a state box that hosts
+;; poll through the `update-state` RPC.
 ;;
 ;; PodLens-specific rules (docs/UPDATE.md): the 4-hour silent-check
-;; throttle lives in the hosts (macOS UserDefaults / Windows config key) —
-;; this module only persists the sticky rollout bucket. Downloads land
-;; under <data-dir>/updates/ and config.json / library.json / audio are
-;; never touched.
+;; throttle lives in the host — this module only persists the sticky rollout
+;; bucket. Downloads land under <data-dir>/updates/ and config.json /
+;; library.json / audio are never touched.
 ;;
-;; Note on crypto factories: rivet/distribution pins the provider set to
-;; libcrypto at module load and deliberately avoids crypto/all — factory
-;; FFIs load at import time and the gmp factory kills embedded runtimes on
-;; hosts without libgmp. This module runs inside the embedded CS runtime,
-;; so it must not require crypto/all either (tests may, they are headless).
-;; This replaces the earlier hand-rolled OpenSSL 3 subprocess scheme: the
-;; crypto package's libcrypto factory does the same Ed25519/SHA-256 work
-;; in-process, with no PATH dependence and no temp-file dance.
+;; Note on crypto: glaze/update verifies through the pure Racket ed25519
+;; package and file/sha1, so an installed application needs no developer
+;; toolchain and no PATH dependence (the earlier rivet/distribution line
+;; pinned a libcrypto FFI factory for the same reason). Only release-side
+;; signing uses the OpenSSL 3 CLI, which never runs inside the product.
 
-(require crypto
+(require glaze/update
          json
          net/base64
-         rivet/distribution
          racket/file
          racket/list
          racket/path
          racket/port
+         racket/random
          racket/string
          "core/paths.rkt"
          "version.rkt")
@@ -47,6 +42,8 @@
          current-update-base-url
          releases-page
          update-configured?
+         platform-symbol
+         architecture-symbol
          payload-extension
          manifest-url
          destination-path
@@ -61,9 +58,9 @@
          rollout-bucket)
 
 ;; Release identity: the version comes from racket/version.rkt (the single
-;; source scripts/check-release-version.sh pins to VERSION/rivet.rktd);
-;; the rest duplicates rivet.rktd, which the packaged app cannot read at
-;; runtime.
+;; source scripts/check-release-version.sh pins to VERSION); the rest are
+;; product identity literals, which the packaged app cannot read from repo
+;; metadata at runtime.
 (define app-build 1)
 (define app-identifier "site.jrtx.podlens")
 (define app-channel 'stable)
@@ -96,31 +93,54 @@
 
 ;; ---------- public key ----------
 
-;; Fixed SPKI prefix bytes for an Ed25519 public key (12 bytes) followed by
-;; the raw 32-byte key = full SubjectPublicKeyInfo DER. (hex->bytes comes
-;; from the crypto require.)
-(define ed25519-spki-prefix (hex->bytes "302a300506032b6570032100"))
+;; glaze/update verifies with the raw 32-byte Ed25519 public key (pure Racket
+;; ed25519); the SPKI DER form is only needed by release-side tooling.
+(define (b64->bytes s)
+  (base64-decode (string->bytes/utf-8 s)))
 
 (define (update-configured?)
   (and (string? update-public-key-b64)
-       (let ([raw (base64-string->bytes update-public-key-b64)])
-         (and (= 32 (bytes-length raw)) (embedded-public-key) #t))))
+       (let ([raw (b64->bytes update-public-key-b64)])
+         (= 32 (bytes-length raw)))))
+
+(define embedded-key-path-box (box #f))
 
 (define (embedded-public-key)
-  (datum->pk-key
-   (bytes-append ed25519-spki-prefix
-                 (base64-string->bytes update-public-key-b64))
-   'SubjectPublicKeyInfo))
+  ;; glaze's verifier reads the public key from a path (PEM or 44-byte DER
+  ;; file); the embedded base64 raw key is materialized once per process as
+  ;; a PEM temp file. No toolchain needed — just the pure Racket verifier.
+  (or (unbox embedded-key-path-box)
+      (let ([p (make-temporary-file "podlens-update-pub-~a.pem")])
+        (define der
+          (bytes-append (bytes #x30 #x2a #x30 #x05 #x06 #x03 #x2b #x65 #x70
+                               #x03 #x21 #x00)
+                        (b64->bytes update-public-key-b64)))
+        (display-to-file
+         (string-append "-----BEGIN PUBLIC KEY-----\n"
+                        (bytes->string/utf-8 (base64-encode der #"\n"))
+                        "-----END PUBLIC KEY-----\n")
+         p #:exists 'truncate/replace)
+        (set-box! embedded-key-path-box p)
+        p)))
 
 ;; ---------- platform identity ----------
 
-;; platform-symbol / architecture-symbol come from rivet/distribution
-;; (rivet now exports them; the local duplicates were deleted when the
-;; names started colliding — upstream emits the same symbols into
-;; update manifests, so consuming them directly removes the drift).
-;; payload-extension stays local on purpose: rivet's installer-extension takes an
-;; installer kind, this one answers "what extension does THIS platform's
-;; PodLens payload carry".
+;; glaze/update consumes plain platform/architecture symbols in manifests
+;; and updater-config; the carrier does not export identity helpers, so the
+;; product owns these two mappings (same symbols the release pipeline emits).
+(define (platform-symbol)
+  (case (system-type 'os)
+    [(macosx) 'macos]
+    [(windows) 'windows]
+    [else 'linux]))
+
+(define (architecture-symbol)
+  (case (system-type 'arch)
+    [(arm64) 'arm64]
+    [else 'x64]))
+
+;; payload-extension stays local on purpose: it answers "what extension does
+;; THIS platform's PodLens update payload carry" (portable feed artifacts).
 (define (payload-extension)
   (case (system-type 'os)
     [(macosx) ".zip"]
@@ -146,17 +166,18 @@
 (define candidate-box (box #f))
 (define worker-thread-box (box #f))
 
-;; Download watchdog bounds. rivet's copy loop waits on read-bytes-avail!
+;; Download watchdog bounds. glaze's copy loop waits on read-bytes-avail!
 ;; with no timeout, so a connection that stalls without RST/FIN parks the
 ;; worker thread forever — visibly "stuck at 100%" (all bytes had arrived;
 ;; the loop was still waiting for EOF). Two finite bounds keep the phase
 ;; machine honest: no byte progress for the stall limit, or wall clock
-;; past the total limit, breaks the worker (rivet's partial-file cleanup
+;; past the total limit, breaks the worker (glaze's partial-file cleanup
 ;; runs, and the worker reports phase=error itself) so the host always
 ;; gets a terminal state.
 (define download-stall-limit-seconds 120)
 (define download-total-limit-seconds (* 30 60))
 (define last-progress-seconds (box 0))
+(define last-progress-bytes (box 0))
 
 (define (state-set! key value)
   (set-box! update-state (hash-set (unbox update-state) key value)))
@@ -257,8 +278,8 @@
 ;; Returns a plain hasheq describing the outcome; the backend maps it onto
 ;; the typed UpdateCheck record. Throttling is the host's job
 ;; (docs/UPDATE.md). fetch-update-manifest accepts only #:key-id and
-;; #:maximum-bytes — redirection following (GitHub release assets answer
-;; with a 302 into an otherwise empty body, rivet#153) is built in.
+;; #:maximum-bytes — capped HTTPS-only redirection following (GitHub
+;; release assets answer with a 302) is built into glaze's transport.
 (define (perform-check!)
   (reset-update-state!)
   (state-set! 'phase "checking")
@@ -281,10 +302,7 @@
                       (embedded-public-key)
                       update-key-id
                       (rollout-bucket)
-                      maximum-download-bytes
-                      ;; component: podlens feeds carry the legacy plain
-                      ;; app artifact (rivet release stamps #f today)
-                      #f))
+                      maximum-download-bytes))
     (define candidate (select-update config manifest))
     (cond
       [candidate
@@ -324,20 +342,12 @@
               (string-append app-display-name "-" version extension)))
 
 (define (download-with-progress! config candidate destination)
-  ;; rivet's downloader bounds the stream to the signed size, verifies
+  ;; glaze's downloader bounds the stream to the signed size, verifies
   ;; size + SHA-256 against the signed manifest before the file is
-  ;; trusted, and swaps the .partial into place atomically. Progress
-  ;; reports arrive as byte counts; publish integer percent to the state
-  ;; box and feed the watchdog's stall clock on every report.
-  (define total (update-artifact-size (update-candidate-artifact candidate)))
-  (download-update config candidate destination
-                   #:on-progress
-                   (lambda (done)
-                     (set-box! last-progress-seconds (current-seconds))
-                     (state-set! 'percent
-                                 (if (> total 0)
-                                     (min 100 (quotient (* done 100) total))
-                                     0)))))
+  ;; trusted, and swaps the .partial into place atomically. It exposes no
+  ;; progress callback; the watchdog below derives integer percent from
+  ;; the .partial file size and feeds its stall clock on every growth.
+  (download-update config candidate destination))
 
 ;; Runs on a backend worker thread; the host follows progress via the
 ;; update-state RPC. Never raises: failures surface through the phase.
@@ -360,15 +370,15 @@
                     (embedded-public-key)
                     update-key-id
                     (rollout-bucket)
-                    maximum-download-bytes
-                    #f))
+                    maximum-download-bytes))
   (define destination (destination-path data-dir candidate))
   (set-box! last-progress-seconds (current-seconds))
+  (set-box! last-progress-bytes 0)
   (define worker-thread
     (thread
      (lambda ()
        ;; The watchdog breaks a stalled worker; exn:break is not an
-       ;; exn:fail, so it needs its own arm — either way rivet's partial
+       ;; exn:fail, so it needs its own arm — either way glaze's partial
        ;; cleanup removes the .partial and the phase lands on error
        ;; (never mid-flight).
        (with-handlers
@@ -387,20 +397,37 @@
   (set-box! worker-thread-box worker-thread)
   ;; Watchdog: exits once the worker finishes on its own; otherwise a stall
   ;; (no byte progress) or the total wall-clock limit breaks the worker so
-  ;; phase never rests on "downloading" indefinitely.
+  ;; phase never rests on "downloading" indefinitely. Percent is derived
+  ;; from the .partial size because glaze's downloader has no progress
+  ;; callback; every growth also feeds the stall clock.
   (define download-started (current-seconds))
   (thread
    (lambda ()
      (let loop ()
        (cond
-         [(sync/timeout download-stall-limit-seconds
-                        (thread-dead-evt worker-thread))
-          (void)]
-         [(> (- (current-seconds) (unbox last-progress-seconds))
-             download-stall-limit-seconds)
-          (break-thread worker-thread)]
-         [(> (- (current-seconds) download-started)
-             download-total-limit-seconds)
-          (break-thread worker-thread)]
-         [else (loop)]))))
+         [(sync/timeout 1 (thread-dead-evt worker-thread)) (void)]
+         [else
+          (define partial (path-add-extension destination #".partial"))
+          (define done
+            (cond
+              [(file-exists? partial) (file-size partial)]
+              [(file-exists? destination) (file-size destination)]
+              [else 0]))
+          (define total
+            (update-artifact-size (update-candidate-artifact candidate)))
+          (when (> done (unbox last-progress-bytes))
+            (set-box! last-progress-bytes done)
+            (set-box! last-progress-seconds (current-seconds)))
+          (state-set! 'percent
+                      (if (> total 0)
+                          (min 100 (quotient (* done 100) total))
+                          0))
+          (cond
+            [(> (- (current-seconds) (unbox last-progress-seconds))
+                download-stall-limit-seconds)
+             (break-thread worker-thread)]
+            [(> (- (current-seconds) download-started)
+                download-total-limit-seconds)
+             (break-thread worker-thread)]
+            [else (loop)])]))))
   (void))
