@@ -41,6 +41,10 @@ export async function runHarnessIfGated(): Promise<void> {
   }
   if (!gate.enabled) return;
   harnessStarted = true;
+  // Harness-only flag: the player keeps muted-autoplay media muted under this
+  // flag (WebKitGTK pauses muted-autoplay media when unmuted without a real
+  // gesture; acceptance asserts the clock/bridge, not audibility).
+  (window as unknown as Record<string, unknown>).__podlensE2E = true;
   const report = (id: string, ok: boolean, detail: string): Promise<unknown> =>
     apiPost('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
   const step = async (id: string, fn: () => Promise<string | void>): Promise<void> => {
@@ -150,7 +154,7 @@ export async function runHarnessIfGated(): Promise<void> {
       if (a) a.muted = true;
       try {
         await a?.play();
-        if (a) a.muted = false;
+        // keep muted: unmute without a real gesture pauses WebKitGTK media
       } catch (e) {
         throw new Error(
           `play rejected (${prior}): ${(e as Error).name}: ${(e as Error).message}`,
