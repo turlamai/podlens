@@ -93,6 +93,11 @@ jobs:
     # to the software path or webview startup crashes (glaze docs/ci.md).
     env:
       WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+      # Acceptance-only hatch (glaze docs/ci.md): synthetic clicks must be
+      # able to start AUDIBLE playback, else the journey's muted fallback
+      # kicks in and OS Now Playing (MPRIS/SMTC/MediaRemote) legitimately
+      # stays empty for muted media.
+      GLAZE_ALLOW_PROGRAMMATIC_PLAYBACK: '1'
     strategy:
       fail-fast: false
       matrix:

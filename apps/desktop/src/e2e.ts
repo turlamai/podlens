@@ -145,6 +145,7 @@ export async function runHarnessIfGated(): Promise<void> {
   await step('journey-play-mediasession', async () => {
     // Media-event counters: on a dead pipeline play() can resolve while no
     // media event ever fires; the counters tell load stalls from clock stalls.
+    let mutedFallback = false;
     const a0 = document.getElementById('audio') as HTMLAudioElement | null;
     const w0 = window as unknown as Record<string, unknown>;
     if (a0 && !w0.__podlensMediaEvents) {
@@ -168,6 +169,7 @@ export async function runHarnessIfGated(): Promise<void> {
       const w = window as unknown as Record<string, unknown>;
       const prior = `unmuted=${w.__podlensPlayError ?? 'none'} muted=${w.__podlensMutedPlayError ?? 'none'}`;
       if (a) a.muted = true;
+      mutedFallback = true;
       try {
         await a?.play();
         // keep muted: unmute without a real gesture pauses WebKitGTK media
@@ -213,7 +215,7 @@ export async function runHarnessIfGated(): Promise<void> {
       (ms.metadata?.title ?? '').includes('focused listening'),
       `metadata title ${ms.metadata?.title}`,
     );
-    return ms.metadata?.title ?? '';
+    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''}`;
   });
   await step('journey-follow-sync', async () => {
     try {
