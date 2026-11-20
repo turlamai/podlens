@@ -56,7 +56,7 @@ def main():
     ]
     for key, zh, en in rows:
         zh, en = normalize(unescape(zh)), normalize(unescape(en))
-        lines.append(f"  {key}: [{ts_string(zh)}, {ts_string(en)}],")
+        lines.append(f'  "{key}": [{ts_string(zh)}, {ts_string(en)}],')
     lines += [
         "};",
         "",
