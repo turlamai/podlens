@@ -31,7 +31,8 @@
          glaze            ; make-tray, make-menu-item, tray-supported?
          (only-in glaze/now-playing ; host-owned OS Now Playing (glaze#153)
                   now-playing-set! now-playing-clear!
-                  now-playing-os-info now-playing-set-command-handler!)
+                  now-playing-os-info now-playing-set-command-handler!
+                  now-playing-supported?)
          glaze/autolaunch ; auto-launch-set! / auto-launch-enabled?
          (only-in glaze/server path->mime-type)
          web-server/http/response-structs ; response/full, response/output
