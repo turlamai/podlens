@@ -6,7 +6,8 @@
   "scripts": {
     "check": "pnpm -r run check",
     "build": "pnpm -r run build",
-    "gen:rpc": "python scripts/gen-rpc-types.py"
+    "gen:rpc": "python scripts/gen-rpc-types.py",
+    "gen:i18n": "python scripts/gen-web-i18n.py"
   },
   "packageManager": "pnpm@11.3.0"
 }
