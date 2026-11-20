@@ -47,7 +47,10 @@
    'doctor-api '("API 已配置" . "API configured")
    'doctor-no-api '("未配置 API key（Settings 里设置）" . "API key not configured (set it in Settings)")
    'doctor-ffmpeg '("ffmpeg 可用，长音频可自动分段" . "ffmpeg found — long audio can be split")
-   'doctor-no-ffmpeg '("未安装 ffmpeg，超过 24 MiB 的单集无法转写" . "ffmpeg missing — episodes over 24 MiB cannot be transcribed")))
+   'doctor-no-ffmpeg '("未安装 ffmpeg，超过 24 MiB 的单集无法转写" . "ffmpeg missing — episodes over 24 MiB cannot be transcribed")
+   ;; glaze thin host (tray menu; #63) — the single source stays this table
+   'tray-show '("显示 PodLens" . "Show PodLens")
+   'tray-quit '("退出 PodLens" . "Quit PodLens")))
 
 ;; {0} {1} placeholders
 (define (tr lang key . args)

@@ -18,6 +18,11 @@ concurrency:
 # references this so a bump is one edit, not a grep-replace across jobs.
 env:
   RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
+  # Glaze-line adapter pins (#63): the adapter job builds against current
+  # upstream main heads verified locally; the native-host jobs above keep
+  # their historical RIVET_PIN until the native legs retire (slice 4).
+  GLAZE_RIVET_PIN: bf7a62b9a3331bd5d6df48d1b7fe77be0cfed90d
+  GLAZE_PIN: 2ec4533c4663cd058018c669af56b85c137a4a2a
 jobs:
   backend:
     name: Backend tests (${{ matrix.os }})
@@ -161,3 +166,85 @@ jobs:
       - name: Build + package + verify
         run: raco rivet package
         shell: bash
+
+  glaze-adapter:
+    name: Glaze adapter (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Racket (CS)
+        uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          distribution: full
+      # raco's HTTPS goes through Racket's OpenSSL, whose Windows
+      # certificate-store loader crashes on some runner images; git's own
+      # TLS is stable, so clone the pinned checkouts and install from disk.
+      - name: Install pinned Rivet + Glaze (Windows, git TLS)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
+          git -C rivet-src checkout ${{ env.GLAZE_RIVET_PIN }}
+          raco pkg install --auto --no-docs ./rivet-src
+          git clone --no-checkout https://github.com/turlamai/glaze.git glaze-src
+          git -C glaze-src checkout ${{ env.GLAZE_PIN }}
+          raco pkg install --auto --no-docs ./glaze-src
+      - name: Install pinned Rivet + Glaze (catalog)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.GLAZE_RIVET_PIN }}'
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ env.GLAZE_PIN }}'
+      - name: Linux webview runtime deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Schema compat gate (zero breaking)
+        shell: bash
+        run: raco rivet schema check rivet-schema.json --json
+      - name: Compile adapter
+        shell: bash
+        run: raco make backend/main.rkt
+      - name: Adapter contract test
+        shell: bash
+        run: racket backend/tests/adapter-test.rkt
+      - name: RPC surface gate + generated client
+        shell: bash
+        run: |
+          pnpm gen:rpc
+          python scripts/check-rpc-surface.py
+      - name: Web typecheck + build
+        shell: bash
+        run: |
+          pnpm check
+          pnpm build
+      - name: Real-window verify (Linux, Xvfb)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: xvfb-run -a racket verify.rkt
+      - name: Real-window verify
+        if: runner.os != 'Linux'
+        shell: bash
+        run: racket verify.rkt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: glaze-verify-${{ matrix.os }}
+          path: .glaze/verify/*.png
+          if-no-files-found: warn
