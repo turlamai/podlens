@@ -215,7 +215,18 @@ export async function runHarnessIfGated(): Promise<void> {
       (ms.metadata?.title ?? '').includes('focused listening'),
       `metadata title ${ms.metadata?.title}`,
     );
-    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''} muted=${a0?.muted} vol=${a0?.volume} playErr=${(window as unknown as Record<string, unknown>).__podlensPlayError ?? 'none'}`;
+    // Host-owned OS Now Playing bridge (glaze#153): the page sync must
+    // reach the host surface. The Windows stub answers {} (web SMTC is
+    // the verified path there); macOS/Linux read the published state back.
+    const os = (await apiPost('api/host/now-playing_os', {})) as Record<string, unknown>;
+    const hostTitle = typeof os.title === 'string' ? os.title : '';
+    let hostNote = 'host=inert';
+    if (hostTitle || typeof os.playing === 'boolean') {
+      expect(hostTitle.includes('focused listening'), `host now-playing title ${hostTitle}`);
+      expect(os.playing === true, `host now-playing playing ${String(os.playing)}`);
+      hostNote = `host=${hostTitle}`;
+    }
+    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''} muted=${a0?.muted} vol=${a0?.volume} playErr=${(window as unknown as Record<string, unknown>).__podlensPlayError ?? 'none'} ${hostNote}`;
   });
   await step('journey-follow-sync', async () => {
     try {

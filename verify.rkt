@@ -32,7 +32,7 @@
     (define rcv (make-log-receiver (current-logger) 'info))
     (let loop ()
       (define v (sync rcv))
-      (eprintf "[glaze-log] ~a: ~a\n" (vector-ref v 0) (vector-ref v 2))
+      (eprintf "[glaze-log] ~a: ~a\n" (vector-ref v 0) (vector-ref v 1))
       (loop)))))
 
 (define-runtime-path frontend-dist "apps/desktop/dist")
@@ -65,8 +65,8 @@
 ;; ---- slice 5: OS-level Now Playing probes -------------------------------
 ;; The in-page journey asserts the MediaSession contract; these probes assert
 ;; the OS surface each platform derives from it: Windows SMTC (Chromium /
-;; WebView2 bridge), macOS Now Playing (WKWebView / MediaRemote), Linux MPRIS
-;; (WebKitGTK bridges MediaSession to org.mpris.MediaPlayer2). Probe-only code:
+;; WebView2 bridge), macOS Now Playing (host-owned MediaPlayer.framework,
+;; glaze#153), Linux MPRIS (host-owned GIO/GDBus name, glaze#153). Probe-only code:
 ;; nothing here ships in the product.
 (define fixture-title "A small episode about focused listening")
 
@@ -137,7 +137,7 @@ PS1
 
 ;; Poll the platform surface until the fixture title shows up (the bridges
 ;; publish shortly after playback starts) or the budget runs out.
-(define (probe-nowplaying)
+(define (probe-nowplaying url)
   (define probe-t0 (current-inexact-milliseconds))
   (define deadline (+ probe-t0 30000))
   (let loop ()
@@ -146,10 +146,17 @@ PS1
         [(windows)
          (run-capture "powershell" "-NoProfile" "-Command" powershell-smtc-probe)]
         [(macosx)
+         ;; Host-owned surface (glaze#153): read MPNowPlayingInfoCenter
+         ;; back through the public API; the private MediaRemote probe
+         ;; stays as secondary evidence only.
+         (define os (post-json url "api/host/now-playing_os" (hasheq)))
+         (define host-text (format "host-os-info=~s" os))
          (define bin (wait-swift-probe-bin))
-         (if bin
-             (run-capture (path->string bin))
-             (values 1 "swiftc precompile unavailable"))]
+         (define-values (_rc mr)
+           (if bin
+               (run-capture (path->string bin))
+               (values 1 "swiftc precompile unavailable")))
+         (values 0 (string-append host-text "\n--- MediaRemote ---\n" mr))]
         [(unix)
          (define-values (_lc names)
            (run-capture "dbus-send" "--session" "--print-reply"
@@ -162,7 +169,7 @@ PS1
               (and m (cadr m)))
             (string-split names "\n")))
          (define mpris
-           (filter (lambda (s) (string-prefix? s "org.mpris.MediaPlayer2."))
+           (filter (lambda (s) (string-prefix? s "org.mpris.MediaPlayer2.site_jrtx_podlens"))
                    name-lines))
          (set-box! last-names-box name-lines)
          (set-box! poll-log-box
@@ -232,13 +239,13 @@ PS1
           [(> n 0) (sleep 1) (wait (sub1 n))]
           [else #f])))
 (when (eq? (system-type) 'macosx) (precompile-swift-probe!))
-(define (start-nowplaying-probe!)
+(define (start-nowplaying-probe! url)
   (thread
    (lambda ()
      (with-handlers ([exn:fail? (lambda (e)
                                   (set-box! nowplaying-result
                                             (cons #f (exn-message e))))])
-       (set-box! nowplaying-result (probe-nowplaying))))))
+       (set-box! nowplaying-result (probe-nowplaying url))))))
 
 ;; Start the engine transport (the app's module+ main does the same).
 (start-engine!)
@@ -386,7 +393,7 @@ PS1
                            (equal? (hash-ref r 'id #f) "journey-play-mediasession")
                            (eq? #t (hash-ref r 'ok #f)))))
            (set! probe-started? #t)
-           (start-nowplaying-probe!))
+           (start-nowplaying-probe! url))
          (cond
            [(for/or ([r (in-list (if (list? rs) rs '()))])
               (and (hash? r) (equal? (hash-ref r 'id #f) "journey-complete")))

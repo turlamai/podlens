@@ -29,6 +29,9 @@
          glaze/shell      ; shell-spawn! (reveal / open external)
          glaze/types      ; GString, GInt64, GBool, GValue, goptional, grecord
          glaze            ; make-tray, make-menu-item, tray-supported?
+         (only-in glaze/now-playing ; host-owned OS Now Playing (glaze#153)
+                  now-playing-set! now-playing-clear!
+                  now-playing-os-info now-playing-set-command-handler!)
          glaze/autolaunch ; auto-launch-set! / auto-launch-enabled?
          (only-in glaze/server path->mime-type)
          web-server/http/response-structs ; response/full, response/output
@@ -255,6 +258,17 @@
   [(POST "api/host/autostart_set" #:returns GValue)
    (autostartSet [enabled GBool])
    (host-autostart-set! enabled)]
+  ;; Host-owned OS Now Playing (glaze#153): the page syncs playback state
+  ;; here and the host publishes the OS surface (macOS MediaPlayer,
+  ;; Linux own MPRIS; Windows stub inert — web SMTC stays the path there).
+  ;; now-playing_os reads the OS surface back for acceptance evidence.
+  [(POST "api/host/now-playing" #:returns GBool)
+   (nowPlaying [info GValue])
+   (host-now-playing! info)
+   #t]
+  [(POST "api/host/now-playing_os" #:returns GValue)
+   (nowPlayingOs)
+   (or (now-playing-os-info) (hasheq))]
 
   ;; ---- acceptance harness gate (#63 slice 5) ---------------------------
   ;; The web UI carries an in-page journey harness (#e2e) because glaze
@@ -487,6 +501,29 @@
 
 (define (host-tray-live?) (and (unbox tray-handle) #t))
 
+;; ---- host-owned OS Now Playing (glaze#153) -------------------------------
+;; JSON object keys arrive as symbols or strings depending on carrier;
+;; accept both so the page sync never depends on codec internals.
+(define (np-ref h k d)
+  (if (hash? h)
+      (hash-ref h k (lambda () (hash-ref h (symbol->string k) d)))
+      d))
+
+(define (host-now-playing! info)
+  (cond
+    [(or (not info) (and (hash? info) (np-ref info 'clear #f)))
+     (now-playing-clear!)]
+    [(hash? info)
+     (now-playing-set!
+      (hasheq 'title (np-ref info 'title "")
+              'artist (np-ref info 'artist "")
+              'album (np-ref info 'album "")
+              'duration (np-ref info 'duration 0.0)
+              'position (np-ref info 'position 0.0)
+              'playing (np-ref info 'playing #f)
+              'identifier (np-ref info 'identifier "site.jrtx.podlens")))]
+    [else (void)]))
+
 (define (autostart-enabled-value)
   (define v (auto-launch-enabled? "PodLens"))
   (if (symbol? v) (symbol->string v) v))
@@ -556,12 +593,20 @@
                                                     (with-host-app
                                                      (lambda () (app-quit! (unbox host-app)))))))
                  #:on-event (lambda (e)
-                              (when (memq e '(click left-click)) (show-main!))))))))
+                              (when (memq e '(click left-click)) (show-main!)))))))
+  ;; OS transport commands (MPRIS / MPRemoteCommandCenter) reach the page
+  ;; over the SSE engine-event channel; capability loss never blocks startup.
+  (with-handlers ([exn:fail? (lambda (_) (void))])
+    (now-playing-set-command-handler!
+     (lambda (cmd arg)
+       (bus-broadcast! bus 'now-playing-command
+                       (hasheq 'cmd (symbol->string cmd) 'arg arg))))))
 
 (define (host-teardown!)
   (define t (unbox tray-handle))
   (when t (with-handlers ([exn:fail? (lambda (_) (void))]) (tray-close t)))
-  (set-box! tray-handle #f))
+  (set-box! tray-handle #f)
+  (with-handlers ([exn:fail? (lambda (_) (void))]) (now-playing-clear!)))
 
 (define engine-started? #f)
 

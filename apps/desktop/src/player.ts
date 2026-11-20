@@ -3,7 +3,7 @@
 // route; the bootstrap cookie authenticates it. Positions persist through
 // position-save (throttled), resume through resume-last. MediaSession /
 // Now Playing integration lands in slice 3.
-import { audioUrl, positionSave, episodeDownload, episodeChapters } from '@podlens/core';
+import { audioUrl, positionSave, episodeDownload, episodeChapters, apiPost, onEngineEvent } from '@podlens/core';
 import { state, episodeOf, feedOfEpisode, currentSentence, t, type Episode } from './state';
 
 let audio: HTMLAudioElement | null = null;
@@ -26,12 +26,14 @@ export function initPlayer(): void {
   audio.addEventListener('play', () => {
     state.playing = true;
     syncMediaSession();
+    hostNowPlayingSync(true);
     hooks.render();
   });
   audio.addEventListener('pause', () => {
     state.playing = false;
     saveNow();
     syncMediaSession();
+    hostNowPlayingSync(true);
     hooks.render();
   });
   audio.addEventListener('ended', onEnded);
@@ -41,6 +43,76 @@ export function initPlayer(): void {
     }
   });
   installMediaSessionActions();
+  installHostNowPlayingCommands();
+}
+
+// ---- host-owned OS Now Playing sync (#63 / glaze#153) --------------------
+// The host publishes the OS surface (macOS MediaPlayer.framework, Linux
+// own MPRIS); Windows keeps the web SMTC path above (host stub is inert).
+// State sync is throttled; OS transport commands arrive over SSE and ride
+// the same play/pause/seek paths as the in-page controls.
+let lastHostSyncAt = 0;
+let lastHostKey = '';
+
+function hostNowPlayingSync(force = false): void {
+  const ep = episodeOf(state.episode);
+  if (!ep) {
+    if (lastHostKey) {
+      lastHostKey = '';
+      void apiPost('api/host/now-playing', { clear: true }).catch(() => {});
+    }
+    return;
+  }
+  const feed = feedOfEpisode(ep);
+  const info = {
+    clear: false,
+    title: ep.title,
+    artist: feed?.title || ep.feedTitle || '',
+    album: 'PodLens',
+    duration: duration(),
+    position: position(),
+    playing: state.playing,
+    identifier: 'site.jrtx.podlens',
+  };
+  const key = `${info.title}|${info.playing}|${Math.floor(info.position / 2)}|${info.duration}`;
+  const now = Date.now();
+  if (!force && (key === lastHostKey || now - lastHostSyncAt < 2000)) return;
+  lastHostKey = key;
+  lastHostSyncAt = now;
+  void apiPost('api/host/now-playing', info).catch(() => {});
+}
+
+function installHostNowPlayingCommands(): void {
+  onEngineEvent('now-playing-command', (payload) => {
+    const p = (payload ?? {}) as { cmd?: string; arg?: number };
+    switch (p.cmd) {
+      case 'play':
+        if (state.episode) void playEpisode(state.episode);
+        break;
+      case 'pause':
+        pause();
+        break;
+      case 'stop':
+        pause();
+        seek(0);
+        break;
+      case 'toggle':
+        toggle();
+        break;
+      case 'next':
+        void chapterJump(1);
+        break;
+      case 'previous':
+        void chapterJump(-1);
+        break;
+      case 'seek-by':
+        seek(position() + (Number(p.arg) || 0));
+        break;
+      case 'seek-to':
+        seek(Number(p.arg) || 0);
+        break;
+    }
+  });
 }
 
 // ---- OS now-playing bridge (#63 slice 3) --------------------------------
@@ -283,6 +355,7 @@ function onTime(): void {
   }
   hooks.syncPositionUi();
   syncPositionState();
+  hostNowPlayingSync();
   if (Date.now() - lastSaveAt > 5000) saveNow();
 }
 
@@ -295,6 +368,7 @@ function onEnded(): void {
   state.playing = false;
   hooks.notify(t('statusPlayback_done'));
   hooks.onEnded(ep);
+  hostNowPlayingSync(true);
   hooks.render();
 }
 
@@ -312,4 +386,5 @@ export function resolvePendingPlay(): void {
 export function stopForSwitch(): void {
   audio?.pause();
   saveNow();
+  hostNowPlayingSync(true);
 }

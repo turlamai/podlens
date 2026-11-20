@@ -112,9 +112,14 @@ web UI 取本地音频不加引擎 RPC：宿主路由 `GET api/audio/:id` 按 `<
 
 - 当前载体是共享 web UI + 三平台原生 WebView 窗口，**不是**三套原生控件；
   平台差异集中在窗口chrome、托盘、媒体键与文件对话框，由 glaze 承载。
-- 系统级 Now Playing：web 侧 MediaSession 桥已立（metadata/playbackState/
-  positionState + 八个 action handler）；OS 级逐平台探针（Windows SMTC/WinRT、
-  Linux MPRIS、macOS Now Playing）尚未执行，属 #63 切片 5，未验证前不宣称。
+- 系统级 Now Playing：web 侧 MediaSession 桥保留（页内 metadata/playbackState/
+  positionState + action handler，Windows SMTC 仍走它）；OS 表面自 glaze#153
+  起由**宿主自有**能力发布（macOS 公共 MediaPlayer.framework、Linux 宿主自有
+  MPRIS2；Windows 宿主 stub 惰性）。页面经 `api/host/now-playing` 同步状态，
+  OS 传输命令经 SSE `now-playing-command` 回到页面播放路径；验收探针读宿主
+  表面（Linux 匹配 `org.mpris.MediaPlayer2.site_jrtx_podlens`、macOS 经
+  `api/host/now-playing_os` 回读、Windows SMTC 探针不变），不宣称 web 桥
+  直接等于 OS 集成。
 - 验收进程的合成点击播放依赖 glaze 的 env-gated hatch
   （`GLAZE_ALLOW_PROGRAMMATIC_PLAYBACK=1`，turlamai/glaze#143/#144）；
   **发布应用禁设该变量**，真实用户手势门槛不变。

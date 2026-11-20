@@ -109,6 +109,16 @@ host bridge, never through per-platform UI forks.
   own tray, not a product-deep integration; no mobile roadmap; not an
   all-day resident low-footprint app. Declared in podlens#63 for owner
   correction.
+- OS Now Playing carrier decision (2026-11-20, glaze#153 / glaze PR#154):
+  host-owned publication, not the web engine's MediaSession bridge.
+  Evidence chain: WebKitGTK never owns an MPRIS name on headless CI
+  (WebKit bug 279362; bus-identity forensics in podlens#63), and macOS 26
+  private MediaRemote returns nothing even for audible playback. macOS
+  uses public MediaPlayer.framework; Linux owns MPRIS2 over GIO/GDBus;
+  Windows keeps the verified WebView2 web MediaSession → SMTC path (host
+  stub inert). Page syncs via `api/host/now-playing`; OS commands return
+  over SSE `now-playing-command`; acceptance probes read the host surface
+  (`api/host/now-playing_os` readback / owned MPRIS name / SMTC probe).
 - Main task: resume listening and resume reading one episode; primary
   action = play/pause in the reserved player; secondary = jump back to the
   current transcript sentence.
