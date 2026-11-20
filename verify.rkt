@@ -17,6 +17,7 @@
          net/url
          net/http-client
          racket/file
+         racket/list
          racket/port
          racket/runtime-path
          racket/string
@@ -172,9 +173,11 @@ SW1
                         "--dest=org.freedesktop.DBus" "/org/freedesktop/DBus"
                         "org.freedesktop.DBus.ListNames"))
          (define name-lines
-           (map (lambda (line)
-                  (string-trim (string-trim line) "\""))
-                (string-split names "\n")))
+           (filter-map
+            (lambda (line)
+              (define m (regexp-match #px"\"([^\"]*)\"" line))
+              (and m (cadr m)))
+            (string-split names "\n")))
          (define mpris
            (filter (lambda (s) (string-prefix? s "org.mpris.MediaPlayer2."))
                    name-lines))
@@ -207,14 +210,14 @@ SW1
       [(>= (current-inexact-milliseconds) deadline)
        (cons #f (string-append
                  text
-                 "\n--- poll timeline ---\n"
-                 (string-join (reverse (unbox poll-log-box)) "\n")
                  "\n--- bus identities ---\n"
                  (string-join
                   (map bus-identity
                        (filter (lambda (s) (string-prefix? s ":"))
                                (unbox last-names-box)))
-                  "\n")))]
+                  "\n")
+                 "\n--- poll timeline ---\n"
+                 (string-join (reverse (unbox poll-log-box)) "\n")))]
       [else (sleep 1.0) (loop)])))
 
 (define nowplaying-result (box (cons #f "probe not run")))
@@ -500,7 +503,7 @@ SW1
   (printf "[verify] ~a = ~a\n" (car verdict) (cdr verdict)))
 (define np-detail (cdr (unbox nowplaying-result)))
 (printf "[verify] nowplaying detail: ~a\n"
-        (substring np-detail 0 (min 900 (string-length np-detail))))
+        (substring np-detail 0 (min 6000 (string-length np-detail))))
 (unless (and (pair? verdicts) (andmap cdr verdicts))
   (eprintf "[verify] native UI verification failed\n")
   (for ([r (in-list (if (list? (unbox journey-reports)) (unbox journey-reports) '()))])
