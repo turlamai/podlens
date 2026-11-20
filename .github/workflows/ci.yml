@@ -125,7 +125,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 xvfb pulseaudio \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       # The seeded listening journeys play real media; WebKitGTK needs an
       # audio sink or the media clock stalls. Headless runners have none,
       # so give PulseAudio a null sink for the verify step.
