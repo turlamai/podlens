@@ -482,6 +482,9 @@ PS1
 (define np-detail (cdr (unbox nowplaying-result)))
 (printf "[verify] nowplaying detail: ~a\n"
         (substring np-detail 0 (min 6000 (string-length np-detail))))
+(for ([r (in-list (if (list? (unbox journey-reports)) (unbox journey-reports) '()))])
+  (when (and (hash? r) (equal? (hash-ref r 'id #f) "journey-play-mediasession"))
+    (printf "[verify] play journey detail: ~a\n" (hash-ref r 'detail ""))))
 (unless (and (pair? verdicts) (andmap cdr verdicts))
   (eprintf "[verify] native UI verification failed\n")
   (for ([r (in-list (if (list? (unbox journey-reports)) (unbox journey-reports) '()))])

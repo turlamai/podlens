@@ -215,7 +215,7 @@ export async function runHarnessIfGated(): Promise<void> {
       (ms.metadata?.title ?? '').includes('focused listening'),
       `metadata title ${ms.metadata?.title}`,
     );
-    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''}`;
+    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''} muted=${a0?.muted} vol=${a0?.volume} playErr=${(window as unknown as Record<string, unknown>).__podlensPlayError ?? 'none'}`;
   });
   await step('journey-follow-sync', async () => {
     try {

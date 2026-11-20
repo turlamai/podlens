@@ -61,21 +61,25 @@ jobs:
           version: stable
           distribution: full
       # raco's HTTPS goes through Racket's OpenSSL, whose Windows
-      # certificate-store loader crashes on some runner images; git's own
-      # TLS is stable, so clone the pinned checkouts and install from disk.
-      # Directory names must stay canonical (glaze/rivet): a link install
-      # takes its package name from the directory, and `raco glaze
-      # acceptance`'s doctor leg fails closed on non-canonical names.
-      - name: Install pinned Rivet + Glaze (Windows, git TLS)
+      # certificate-store loader crashes (X509*->C) on some runner images,
+      # even for catalog dependency resolution of a local install. Use the
+      # same verified-TLS path as ci.yml: Node's independent Mozilla roots
+      # fed to ssl-default-verify-sources in the installing process.
+      - name: Export trusted Mozilla CA roots for Windows Racket
         if: runner.os == 'Windows'
-        shell: bash
+        shell: pwsh
         run: |
-          git clone --no-checkout https://github.com/turlamai/rivet.git rivet
-          git -C rivet checkout "$GLAZE_RIVET_PIN"
-          raco pkg install --auto --no-docs ./rivet
-          git clone --no-checkout https://github.com/turlamai/glaze.git glaze
-          git -C glaze checkout "$GLAZE_PIN"
-          raco pkg install --auto --no-docs ./glaze
+          $bundle = Join-Path $env:RUNNER_TEMP 'podlens-mozilla-roots.pem'
+          $js = 'const tls=require("node:tls"),fs=require("node:fs"); if(tls.rootCertificates.length<50) process.exit(2); fs.writeFileSync(process.argv[1],tls.rootCertificates.join("\n")+"\n",{flag:"wx"});'
+          node -e $js $bundle
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $bundle -PathType Leaf)) {
+            throw "Unable to export trusted CA roots; refusing insecure TLS fallback"
+          }
+          "PODLENS_CI_CA_BUNDLE=$bundle" >> $env:GITHUB_ENV
+      - name: Install pinned Rivet + Glaze (Windows, verified TLS)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: racket scripts/ci-install-windows-deps.rkt
       - name: Install pinned Rivet + Glaze (catalog)
         if: runner.os != 'Windows'
         shell: bash

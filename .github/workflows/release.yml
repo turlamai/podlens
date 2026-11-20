@@ -205,19 +205,26 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install Rivet + Glaze (pinned clones)
-        # raco's HTTPS goes through Racket's OpenSSL, whose Windows
-        # certificate-store loader crashes on runner images that ship a
-        # certificate d2i_X509 cannot parse. git's own TLS is stable, so
-        # clone the pinned checkouts and install from the directory.
+      - name: Export trusted Mozilla CA roots for Windows Racket
+        shell: pwsh
         run: |
-          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
-          git -C rivet-src checkout ${{ needs.validate.outputs.rivet-pin }}
-          raco pkg install --auto --no-docs ./rivet-src
-          git clone --no-checkout https://github.com/turlamai/glaze.git glaze-src
-          git -C glaze-src checkout ${{ needs.validate.outputs.glaze-pin }}
-          raco pkg install --auto --no-docs ./glaze-src
-        shell: bash
+          # Racket's Windows ROOT-store loader may throw X509*->C on hosted
+          # images, even for catalog dependency resolution of a local
+          # install. Node bundles independent Mozilla roots; never bypass
+          # TLS certificate or hostname verification.
+          $bundle = Join-Path $env:RUNNER_TEMP 'podlens-mozilla-roots.pem'
+          $js = 'const tls=require("node:tls"),fs=require("node:fs"); if(tls.rootCertificates.length<50) process.exit(2); fs.writeFileSync(process.argv[1],tls.rootCertificates.join("\n")+"\n",{flag:"wx"});'
+          node -e $js $bundle
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $bundle -PathType Leaf)) {
+            throw "Unable to export trusted CA roots; refusing insecure TLS fallback"
+          }
+          "PODLENS_CI_CA_BUNDLE=$bundle" >> $env:GITHUB_ENV
+      - name: Install Rivet + Glaze (pinned, verified TLS)
+        env:
+          RIVET_PIN: ${{ needs.validate.outputs.rivet-pin }}
+          GLAZE_PIN: ${{ needs.validate.outputs.glaze-pin }}
+        shell: pwsh
+        run: racket scripts/ci-install-windows-deps.rkt
       - name: Install WiX (v5; v7 requires EULA acceptance, v5 runs the v4 schema)
         run: |
           dotnet tool install --global wix --version 5.0.2
