@@ -377,7 +377,8 @@ jobs:
             --publisher "Turing Lambda" \
             --identifier site.jrtx.podlens \
             --entry main.rkt \
-            --installer
+            --installer \
+            --icon assets/branding/app.png
           test -s dist/podlens.deb
           test -s dist/podlens.rpm
           test -s dist/podlens.AppImage

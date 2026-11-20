@@ -8,6 +8,9 @@
 # and the slice-5 OS Now Playing probe finds nothing. Run the session bus on
 # a /run/user socket instead; the app, the bridge and the probe share it.
 set -euo pipefail
+# Surface WebKit's MediaSession/MPRIS log channels on headless runners so a
+# silent registration gate (eligibility / empty title) is diagnosable.
+export G_MESSAGES_DEBUG="${G_MESSAGES_DEBUG:-all}"
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "$XDG_RUNTIME_DIR"
 BUS_INFO="$(mktemp)"
