@@ -29,7 +29,7 @@ on:
 # check; the "Read the rivet pin" step below always overwrites this with the
 # pin the published N release was actually built against.
 env:
-  RIVET_PIN: 179319936c6a22b2fa676c0fd557bcdb05ee5205
+  RIVET_PIN: c1f0d921e2136c0cfb2c1c1f6d273f2b26222a19
 
 permissions:
   contents: read
