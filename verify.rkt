@@ -106,7 +106,8 @@
      (define loaded?
        (let loop ()
          (cond
-           [(string-prefix? (webview-title wv) "PodLens") #t]
+           [(and (string? (webview-title wv))
+                 (string-prefix? (webview-title wv) "PodLens")) #t]
            [(>= (current-inexact-milliseconds) deadline) #f]
            [else (sleep 0.1) (loop)])))
      (sleep 1.5)

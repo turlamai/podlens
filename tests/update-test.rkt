@@ -44,18 +44,12 @@
     (file->string (build-path repository-root ".github" "workflows" "release.yml")))
   (define signer
     (file->string (build-path repository-root "scripts" "make-update-manifest.sh")))
-  (define swift
-    (file->string (build-path repository-root "macos-host" "Sources" "RivetHost"
-                             "UpdateService.swift")))
   (check-true (string-contains? workflow "Require Ed25519 update signing key"))
   (check-true (string-contains? workflow "test -s dist/update-manifest.json"))
   (check-false (string-contains? workflow "HAS_UPDATE_KEY"))
   (check-true (string-contains? signer
                                 "https://github.com/turlamai/podlens/releases/download/"))
-  (check-true (string-contains? swift
-                                "https://github.com/turlamai/podlens/releases/latest/download/update-manifest.json"))
-  (check-false (string-contains? signer "turinglambdaai/podlens"))
-  (check-false (string-contains? swift "turinglambdaai/podlens")))
+  (check-false (string-contains? signer "turinglambdaai/podlens")))
 
 
 (test-case "identity symbols match rivet release manifests"

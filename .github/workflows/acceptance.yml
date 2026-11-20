@@ -58,16 +58,19 @@ jobs:
       # raco's HTTPS goes through Racket's OpenSSL, whose Windows
       # certificate-store loader crashes on some runner images; git's own
       # TLS is stable, so clone the pinned checkouts and install from disk.
+      # Directory names must stay canonical (glaze/rivet): a link install
+      # takes its package name from the directory, and `raco glaze
+      # acceptance`'s doctor leg fails closed on non-canonical names.
       - name: Install pinned Rivet + Glaze (Windows, git TLS)
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
-          git -C rivet-src checkout "$GLAZE_RIVET_PIN"
-          raco pkg install --auto --no-docs ./rivet-src
-          git clone --no-checkout https://github.com/turlamai/glaze.git glaze-src
-          git -C glaze-src checkout "$GLAZE_PIN"
-          raco pkg install --auto --no-docs ./glaze-src
+          git clone --no-checkout https://github.com/turlamai/rivet.git rivet
+          git -C rivet checkout "$GLAZE_RIVET_PIN"
+          raco pkg install --auto --no-docs ./rivet
+          git clone --no-checkout https://github.com/turlamai/glaze.git glaze
+          git -C glaze checkout "$GLAZE_PIN"
+          raco pkg install --auto --no-docs ./glaze
       - name: Install pinned Rivet + Glaze (catalog)
         if: runner.os != 'Windows'
         shell: bash
