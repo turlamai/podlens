@@ -68,9 +68,8 @@
 
 (define update-key-id "podlens-2026-10")
 
-;; Ed25519 public key, base64 of the raw 32 bytes (scripts/update-keys.sh)
-;; — the same literal the macOS host embeds (UpdateService.swift). The
-;; private half lives outside the repository and never ships. Rotate by
+;; Ed25519 public key, base64 of the raw 32 bytes (scripts/update-keys.sh).
+;; The private half lives outside the repository and never ships. Rotate by
 ;; shipping a build that trusts the next key before signing releases
 ;; exclusively with it.
 (define update-public-key-b64

@@ -63,7 +63,21 @@
          host-tray-live? host-open-external!
          audio-file-for)
 
-(define-runtime-path frontend-dist "../apps/desktop/dist")
+;; Development serves the vite build straight from the workspace; a packaged
+;; app (raco glaze build) ships the same tree as `public/` next to the exe
+;; (macOS: inside the bundle's Resources, which the generated entry makes the
+;; working directory), so prefer that copy when it exists.
+(define-runtime-path dev-frontend-dist "../apps/desktop/dist")
+(define frontend-dist
+  (let* ([run (find-system-path 'run-file)]
+         [exe-dir (and (path? run) (path-only run))]
+         [candidates (list (and exe-dir (build-path exe-dir "public"))
+                           (and exe-dir (build-path exe-dir ".." "public"))
+                           (and exe-dir (build-path exe-dir ".." "Resources" "public"))
+                           (build-path (current-directory) "public"))])
+    (or (for/or ([dir (in-list candidates)])
+          (and dir (directory-exists? dir) dir))
+        dev-frontend-dist)))
 
 (define bus (make-event-bus))
 (define event-bus bus)

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PodLens
+Comment=Podcast listening with sentence-level transcripts
+Exec=podlens
+Icon=applications-multimedia
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=podcast;transcript;listening;

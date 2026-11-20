@@ -14,3 +14,5 @@ windows/x64/
 node_modules/
 .glaze/
 *.tsbuildinfo
+public/
+backend/glaze-build-entry.rkt

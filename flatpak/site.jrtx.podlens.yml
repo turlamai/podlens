@@ -1,0 +1,38 @@
+# Flatpak bundle for the glaze carrier payload (portable tar.gz tree:
+# bin/ + lib/ + public/). GNOME 50 ships WebKitGTK 4.1 (GTK3) and the
+# GStreamer closure the carrier needs; the release workflow asserts both
+# inside the Sdk before building. Placeholders are sed-substituted per
+# release so the archive checksum is exact.
+app-id: site.jrtx.podlens
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: podlens
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+  - --talk-name=org.freedesktop.Notifications
+  # OS Now Playing: the WebKitGTK MPRIS bridge owns a MediaPlayer2 name;
+  # allow the product name and probing of the bus surface.
+  - --own-name=org.mpris.MediaPlayer2.podlens
+  - --talk-name=org.mpris.MediaPlayer2.*
+modules:
+  - name: podlens
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/podlens
+      - cp -a bin lib public /app/podlens/
+      - install -Dm755 podlens.sh /app/bin/podlens
+      - install -Dm644 site.jrtx.podlens.desktop /app/share/applications/site.jrtx.podlens.desktop
+    sources:
+      - type: archive
+        url: podlens-__VERSION__-linux-__ARCH__.tar.gz
+        sha256: __SHA256__
+      - type: file
+        path: podlens.sh
+      - type: file
+        path: site.jrtx.podlens.desktop
