@@ -24,6 +24,17 @@
          racket/system
          "backend/main.rkt")
 
+;; Surface glaze's hatch/readback log lines (current-logger, no receiver by
+;; default) in headless CI evidence.
+(void
+ (thread
+  (lambda ()
+    (define rcv (make-log-receiver (current-logger) 'info))
+    (let loop ()
+      (define v (sync rcv))
+      (eprintf "[glaze-log] ~a: ~a\n" (vector-ref v 0) (vector-ref v 2))
+      (loop)))))
+
 (define-runtime-path frontend-dist "apps/desktop/dist")
 (define-runtime-path evidence-dir ".glaze/verify")
 (define-runtime-path seed-script "scripts/e2e/seed-listening-fixture.rkt")
