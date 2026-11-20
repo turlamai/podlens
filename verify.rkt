@@ -130,10 +130,32 @@ if let d = info {
 SW1
   )
 
+;; Forensic aids for the Linux probe: a per-second timeline of bus names
+;; and the owning process of each unique connection, dumped only when the
+;; probe times out (headless runners have no desktop session to inspect).
+(define poll-log-box (box '()))
+(define last-names-box (box '()))
+(define (bus-identity name)
+  (define-values (_c pid-out)
+    (run-capture "dbus-send" "--session" "--print-reply"
+                 "--dest=org.freedesktop.DBus" "/org/freedesktop/DBus"
+                 "org.freedesktop.DBus.GetConnectionUnixProcessID"
+                 (string-append "string:" name)))
+  (define pid-m (regexp-match #px"uint32 (\\d+)" pid-out))
+  (define cmd
+    (and pid-m
+         (with-handlers ([exn:fail? (lambda (_) "")])
+           (string-replace
+            (file->string (string-append "/proc/" (cadr pid-m) "/cmdline"))
+            "\0" " "))))
+  (format "~a pid=~a cmd=~a"
+          name (if pid-m (cadr pid-m) "?") (or cmd "")))
+
 ;; Poll the platform surface until the fixture title shows up (the bridges
 ;; publish shortly after playback starts) or the budget runs out.
 (define (probe-nowplaying)
-  (define deadline (+ (current-inexact-milliseconds) 30000))
+  (define probe-t0 (current-inexact-milliseconds))
+  (define deadline (+ probe-t0 30000))
   (let loop ()
     (define-values (ok text)
       (case (system-type)
@@ -149,11 +171,22 @@ SW1
            (run-capture "dbus-send" "--session" "--print-reply"
                         "--dest=org.freedesktop.DBus" "/org/freedesktop/DBus"
                         "org.freedesktop.DBus.ListNames"))
+         (define name-lines
+           (map (lambda (line)
+                  (string-trim (string-trim line) "\""))
+                (string-split names "\n")))
          (define mpris
            (filter (lambda (s) (string-prefix? s "org.mpris.MediaPlayer2."))
-                   (map (lambda (line)
-                          (string-trim (string-trim line) "\""))
-                        (string-split names "\n"))))
+                   name-lines))
+         (set-box! last-names-box name-lines)
+         (set-box! poll-log-box
+                   (cons (format "t=~as mpris=~a bus-names=~a"
+                                 (/ (- (current-inexact-milliseconds) probe-t0) 1000.0)
+                                 (length mpris)
+                                 (string-join
+                                  (filter (lambda (s) (string-prefix? s ":")) name-lines)
+                                  ","))
+                         (unbox poll-log-box)))
          (define outs
            (for/list ([name (in-list mpris)])
              (define-values (_c meta)
@@ -171,7 +204,17 @@ SW1
         [else (values 1 "unsupported platform")]))
     (cond
       [(string-contains? text fixture-title) (cons #t text)]
-      [(>= (current-inexact-milliseconds) deadline) (cons #f text)]
+      [(>= (current-inexact-milliseconds) deadline)
+       (cons #f (string-append
+                 text
+                 "\n--- poll timeline ---\n"
+                 (string-join (reverse (unbox poll-log-box)) "\n")
+                 "\n--- bus identities ---\n"
+                 (string-join
+                  (map bus-identity
+                       (filter (lambda (s) (string-prefix? s ":"))
+                               (unbox last-names-box)))
+                  "\n")))]
       [else (sleep 1.0) (loop)])))
 
 (define nowplaying-result (box (cons #f "probe not run")))
