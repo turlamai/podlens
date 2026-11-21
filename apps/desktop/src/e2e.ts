@@ -2,7 +2,6 @@
 // into the webview, so the journey runs inside the page itself: verify.rkt
 // navigates the window to #e2e with PODLENS_E2E=1, and each step reports
 // through api/host/e2e_report. Inert in production (hash + host gate).
-import { apiPost, resumeLast } from '@podlens/core';
 import { state } from './state';
 import { position, preload } from './player';
 
@@ -56,13 +55,26 @@ async function postRetry(path: string, body: unknown, tries = 5): Promise<unknow
   let last: unknown = new Error('no attempt');
   for (let i = 0; i < tries; i++) {
     try {
-      return await apiPost(path, body);
+      return await httpPost(path, body);
     } catch (e) {
       last = e;
       await wait(150 * (i + 1));
     }
   }
   throw last;
+}
+
+// Harness traffic goes straight to the same-origin host server: the native
+// bridge invoke channel wedges on macOS CI once media playback starts
+// (lost reports / hanging RPCs), while plain fetch stays reliable.
+async function httpPost(path: string, body: unknown): Promise<unknown> {
+  const res = await fetch(`${location.origin}/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`http ${res.status} for ${path}`);
+  return res.json();
 }
 
 let harnessStarted = false;
@@ -261,7 +273,7 @@ export async function runHarnessIfGated(): Promise<void> {
     const hostDeadline = Date.now() + 4000;
     for (;;) {
       os = (await withTimeout(
-        apiPost('api/host/now-playing_os', {}) as Promise<Record<string, unknown>>,
+        httpPost('api/host/now-playing_os', {}) as Promise<Record<string, unknown>>,
         2000,
         'host now-playing_os RPC',
       ).catch(() => ({}))) as Record<string, unknown>;
@@ -316,15 +328,21 @@ export async function runHarnessIfGated(): Promise<void> {
   });
   await step('journey-pause-position', async () => {
     if (!state.playing) {
-      // Fixture may have run out on a very slow runner; restart briefly so
-      // the pause-save path is still exercised.
+      // Fixture may have run out on a very slow runner; rewind to sentence 0
+      // and restart so the pause-save path is still exercised.
+      click('.sentence[data-sec="0"]');
+      await wait(200);
       click('.player [data-action="toggle"]');
-      await until(() => state.playing, 2000, 'restart for pause check');
+      await until(() => state.playing, 2500, 'restart for pause check');
     }
     click('.player [data-action="toggle"]');
     await wait(500);
     expect(!state.playing, 'playback did not pause');
-    const row = await withTimeout(resumeLast(), 4000, 'resume-last RPC');
+    const row = (await withTimeout(
+      httpPost('api/rpc/resume-last', {}) as Promise<unknown[]>,
+      4000,
+      'resume-last RPC',
+    )) as unknown[];
     expect(row.length >= 3, 'resume-last lost the episode');
     return `saved=${row[2] ?? ''}`;
   });
