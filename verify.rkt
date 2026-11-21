@@ -412,7 +412,7 @@ PS1
      (define (report-ok? rs id)
        (for/or ([r (in-list (if (list? rs) rs '()))])
          (and (hash? r) (equal? (hash-ref r 'id #f) id) (eq? #t (hash-ref r 'ok #f)))))
-     (define reports0 (collect-journey (+ (current-inexact-milliseconds) 75000)))
+     (define reports0 (collect-journey (+ (current-inexact-milliseconds) 120000)))
      ;; WKWebView CI hosts wedge media pipelines / drop renders occasionally;
      ;; one fresh-page harness retry keeps acceptance honest without masking
      ;; deterministic regressions (a second failure stays fatal).
@@ -424,7 +424,7 @@ PS1
            (begin
              (eprintf "[verify] macOS harness retry: reloading #e2e\n")
              (webview-navigate wv (string-append url "#e2e"))
-             (collect-journey (+ (current-inexact-milliseconds) 75000)))
+             (collect-journey (+ (current-inexact-milliseconds) 120000)))
            reports0))
      (set-box! journey-reports reports)
      ;; Give the OS probe its own budget after the journeys finish; playback

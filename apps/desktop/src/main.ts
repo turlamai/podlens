@@ -471,10 +471,12 @@ async function onAction(el: HTMLElement): Promise<void> {
       const sec = Number(el.dataset.sec);
       state.reading = sec;
       player.seek(sec);
-      await player.playEpisode(state.episode as string, { seekTo: sec });
+      // Jump first: on stall-prone media pipelines (WebKitGTK muted autoplay)
+      // play() can take seconds; the transcript jump must not wait for it.
       await navigate('transcript');
       $(`.sentence[data-sec="${sec}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       notify(t('ui-anchored'));
+      void player.playEpisode(state.episode as string, { seekTo: sec }).catch(() => {});
       break;
     }
     case 'current': {
