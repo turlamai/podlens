@@ -85,7 +85,10 @@ export async function runHarnessIfGated(): Promise<void> {
     postRetry('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
   const step = async (id: string, fn: () => Promise<string | void>): Promise<void> => {
     try {
-      const detail = await fn();
+      // Whole-step backstop: any wedged await (media pipeline, RPC, timer
+      // throttle) must surface as a reported failure, never a silent hang
+      // that cascades every later verdict to #f.
+      const detail = await withTimeout(fn(), 25000, `step ${id}`);
       await report(id, true, detail ?? '');
     } catch (err) {
       await report(id, false, String(err instanceof Error ? err.message : err));

@@ -206,7 +206,14 @@ export async function loadSettings(): Promise<void> {
   state.follow = truthy(state.settings['follow-transcript']);
   applyAppearance();
   try {
-    state.security = JSON.parse(await securityStatus());
+    // macOS CI keychain queries can block headless sessions forever; the
+    // settings view must render even when the security surface is silent.
+    state.security = JSON.parse(
+      await Promise.race([
+        securityStatus(),
+        new Promise<string>((_, rej) => setTimeout(() => rej(new Error('security timeout')), 3000)),
+      ]),
+    );
   } catch {
     state.security = null;
   }
