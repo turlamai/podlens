@@ -313,6 +313,7 @@ jobs:
         with:
           version: stable
           distribution: full
+          architecture: ${{ matrix.arch }}
       - name: Install Rivet + Glaze (catalog)
         run: |
           raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ needs.validate.outputs.rivet-pin }}'
