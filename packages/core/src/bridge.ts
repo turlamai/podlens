@@ -56,11 +56,23 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 /** Fetch-only POST: bypasses the native bridge invoke channel, which wedges
  *  on macOS CI hosts once media playback starts (podlens#63). */
 export async function apiPostFetch<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
+  // glaze closes keep-alive sockets from a per-request custodian after the
+  // response; WKWebView fetch reuses a just-closed socket and fails POSTs
+  // without retrying. One fresh-connection retry absorbs that race.
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch {
+    res = await fetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+  }
   if (!res.ok) {
     const detail = await res.text();
     // glaze's typed error body carries the engine's user-facing message

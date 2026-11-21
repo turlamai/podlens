@@ -68,11 +68,19 @@ async function postRetry(path: string, body: unknown, tries = 5): Promise<unknow
 // bridge invoke channel wedges on macOS CI once media playback starts
 // (lost reports / hanging RPCs), while plain fetch stays reliable.
 async function httpPost(path: string, body: unknown): Promise<unknown> {
-  const res = await fetch(`${location.origin}/${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const send = () =>
+    fetch(`${location.origin}/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  let res: Response;
+  try {
+    res = await send();
+  } catch {
+    // closed keep-alive socket race (glaze per-request custodian); retry once
+    res = await send();
+  }
   if (!res.ok) throw new Error(`http ${res.status} for ${path}`);
   return res.json();
 }
