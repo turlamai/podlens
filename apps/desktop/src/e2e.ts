@@ -330,14 +330,14 @@ export async function runHarnessIfGated(): Promise<void> {
     // round trip; poll briefly instead of reading once (inert carriers
     // answer {} and fall through after the cap).
     let os: Record<string, unknown> = {};
-    const hostDeadline = Date.now() + 4000;
+    const hostDeadline = Date.now() + 8000;
     for (;;) {
       os = (await withTimeout(
         httpPost('api/host/now-playing_os', {}) as Promise<Record<string, unknown>>,
         2000,
         'host now-playing_os RPC',
       ).catch(() => ({}))) as Record<string, unknown>;
-      if (typeof os.title === 'string' && os.title) break;
+      if (typeof os.title === 'string' && os.title && os.playing === true) break;
       if (Date.now() > hostDeadline) break;
       await wait(400);
     }
