@@ -124,8 +124,6 @@ jobs:
             --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --key "$P8"
           rm -f "$P8"
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -231,8 +229,6 @@ jobs:
           echo "$USERPROFILE/.dotnet/tools" >> "$GITHUB_PATH"
         shell: bash
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -360,8 +356,6 @@ jobs:
           cp "$dest" "$RUNNER_TEMP/bin/appimagetool"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 22
