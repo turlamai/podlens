@@ -138,6 +138,15 @@ jobs:
       # glaze build signs the .app, wraps the signed bundle into the dmg and
       # notarizes + staples when a profile is given; without credentials a
       # tag release fails closed above the build instead of shipping ad-hoc.
+      - name: Reclaim disk before carrier build
+        run: |
+          set -euo pipefail
+          df -h .
+          # node_modules and the pnpm store are dead weight once public/ is
+          # staged; hdiutil needs headroom for the dmg scratch image.
+          rm -rf node_modules apps/*/node_modules packages/*/node_modules
+          pnpm store prune || true
+          df -h .
       - name: Build (Developer ID + notarized)
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
         run: |
@@ -400,16 +409,14 @@ jobs:
             "org.gnome.Platform/${FPARCH}/50" "org.gnome.Sdk/${FPARCH}/50"
           flatpak run --command=sh "org.gnome.Sdk/${FPARCH}/50" -c \
             'ls /usr/lib/*/libwebkit2gtk-4.1.so* /usr/lib/*/libgtk-3.so*'
-          # The manifest template carries version/arch/sha placeholders so
-          # the archive source's checksum is exact per release. The archive
-          # is the glaze portable tree (bin/ + lib/ + public/). The generated
-          # manifest lives at the repo root, so file sources are re-pointed
-          # at flatpak/ and the brand icon; the archive stays root-relative.
-          tar -czf "podlens-${VERSION}-linux-${ARCH}.tar.gz" -C dist bin lib public
-          SHA="$(sha256sum "podlens-${VERSION}-linux-${ARCH}.tar.gz" | cut -d' ' -f1)"
-          sed -e "s/__VERSION__/${VERSION}/" -e "s/__ARCH__/${ARCH}/" \
-              -e "s/__SHA256__/${SHA}/" \
-              -e 's|path: podlens.sh|path: flatpak/podlens.sh|' \
+          # The manifest template carries file-source path rewrites so the
+          # generated manifest at the repo root resolves them. The payload
+          # enters as a dir source staged from dist/ (bin/ + lib/ + public/):
+          # flatpak-builder archive sources need absolute URIs, and a local
+          # dir source keeps the bundle byte-identical to the update payload.
+          mkdir -p flatpak-src
+          cp -a dist/bin dist/lib dist/public flatpak-src/
+          sed -e 's|path: podlens.sh|path: flatpak/podlens.sh|' \
               -e 's|path: site.jrtx.podlens.desktop|path: flatpak/site.jrtx.podlens.desktop|' \
               -e 's|path: app.png|path: assets/branding/app.png|' \
               flatpak/site.jrtx.podlens.yml > site.jrtx.podlens.gen.yml
