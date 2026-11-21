@@ -61,7 +61,7 @@ function hostNowPlayingSync(force = false): void {
   if (!ep) {
     if (lastHostKey) {
       lastHostKey = '';
-      void apiPost('api/host/now-playing', { clear: true }).catch(() => {});
+      void apiPost('api/host/now-playing', { info: { clear: true } }).catch(() => {});
     }
     return;
   }
@@ -81,7 +81,7 @@ function hostNowPlayingSync(force = false): void {
   if (!force && (key === lastHostKey || now - lastHostSyncAt < 2000)) return;
   lastHostKey = key;
   lastHostSyncAt = now;
-  void apiPost('api/host/now-playing', info)
+  void apiPost('api/host/now-playing', { info })
     .then(() => {
       w.__podlensHostSyncOk = ((w.__podlensHostSyncOk as number) ?? 0) + 1;
     })
