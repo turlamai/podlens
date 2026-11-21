@@ -1,8 +1,8 @@
-# Flatpak bundle for the glaze carrier payload (portable tar.gz tree:
-# bin/ + lib/ + public/). GNOME 50 ships WebKitGTK 4.1 (GTK3) and the
-# GStreamer closure the carrier needs; the release workflow asserts both
-# inside the Sdk before building. Placeholders are sed-substituted per
-# release so the archive checksum is exact.
+# Flatpak bundle for the glaze carrier payload (portable tree: bin/ + lib/ +
+# public/). GNOME 50 ships WebKitGTK 4.1 (GTK3) and the GStreamer closure the
+# carrier needs; the release workflow asserts both inside the Sdk before
+# building. The release workflow stages flatpak-src/ from dist/ so the bundle
+# payload is byte-identical to the portable update tarball.
 app-id: site.jrtx.podlens
 runtime: org.gnome.Platform
 runtime-version: '50'
@@ -30,9 +30,8 @@ modules:
       - install -Dm644 site.jrtx.podlens.desktop /app/share/applications/site.jrtx.podlens.desktop
       - install -Dm644 app.png /app/share/icons/hicolor/512x512/apps/site.jrtx.podlens.png
     sources:
-      - type: archive
-        path: podlens-__VERSION__-linux-__ARCH__.tar.gz
-        sha256: __SHA256__
+      - type: dir
+        path: flatpak-src
       - type: file
         path: podlens.sh
       - type: file
