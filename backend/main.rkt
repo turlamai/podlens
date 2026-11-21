@@ -605,21 +605,37 @@
   ;; Carrier diagnostics: a silently degraded backend must be visible in
   ;; the verify log, never inferred from a missing probe surface.
   (log-warning "now-playing supported?=~s" (now-playing-supported?))
+  (define np-backend-module
+    (case (system-type 'os)
+      [(macosx) 'glaze/now-playing/now-playing-macos]
+      [(unix) 'glaze/now-playing/now-playing-linux]
+      [else 'glaze/now-playing/now-playing-stub]))
+  (define np-diag
+    (with-handlers ([exn:fail? (lambda (_) #f)])
+      (dynamic-require np-backend-module 'diagnostics (lambda () #f))))
+  (when (procedure? np-diag)
+    (with-handlers ([exn:fail? (lambda (_) (void))])
+      (log-warning "now-playing diag: ~s" (np-diag))))
   (unless (now-playing-supported?)
     (with-handlers ([exn:fail? (lambda (e)
                                  (log-warning "now-playing backend load error: ~a"
                                               (exn-message e)))])
-      (dynamic-require (case (system-type 'os)
-                         [(macosx) 'glaze/now-playing/now-playing-macos]
-                         [(unix) 'glaze/now-playing/now-playing-linux]
-                         [else 'glaze/now-playing/now-playing-stub])
-                       'supported?))))
+      (dynamic-require np-backend-module 'supported?))))
 
 (define (host-teardown!)
   (define t (unbox tray-handle))
   (when t (with-handlers ([exn:fail? (lambda (_) (void))]) (tray-close t)))
   (set-box! tray-handle #f)
-  (with-handlers ([exn:fail? (lambda (_) (void))]) (now-playing-clear!)))
+  (with-handlers ([exn:fail? (lambda (_) (void))]) (now-playing-clear!))
+  ;; Post-journey carrier state: the bus connection is established lazily
+  ;; at first publish, so the install-time diagnostics cannot show it.
+  (with-handlers ([exn:fail? (lambda (_) (void))])
+    (define d (dynamic-require (case (system-type 'os)
+                                 [(macosx) 'glaze/now-playing/now-playing-macos]
+                                 [(unix) 'glaze/now-playing/now-playing-linux]
+                                 [else 'glaze/now-playing/now-playing-stub])
+                               'diagnostics (lambda () #f)))
+    (when (procedure? d) (log-warning "now-playing teardown diag: ~s" (d)))))
 
 (define engine-started? #f)
 
