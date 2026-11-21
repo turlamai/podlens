@@ -5,7 +5,27 @@
 import { state } from './state';
 import { position, preload } from './player';
 
-const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+// Hidden/occluded WKWebView pages clamp setTimeout to ~1/min (macOS CI
+// windows lose focus mid-journey), which silently freezes every harness
+// wait and backstop. MessageChannel macrotasks are not throttled, so the
+// harness clock runs on a message pump instead of timers.
+const tickChannel = new MessageChannel();
+let tickWaiters: Array<() => void> = [];
+tickChannel.port1.onmessage = () => {
+  const waiters = tickWaiters;
+  tickWaiters = [];
+  for (const w of waiters) w();
+};
+function nextTick(): Promise<void> {
+  return new Promise((resolve) => {
+    tickWaiters.push(resolve);
+    tickChannel.port2.postMessage(0);
+  });
+}
+const wait = async (ms: number): Promise<void> => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) await nextTick();
+};
 
 // Condition polling instead of fixed sleeps: slow CI runners add latency
 // between click and media-clock start, so fixed waits either flake or
@@ -34,16 +54,21 @@ function expect(cond: unknown, message: string): void {
 // deadline so a wedge surfaces as a reported step failure instead.
 function withTimeout<T>(p: Promise<T> | undefined, ms: number, what: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`timeout waiting for ${what}`)), ms);
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (!settled) {
+        settled = true;
+        fn();
+      }
+    };
+    void (async () => {
+      const end = Date.now() + ms;
+      while (Date.now() < end && !settled) await nextTick();
+      finish(() => reject(new Error(`timeout waiting for ${what}`)));
+    })();
     Promise.resolve(p as Promise<T>).then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
+      (v) => finish(() => resolve(v)),
+      (e) => finish(() => reject(e)),
     );
   });
 }
