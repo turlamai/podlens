@@ -422,7 +422,7 @@ jobs:
               flatpak/site.jrtx.podlens.yml > site.jrtx.podlens.gen.yml
           # --disable-rofiles-fuse: runners have no /dev/fuse.
           flatpak-builder --user --force-clean --disable-rofiles-fuse \
-            --repo=flatpak-repo flatpak-build site.jrtx.podlens.gen.yml
+            --default-branch=stable --repo=flatpak-repo flatpak-build site.jrtx.podlens.gen.yml
           flatpak build-bundle flatpak-repo \
             "podlens-${VERSION}-linux-${ARCH}.flatpak" site.jrtx.podlens stable
           # Structural smoke: install the exact bundle and check the payload
