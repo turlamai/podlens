@@ -510,6 +510,7 @@
       (hash-ref h k (lambda () (hash-ref h (symbol->string k) d)))
       d))
 
+(define np-post-log-count (box 0))
 (define (host-now-playing! info)
   (cond
     [(or (not info) (and (hash? info) (np-ref info 'clear #f)))
@@ -523,7 +524,21 @@
               'position (np-ref info 'position 0.0)
               'playing (np-ref info 'playing #f)
               'identifier (np-ref info 'identifier "site.jrtx.podlens")))]
-    [else (void)]))
+    [else (void)])
+  ;; Carrier evidence: the first few syncs log the backend diagnostics so a
+  ;; silently failed publish (bus connect / registration / name ownership)
+  ;; is visible in the verify log instead of inferred from host=inert.
+  (when (< (unbox np-post-log-count) 3)
+    (set-box! np-post-log-count (add1 (unbox np-post-log-count)))
+    (with-handlers ([exn:fail? (lambda (_) (void))])
+      (define d
+        (dynamic-require (case (system-type 'os)
+                           [(macosx) 'glaze/now-playing/now-playing-macos]
+                           [(unix) 'glaze/now-playing/now-playing-linux]
+                           [else 'glaze/now-playing/now-playing-stub])
+                         'diagnostics
+                         (lambda () #f)))
+      (when (procedure? d) (log-warning "now-playing post-publish diag: ~s" (d))))))
 
 (define (autostart-enabled-value)
   (define v (auto-launch-enabled? "PodLens"))
