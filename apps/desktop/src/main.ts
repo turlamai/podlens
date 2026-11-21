@@ -134,7 +134,7 @@ async function navigate(page: Page, opts: { show?: string | null; filter?: strin
     state.show = null;
   }
   if (page === 'discover' && !state.catalog.length) await loadCatalog();
-  if (page === 'settings') await loadSettings();
+  if (page === 'settings' && !Object.keys(state.settings).length) await loadSettings();
   if ((page === 'transcript' || page === 'summary') && state.episode) {
     await ensureEpisodeContent(state.episode);
   }
