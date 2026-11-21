@@ -158,6 +158,19 @@ PS1
                (values 1 "swiftc precompile unavailable")))
          (values 0 (string-append host-text "\n--- MediaRemote ---\n" mr))]
         [(unix)
+         ;; Linux bus evidence (glaze#156/#157): name ownership plus an
+         ;; EXTERNAL dbus-monitor capture of our PropertiesChanged signals.
+         ;; Properties.Get readback is best-effort only: GDBus's internal Get
+         ;; branch does not reach the vtable under Racket FFI (glaze#157).
+         (unless (unbox monitor-started-box)
+           (set-box! monitor-started-box #t)
+           (system
+            "dbus-monitor --session \"type='signal',interface='org.freedesktop.DBus.Properties'\" > /tmp/podlens-np-sig.txt 2>&1 &"))
+         (define sig
+           (with-handlers ([exn:fail? (lambda (_) "")])
+             (if (file-exists? "/tmp/podlens-np-sig.txt")
+                 (file->string "/tmp/podlens-np-sig.txt")
+                 "")))
          (define-values (_lc names)
            (run-capture "dbus-send" "--session" "--print-reply"
                         "--dest=org.freedesktop.DBus" "/org/freedesktop/DBus"
@@ -173,9 +186,10 @@ PS1
                    name-lines))
          (set-box! last-names-box name-lines)
          (set-box! poll-log-box
-                   (cons (format "t=~as mpris=~a bus-names=~a"
+                   (cons (format "t=~as mpris=~a sig=~a bus-names=~a"
                                  (/ (- (current-inexact-milliseconds) probe-t0) 1000.0)
                                  (length mpris)
+                                 (string-length sig)
                                  (string-join
                                   (filter (lambda (s) (string-prefix? s ":")) name-lines)
                                   ","))
@@ -183,17 +197,12 @@ PS1
          (define outs
            (for/list ([name (in-list mpris)])
              (define-values (_c meta)
-               (run-capture "dbus-send" "--session" "--print-reply"
+               (run-capture "dbus-send" "--session" "--print-reply" "--reply-timeout=2000"
                             (string-append "--dest=" name) "/org/mpris/MediaPlayer2"
                             "org.freedesktop.DBus.Properties.Get"
                             "string:org.mpris.MediaPlayer2.Player" "string:Metadata"))
-             (define-values (_s status)
-               (run-capture "dbus-send" "--session" "--print-reply"
-                            (string-append "--dest=" name) "/org/mpris/MediaPlayer2"
-                            "org.freedesktop.DBus.Properties.Get"
-                            "string:org.mpris.MediaPlayer2.Player" "string:PlaybackStatus"))
-             (string-append name "\n" meta "\n" status)))
-         (values 0 (string-append names "\n" (string-join outs "\n")))]
+             (string-append name "\n" meta)))
+         (values 0 (string-append names "\n--- signals ---\n" sig "\n" (string-join outs "\n")))]
         [else (values 1 "unsupported platform")]))
     (cond
       [(string-contains? text fixture-title) (cons #t text)]
@@ -211,6 +220,7 @@ PS1
       [else (sleep 1.0) (loop)])))
 
 (define nowplaying-result (box (cons #f "probe not run")))
+(define monitor-started-box (box #f))
 
 ;; swiftc cold-compiles the probe on hosted macOS runners; compile once in
 ;; the background at module load (no -O: the probe is I/O-bound, and -O
