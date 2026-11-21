@@ -29,6 +29,26 @@ function expect(cond: unknown, message: string): void {
   if (!cond) throw new Error(message);
 }
 
+// WebKit media pipelines can wedge with promises that never settle (macOS
+// CI): an unbounded await would hang the step forever, lose its report and
+// cascade every later verdict to #f. Race every foreign await against a
+// deadline so a wedge surfaces as a reported step failure instead.
+function withTimeout<T>(p: Promise<T> | undefined, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout waiting for ${what}`)), ms);
+    Promise.resolve(p).then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 // WebView2 intermittently aborts keep-alive connections (win_err=10053 server
 // noise); a single failed gate/report fetch must not silently skip the whole
 // harness. Retry harness-only POSTs with a short backoff.
@@ -177,7 +197,7 @@ export async function runHarnessIfGated(): Promise<void> {
       if (a) a.muted = true;
       mutedFallback = true;
       try {
-        await a?.play();
+        await withTimeout(a?.play(), 5000, 'muted play promise');
         // keep muted: unmute without a real gesture pauses WebKitGTK media
       } catch (e) {
         throw new Error(
@@ -230,7 +250,11 @@ export async function runHarnessIfGated(): Promise<void> {
     let os: Record<string, unknown> = {};
     const hostDeadline = Date.now() + 4000;
     for (;;) {
-      os = (await apiPost('api/host/now-playing_os', {})) as Record<string, unknown>;
+      os = (await withTimeout(
+        apiPost('api/host/now-playing_os', {}) as Promise<Record<string, unknown>>,
+        2000,
+        'host now-playing_os RPC',
+      ).catch(() => ({}))) as Record<string, unknown>;
       if (typeof os.title === 'string' && os.title) break;
       if (Date.now() > hostDeadline) break;
       await wait(400);
@@ -290,7 +314,7 @@ export async function runHarnessIfGated(): Promise<void> {
     click('.player [data-action="toggle"]');
     await wait(500);
     expect(!state.playing, 'playback did not pause');
-    const row = await resumeLast();
+    const row = await withTimeout(resumeLast(), 4000, 'resume-last RPC');
     expect(row.length >= 3, 'resume-last lost the episode');
     return `saved=${row[2] ?? ''}`;
   });
