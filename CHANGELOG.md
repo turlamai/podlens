@@ -3,6 +3,44 @@
 All notable changes to PodLens are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is SemVer.
 
+## 0.1.0 - 2026-11-20
+
+Version line restarted at 0.1.0 with the glaze carrier rewrite (#63), per
+the family stack-change rule: all pre-rewrite releases and tags were
+deleted. The Racket engine and its data formats are unchanged; an existing
+`~/.podlens/` library keeps working.
+
+### Changed
+
+- **Carrier**: the three native hosts (SwiftUI / WinUI 3 / GTK4) are
+  replaced by one shared web UI running in each platform's system WebView
+  through [glaze](https://github.com/turlamai/glaze) (WKWebView / WebView2
+  / WebKitGTK). Typed RPC over token-gated loopback HTTP; audio streamed
+  over a Range-capable host route; HTML5 playback with MediaSession and
+  per-platform OS Now Playing (Control Center / SMTC / MPRIS); tray and
+  close-to-tray come from the carrier.
+- **Release pipeline**: glaze build/package per platform — macOS DMG +
+  portable zip (Developer ID + notarization, fail-closed without
+  credentials), Windows MSI + portable zip, Linux deb/rpm/AppImage/
+  Flatpak bundle/tar.gz on x64 and arm64; signed `update-manifest.json`
+  via `raco glaze manifest-sign`, re-verified with
+  `raco glaze verify-release-assets` before publish; SHA256SUMS and
+  Sigstore provenance retained.
+- **Updates**: `racket/update.rkt` now verifies through `glaze/update`
+  (Ed25519 wrapper, sha256 + size); installation stays user-driven per
+  install form (docs/UPDATE.md), qualified end-to-end by the published
+  N→N+1 upgrade workflow on the tar.gz tree.
+- **Acceptance**: per-platform real-window journeys (`verify.rkt`) plus
+  the glaze acceptance envelope replace the native e2e harnesses;
+  transcript follow-along, playback bridge and Now Playing are verified
+  per platform in CI.
+
+### Removed
+
+- Native host legs (`macos-host/`, `windows/`, `linux/`), their e2e
+  harnesses and the rivet packaging scripts.
+- Pre-rewrite releases and tags (version line restart).
+
 ## 0.8.0 - 2026-11-18
 
 ### Added

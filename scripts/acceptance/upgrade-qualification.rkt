@@ -31,18 +31,12 @@
 ;;
 ;; Prints or writes one JSON object and exits non-zero on any mismatch.
 
-(require crypto
+(require glaze/signing
+         glaze/update
          json
          net/base64
          racket/file
          racket/string
-         ;; only-in: keep the driver independent of which names the
-         ;; installed rivet happens to export alongside payback-family
-         ;; modules
-         (only-in rivet/distribution
-                  base64-string->bytes
-                  sha256-file/hex
-                  verify-signed-manifest)
          "../../racket/update.rkt")
 
 (define (need name)
@@ -58,14 +52,22 @@
 (define pristine-path (getenv "PRISTINE_BYTES_PATH"))
 (define tamper-path (getenv "TAMPER_BYTES_PATH"))
 
-;; The updater's embedded key: fixed SPKI prefix + the raw 32-byte public
-;; half (the same assembly racket/update.rkt does; it is not exported, so the
-;; driver rebuilds it from update-public-key-b64).
+;; The updater's embedded key: glaze's verifier reads a PEM/DER file, so the
+;; raw 32-byte public half (update-public-key-b64) is wrapped in the Ed25519
+;; SPKI prefix and materialized as a PEM temp file — the same construction
+;; racket/update.rkt applies at check time.
 (define embedded-public-key
-  (datum->pk-key
-   (bytes-append (hex->bytes "302a300506032b6570032100")
-                 (base64-string->bytes update-public-key-b64))
-   'SubjectPublicKeyInfo))
+  (let ([p (make-temporary-file "podlens-qual-pub-~a.pem")])
+    (define der
+      (bytes-append (bytes #x30 #x2a #x30 #x05 #x06 #x03 #x2b #x65 #x70
+                           #x03 #x21 #x00)
+                    (base64-decode (string->bytes/utf-8 update-public-key-b64))))
+    (display-to-file
+     (string-append "-----BEGIN PUBLIC KEY-----\n"
+                    (bytes->string/utf-8 (base64-encode der #"\n"))
+                    "-----END PUBLIC KEY-----\n")
+     p #:exists 'truncate/replace)
+    p))
 
 (define updates-dir (build-path data-dir "updates"))
 (define (landed-artifacts)
@@ -81,17 +83,17 @@
      ;; refusal below is attributable to the flipped byte alone
      (define pristine-ok
        (with-handlers ([exn:fail? (lambda (_) #f)])
-         (verify-signed-manifest (open-input-bytes (file->bytes pristine-path))
-                                 embedded-public-key
-                                 #:key-id update-key-id)
+         (verify-signed-update-manifest (open-input-bytes (file->bytes pristine-path))
+                                        embedded-public-key
+                                        #:key-id update-key-id)
          #t))
      (unless pristine-ok
        (fail "the pristine live feed bytes did not verify — the environment, not the tamper, is broken"))
      (define tampered-accepted?
        (with-handlers ([exn:fail? (lambda (_) #f)])
-         (verify-signed-manifest (open-input-bytes (file->bytes tamper-path))
-                                 embedded-public-key
-                                 #:key-id update-key-id)
+         (verify-signed-update-manifest (open-input-bytes (file->bytes tamper-path))
+                                        embedded-public-key
+                                        #:key-id update-key-id)
          #t))
      (when tampered-accepted?
        (fail "one-byte-tampered live feed bytes were ACCEPTED — signature enforcement is broken"))
@@ -134,7 +136,7 @@
              'sizeBytes (hash-ref checked 'sizeBytes #f)
              'feedUrl (manifest-url)
              'downloadedPath downloaded-path
-             'downloadedSha256 (sha256-file/hex downloaded-path)
+             'downloadedSha256 (sha256-file downloaded-path)
              'percent (hash-ref snapshot 'percent #f))]))
 
 (if output-json

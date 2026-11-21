@@ -2,13 +2,13 @@
 
 Podcasts, in your language. A cross-platform desktop podcast player that transcribes, translates and summarizes English episodes with your own LLM API key — for listeners who understand far more reading than hearing.
 
-[![CI](https://github.com/turlamai/podlens/actions/workflows/ci.yml/badge.svg)](https://github.com/turlamai/podlens/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/turlamai/podlens)](https://github.com/turlamai/podlens/releases/latest) ![macOS](https://img.shields.io/badge/macOS-SwiftUI-000000?logo=apple&logoColor=white) ![Windows](https://img.shields.io/badge/Windows-WinUI_3-0078D4?logo=windows11&logoColor=white) [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![CI](https://github.com/turlamai/podlens/actions/workflows/ci.yml/badge.svg)](https://github.com/turlamai/podlens/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/turlamai/podlens)](https://github.com/turlamai/podlens/releases/latest) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey) [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 **English** · [中文](README.zh-CN.md)
 
 ## Start here
 
-Free BYOK application. There is no PodLens hosted-AI subscription; your configured providers charge for their usage. Desktop previews for macOS, Windows and Linux. Mobile/companion applications are not delivered; Linux language selection currently uses PODLENS_LANG.
+Free BYOK application. There is no PodLens hosted-AI subscription; your configured providers charge for their usage. Desktop releases for macOS, Windows and Linux. Mobile/companion applications are not delivered (the glaze carrier is desktop-only by family policy); the interface language is chosen in Settings.
 
 [Installation, first use, privacy, backup and recovery](docs/USER-GUIDE.md) · [简体中文](docs/USER-GUIDE.zh-CN.md)
 
@@ -18,16 +18,19 @@ Download from [Releases](https://github.com/turlamai/podlens/releases/latest):
 
 | Platform | Download | Updates |
 |---|---|---|
-| macOS 14+ (Apple Silicon & Intel) | `podlens-<version>-macos-<arch>.dmg` — `arm64` / `x64` (ad-hoc signed — first launch: right-click → Open) | in-app (signed manifest), or reinstall the newer DMG |
-| Windows 10+ x64 | `podlens-<version>-windows-x64.msi` installer (start-menu & desktop shortcuts), or `podlens-<version>-windows-x64.zip` portable | portable: in-app download & install (signed manifest); MSI: re-run the newer installer (the app points you to it) |
-| Linux x64 / arm64 | `podlens-<version>-linux-x86_64.AppImage` / `podlens-<version>-linux-aarch64.AppImage` (bundled GTK4), `podlens-<version>-linux-<distro-arch>.deb` (ships the GStreamer plugin closure incl. `gst-libav` for m4a/mp3), `.rpm`, the portable `tar.gz`/`.zip`, or a `podlens-<version>-linux-<arch>.flatpak` bundle (app id `site.jrtx.podlens`; install with `flatpak --user install` — sandboxed data dir, so it starts a fresh library) | tarball/AppImage: in-app check + download (signed manifest); deb/rpm: upgrade through the package manager; Flatpak bundle: install the newer bundle the same way |
+| macOS 14+ (Apple Silicon & Intel) | `podlens-<version>-macos-<arch>.dmg` — `arm64` / `x64`, or the portable `podlens-<version>-macos-<arch>.zip` | in-app check + verified download (signed manifest), then replace the app with the newer DMG/zip |
+| Windows 10+ x64 | `podlens-<version>-windows-x64.msi` installer (start-menu & desktop shortcuts), or `podlens-<version>-windows-x64.zip` portable | in-app check + verified download; portable: extract the newer zip over the install dir; MSI: re-run the newer installer (the app points you to it) |
+| Linux x64 / arm64 | `podlens-<version>-linux-<arch>.AppImage`, `.deb` (ships the GStreamer plugin closure incl. `gst-libav` for m4a/mp3), `.rpm`, the portable `tar.gz` (`bin/` + `lib/` + `public/`, run `bin/podlens`), or a `podlens-<version>-linux-<arch>.flatpak` bundle (app id `site.jrtx.podlens`; install with `flatpak --user install` — sandboxed data dir, so it starts a fresh library) | tar.gz: in-app check + verified download, then extract the newer tarball over the app directory; deb/rpm: package manager; AppImage/Flatpak: replace the file / install the newer bundle |
 
 Every release carries a `SHA256SUMS` manifest and Sigstore build provenance
 (`gh attestation verify <file> -R turlamai/podlens`).
 
-The macOS build is ad-hoc signed — on first launch, right-click the app and
-choose Open to clear the Gatekeeper prompt. Updates arrive in-app through an
-Ed25519-signed manifest ([docs/UPDATE.md](docs/UPDATE.md)).
+Updates arrive through an Ed25519-signed manifest
+([docs/UPDATE.md](docs/UPDATE.md)); the app verifies signature, hash and
+size before anything is installed, and installation stays user-driven per
+the table above. macOS releases are Developer ID signed and notarized when
+the release credentials are configured; the release pipeline fails closed
+without them.
 
 ## Why PodLens?
 
@@ -43,7 +46,7 @@ The transcripts, translations and summaries are cached on disk, so an episode is
 
 | | PodLens | Apple Podcasts | Overcast |
 |---|---|---|---|
-| Native UI | **SwiftUI / WinUI 3** | AppKit | web wrapper |
+| UI | **one shared web UI on the system WebView** | AppKit | web wrapper |
 | Transcript | **on demand, yours** | limited podcasts | limited podcasts |
 | Translation | **per sentence, local cache** | — | — |
 | Summary | **TL;DR + key points** | AI recaps (US only) | — |
@@ -51,27 +54,29 @@ The transcripts, translations and summaries are cached on disk, so an episode is
 
 ## How it works
 
-PodLens is built on [Rivet](https://github.com/turlamai/rivet): one shared Racket backend (feed parsing, library storage, the AI pipeline, the update client) embedded into each first-party native host. Not Electron, not a web wrapper.
+PodLens is built on [glaze](https://github.com/turlamai/glaze): one shared Racket backend (feed parsing, library storage, the AI pipeline, the update client) serving one shared web UI inside each platform's own system WebView — WKWebView, WebView2, WebKitGTK. Not Electron: no bundled browser, no helper daemon.
 
 ```text
                  Racket application core
       feeds · library · ASR/translate/summarize · updater
                           │
-                    RVT1 protocol
-                 typed RPC / Events
-                    ┌─────┴─────┐
-                macOS         Windows
-               SwiftUI        WinUI 3
+                 typed RPC over loopback HTTP
+                 (token-gated, same-origin UI)
+                          │
+              one web UI (HTML/CSS/TS)
+                    ┌─────┼─────┐
+                macOS   Windows  Linux
+              WKWebView WebView2 WebKitGTK
 ```
 
 - The backend embeds Racket CS in-process — no helper daemon, no console window
-- Playback uses the platform media stack; the audio cache lives in `~/.podlens/audio/`
+- Playback is HTML5 audio in the carrier; the host streams cached audio over a Range-capable loopback route; OS Now Playing (Control Center / SMTC / MPRIS) is bridged per platform
 - The UI talks only to the typed contract in `racket/backend.rkt` — changing it is a cross-platform release
 
 ## What's inside
 
 - **One-click Understand**: download → transcribe → translate → summarize as a single job — finished stages are skipped on re-run, a confirmation shows the text volume before anything is billed, and a running job can be cancelled at its next checkpoint
-- Subscribe to RSS podcast feeds (RSS 2.0 + iTunes tags), refresh with new-episode detection, auto-refresh every 30 minutes with new-episode notifications (macOS)
+- Subscribe to RSS podcast feeds (RSS 2.0 + iTunes tags), refresh with new-episode detection, auto-refresh every 30 minutes with new-episode notifications
 - Playback: 1.0–3.0× speed, ±15/30 s skip, sleep timer, chapter jumps (Podcasting 2.0 `podcast:chapters`), continuous playback into the next episode, resume-on-launch, media keys + Control Center (macOS) / SMTC (Windows) / MPRIS (Linux)
 - **Reading-first detail**: a serif transcript set like a reading surface, follow-along highlighting, keyboard-operable sentences, and bilingual / translation-only / original-only modes
 - **Focus Listening** hides the library and episode lists without interrupting playback, preserving the episode, position and reading context; the same control restores the library in place
@@ -101,7 +106,7 @@ Add a podcast RSS URL, pick an episode, press **Understand** (一键听懂). Or 
 
 ```bash
 git clone https://github.com/turlamai/podlens && cd podlens
-raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#v0.11.0'
+raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#<GLAZE_PIN from .github/workflows/ci.yml>'
 racket racket/cli.rkt add "https://feeds.example.com/show.xml"
 racket racket/cli.rkt episodes <feed-id>
 racket racket/cli.rkt transcribe <episode-id>
@@ -116,31 +121,37 @@ no API key for `--help`, `list`, `doctor` and `config`.)
 
 ```text
 podlens/
-├── rivet.rktd              # release identity, version, deployment targets
+├── glaze.rktd              # carrier schema contract (app id, window, tray)
+├── main.rkt                # glaze build entry (wraps backend/main.rkt)
+├── VERSION                 # release identity, checked against racket/version.rkt
+├── backend/
+│   └── main.rkt            # host: typed RPC routes, audio Range streaming, tray, close-to-tray
+├── apps/desktop/           # the one web UI (TypeScript + Vite); i18n projected from racket/core/i18n.rkt
 ├── racket/
-│   ├── backend.rkt         # the RVT1 wire contract (21 RPCs, 5 events, 1 state)
-│   ├── update.rkt          # signed-manifest update checks
+│   ├── backend.rkt         # the typed wire contract (RPCs, events, state)
+│   ├── update.rkt          # signed-manifest update checks (glaze/update)
 │   ├── cli.rkt             # agent-facing CLI (--json, exit codes)
 │   └── core/               # feeds, library, config, openai, pipeline, chapters, i18n
-├── macos-host/             # SwiftUI host (player, transcript, updater)
-├── windows/                # WinUI 3 host (C++/WinRT code-behind)
-├── linux/                  # GTK4 host (GStreamer playback; GeneratedBackend.hpp is generated)
-├── tests/                  # 41 backend tests incl. a fake OpenAI server
-├── scripts/                # update-keys.sh, make-update-manifest.sh, make-icons.py
-├── docs/                   # UPDATE.md (update contract) · DESIGN-ROADMAP.md (M1–M5)
+├── tests/                  # backend tests incl. a fake OpenAI server and the update flow
+├── verify.rkt              # real-window acceptance journeys (per platform, headless-capable)
+├── scripts/                # update-keys.sh, make-update-manifest.sh, acceptance/, e2e seeds
+├── flatpak/                # bundle manifest + launcher for the Linux flatpak artifact
+├── design/                 # landed prototype + DESIGN.md visual/interaction contract
+├── docs/                   # UPDATE.md (update contract) · USER-GUIDE · release-runbook
 ├── site/                   # podlens.jrtx.site (GitHub Pages)
-└── .github/workflows/      # ci.yml · release.yml · pages.yml
+└── .github/workflows/      # ci · acceptance · release · appimage-upgrade-qualification · pages
 ```
 
 ## Development
 
-Prerequisites: [Racket CS](https://racket-lang.org/) (stable) with the pinned Rivet package installed, and the platform toolchain (Xcode CLT on macOS, VS 2022 with the WinUI workload on Windows, GTK4 + GStreamer dev packages on Linux).
+Prerequisites: [Racket CS](https://racket-lang.org/) (stable, full distribution) with the pinned glaze package installed, and Node.js for the web UI build. Linux additionally needs GTK3 + WebKitGTK 4.1 + GStreamer runtime packages (see `.github/workflows/acceptance.yml` for the exact list).
 
 ```bash
-raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#v0.11.0'
-raco rivet doctor
-raco rivet dev          # build + launch the current platform's host
+raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#<GLAZE_PIN>'
+npm --prefix apps/desktop ci && npm --prefix apps/desktop run build
 raco test tests/        # backend tests (no API key needed — fake server)
+racket verify.rkt       # real-window acceptance journeys on this platform
+raco glaze build --entry main.rkt --version "$(cat VERSION)"   # packaged tree in dist/
 ```
 
 ## Honest gaps
@@ -149,23 +160,23 @@ raco test tests/        # backend tests (no API key needed — fake server)
 - **Chapters only via Podcasting 2.0 feed pointers** — embedded ID3/M4A chapter atoms are not parsed; per-chapter summaries are deliberately not built (N× the LLM bill)
 - **Translation cost is bounded only by your usage** — every sentence of a chosen episode goes through your API; long episodes cost real money. The header shows a sentence/character estimate before you start, and `podlens estimate <id>` prints it
 - **One target language at a time** — the pipeline retranslates when you change `target-lang`
-- **macOS builds are ad-hoc signed** until notarization credentials are configured in CI; first launch needs right-click → Open
+- **macOS signing depends on release credentials** — with the Developer ID and notary secrets configured, releases are signed and notarized; without them a tag release fails closed rather than shipping ad-hoc artifacts
+- **Flatpak starts a fresh library** — the sandboxed data dir is separate from `~/.podlens/`; use the tar.gz/deb/rpm forms to keep an existing library
 
 ## Roadmap
 
-The full design roadmap (M1 consistency baseline → M2 transcript-as-product → M3 utility loop → M4 mobile companion → M5 back to Rivet) lives in [docs/DESIGN-ROADMAP.md](docs/DESIGN-ROADMAP.md).
+The design roadmap lives in [docs/DESIGN-ROADMAP.md](docs/DESIGN-ROADMAP.md). Mobile companions are out of scope: the glaze carrier is desktop-only by family policy.
 
 - [x] RSS subscription + episode cache + playback positions
 - [x] ASR / translation / summary pipeline with job progress events
 - [x] One-click "understand this episode" (pipeline RPC) + cost estimates
-- [x] SwiftUI + WinUI 3 hosts over one RVT1 contract
+- [x] One shared web UI on the glaze system-WebView carrier (macOS / Windows / Linux)
 - [x] Ed25519-signed update channel
-- [x] System media keys (Control Center / SMTC), skip, sleep timer, 3× speed
+- [x] System media keys (Control Center / SMTC / MPRIS), skip, sleep timer, 3× speed
 - [x] Chapter marks (Podcasting 2.0), mark played, unplayed badges, continuous playback, resume on launch
-- [ ] Notarized macOS + Authenticode-signed Windows releases
+- [x] Notarized macOS releases; Linux five-form packaging (deb/rpm/AppImage/Flatpak/tar.gz)
+- [ ] Authenticode-signed Windows releases
 - [ ] Per-chapter summaries, listening stats and vocabulary export
-- [ ] Mobile companion — iOS / iPadOS + Android hosts, watchOS remote
-      (design in [docs/DESIGN-ROADMAP.md](docs/DESIGN-ROADMAP.md))
 
 ## License
 

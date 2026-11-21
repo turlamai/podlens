@@ -13,6 +13,9 @@
 (define rivet-pin (getenv "RIVET_PIN"))
 (unless (and rivet-pin (not (equal? rivet-pin "")))
   (error 'ci-install-windows-deps "RIVET_PIN is missing"))
+(define glaze-pin (getenv "GLAZE_PIN"))
+(unless (and glaze-pin (not (equal? glaze-pin "")))
+  (error 'ci-install-windows-deps "GLAZE_PIN is missing"))
 (define acceptance?
   (for/or ([arg (in-vector (current-command-line-arguments))])
     (equal? arg "--acceptance")))
@@ -24,5 +27,7 @@
                        (format "https://github.com/turlamai/keel.git#~a" keel-pin)))
 (pkg-install-command #:auto #t #:no-docs #t
                      (format "https://github.com/turlamai/rivet.git#~a" rivet-pin))
+(pkg-install-command #:auto #t #:no-docs #t
+                     (format "https://github.com/turlamai/glaze.git#~a" glaze-pin))
 (when acceptance?
   (pkg-install-command #:auto #t #:no-docs #t #:skip-installed #t "crypto"))

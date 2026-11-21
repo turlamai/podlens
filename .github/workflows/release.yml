@@ -13,18 +13,22 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# Single source of truth for the rivet pin (matches ci.yml).
-env:
-  RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
+# The glaze pin lives in ci.yml (single source of truth); validate reads it
+# once and every build job consumes the output. The engine (racket/) still
+# tests against rivet in CI, but release packaging is glaze-only since #63
+# slice 4 retired the native host legs.
 jobs:
   validate:
     name: Validate release tag
     runs-on: ubuntu-latest
+    outputs:
+      glaze-pin: ${{ steps.pin.outputs.glaze-pin }}
+      rivet-pin: ${{ steps.pin.outputs.rivet-pin }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check tag matches VERSION, rivet.rktd, racket/version.rkt
+      - name: Check tag matches VERSION and racket/version.rkt
         run: bash scripts/check-release-version.sh "${{ github.ref_name }}"
       - name: Check CHANGELOG
         run: |
@@ -39,6 +43,15 @@ jobs:
             echo "::error::UPDATE_ED25519_PRIVATE_KEY missing; skipping expensive platform builds rather than publishing without a signed feed"
             exit 1
           fi
+      - name: Read glaze + rivet pins from ci.yml
+        id: pin
+        run: |
+          pin="$(grep -m1 -E '^ *GLAZE_PIN:' .github/workflows/ci.yml | sed -E 's/.*GLAZE_PIN:[[:space:]]*//')"
+          test -n "$pin"
+          echo "glaze-pin=$pin" >> "$GITHUB_OUTPUT"
+          rpin="$(grep -m1 -E '^ *RIVET_PIN:' .github/workflows/ci.yml | sed -E 's/.*RIVET_PIN:[[:space:]]*//')"
+          test -n "$rpin"
+          echo "rivet-pin=$rpin" >> "$GITHUB_OUTPUT"
 
   macos:
     name: macOS build (${{ matrix.arch }})
@@ -59,7 +72,7 @@ jobs:
       # exist (Developer ID p12 + App Store Connect API key) and applies to
       # every workflow run that has them. Credential contract:
       # DEVELOPER_ID_P12_B64 / DEVELOPER_ID_P12_PASSWORD / ASC_KEY_ID /
-      # ASC_ISSUER_ID / ASC_KEY_P8_B64; see rivet docs/production-signing.md.
+      # ASC_ISSUER_ID / ASC_KEY_P8_B64; see glaze docs/production-signing.md.
       MACOS_SIGNING_CONFIGURED: ${{ secrets.DEVELOPER_ID_P12_B64 != '' && secrets.ASC_KEY_P8_B64 != '' }}
       # A tag push is a release: without credentials it must fail closed
       # instead of silently shipping ad-hoc signed artifacts.
@@ -72,8 +85,10 @@ jobs:
           version: stable
           distribution: full
           architecture: ${{ matrix.racket-arch }}
-      - name: Install Rivet (catalog)
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
+      - name: Install Rivet + Glaze (catalog)
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ needs.validate.outputs.rivet-pin }}'
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
       - name: Provision Developer ID certificate
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
         env:
@@ -94,13 +109,7 @@ jobs:
           rm -f "$P12"
           IDENTITY_NAME="$(security find-identity -v -p codesigning "$KEYCHAIN" | grep 'Developer ID Application' | head -1 | sed -E 's/^[^"]*"(.*)"$/\1/')"
           test -n "$IDENTITY_NAME"
-          # rivet reads exactly these two (rivet docs/production-signing.md);
-          # unlike `release`, `package` stays ad-hoc by default, so only the
-          # explicit `--production` invocation below turns them on.
-          {
-            echo "RIVET_MACOS_SIGN_IDENTITY=$IDENTITY_NAME"
-            echo "RIVET_MACOS_NOTARY_PROFILE=ASC_NOTARY"
-          } >> "$GITHUB_ENV"
+          echo "MACOS_SIGN_IDENTITY=$IDENTITY_NAME" >> "$GITHUB_ENV"
       - name: Store notarytool keychain profile
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
         env:
@@ -114,17 +123,50 @@ jobs:
           xcrun notarytool store-credentials ASC_NOTARY \
             --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --key "$P8"
           rm -f "$P8"
-      # `raco rivet package` stays ad-hoc by default; `--production` is the
-      # documented switch that makes rivet consume the credentials exported
-      # above: Developer ID-signs, notarizes, staples, and re-verifies
-      # inside rivet itself.
-      - name: Package (Developer ID + notarized)
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build web UI and stage public/
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm -r run build
+          mkdir -p public
+          cp -R apps/desktop/dist/. public/
+      # glaze build signs the .app, wraps the signed bundle into the dmg and
+      # notarizes + staples when a profile is given; without credentials a
+      # tag release fails closed above the build instead of shipping ad-hoc.
+      - name: Build (Developer ID + notarized)
         if: env.MACOS_SIGNING_CONFIGURED == 'true'
-        run: raco rivet package --production
-      - name: Package (ad-hoc dispatch smoke)
+        run: |
+          raco glaze build \
+            --name podlens \
+            --version "${GITHUB_REF_NAME#v}" \
+            --publisher "Turing Lambda" \
+            --identifier site.jrtx.podlens \
+            --entry main.rkt \
+            --installer \
+            --icon assets/branding/app.icns \
+            --dmg-background assets/branding/dmg-background.png \
+            --sign "$MACOS_SIGN_IDENTITY" \
+            --notarize ASC_NOTARY
+      - name: Build (ad-hoc dispatch smoke)
         if: env.MACOS_SIGNING_CONFIGURED != 'true' && env.IS_TAG_RELEASE != 'true'
-        run: raco rivet package
-      - name: Package requires signing credentials
+        run: |
+          raco glaze build \
+            --name podlens \
+            --version "${GITHUB_REF_NAME#v}" \
+            --publisher "Turing Lambda" \
+            --identifier site.jrtx.podlens \
+            --entry main.rkt \
+            --installer \
+            --icon assets/branding/app.icns \
+            --dmg-background assets/branding/dmg-background.png
+      - name: Build requires signing credentials
         if: env.MACOS_SIGNING_CONFIGURED != 'true' && env.IS_TAG_RELEASE == 'true'
         run: |
           echo "::error::Tag releases must be production-signed: set the macOS signing secrets (DEVELOPER_ID_P12_B64, DEVELOPER_ID_P12_PASSWORD, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_B64) on this repository before tagging."
@@ -139,8 +181,7 @@ jobs:
       - name: Human installer (DMG) + checksum
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          hdiutil create -volname PodLens -srcfolder dist/podlens.app -ov -format UDZO \
-            "podlens-${VERSION}-macos-${{ matrix.arch }}.dmg"
+          mv dist/podlens.dmg "podlens-${VERSION}-macos-${{ matrix.arch }}.dmg"
           shasum -a 256 "podlens-${VERSION}-macos-${{ matrix.arch }}.dmg" \
             > "podlens-${VERSION}-macos-${{ matrix.arch }}.dmg.sha256"
       - uses: actions/upload-artifact@v4
@@ -164,55 +205,88 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install Rivet (catalog)
-        # raco's HTTPS goes through Racket's OpenSSL, whose Windows
-        # certificate-store loader crashes on runner images that ship a
-        # certificate d2i_X509 cannot parse. git's own TLS is stable, so
-        # clone the pinned checkout and install from the directory.
+      - name: Export trusted Mozilla CA roots for Windows Racket
+        shell: pwsh
         run: |
-          git clone --no-checkout https://github.com/turlamai/rivet.git rivet-src
-          git -C rivet-src checkout ${{ env.RIVET_PIN }}
-          raco pkg install --auto --no-docs ./rivet-src
-        shell: bash
-      - name: Install WiX (v5; v7 requires EULA acceptance, v5 runs the v4 schema)
-        run: dotnet tool install --global wix --version 5.0.2
-        shell: bash
-      - name: Package + MSI (rivet release, development signing)
+          # Racket's Windows ROOT-store loader may throw X509*->C on hosted
+          # images, even for catalog dependency resolution of a local
+          # install. Node bundles independent Mozilla roots; never bypass
+          # TLS certificate or hostname verification.
+          $bundle = Join-Path $env:RUNNER_TEMP 'podlens-mozilla-roots.pem'
+          $js = 'const tls=require("node:tls"),fs=require("node:fs"); if(tls.rootCertificates.length<50) process.exit(2); fs.writeFileSync(process.argv[1],tls.rootCertificates.join("\n")+"\n",{flag:"wx"});'
+          node -e $js $bundle
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $bundle -PathType Leaf)) {
+            throw "Unable to export trusted CA roots; refusing insecure TLS fallback"
+          }
+          "PODLENS_CI_CA_BUNDLE=$bundle" >> $env:GITHUB_ENV
+      - name: Install Rivet + Glaze (pinned, verified TLS)
         env:
-          RIVET_UPDATE_BASE_URL: https://github.com/turlamai/podlens/releases/download/${{ github.ref_name }}
-          RIVET_UPDATE_KEY_ID: podlens-2026-10
-          UPDATE_ED25519_PRIVATE_KEY: ${{ secrets.UPDATE_ED25519_PRIVATE_KEY }}
+          RIVET_PIN: ${{ needs.validate.outputs.rivet-pin }}
+          GLAZE_PIN: ${{ needs.validate.outputs.glaze-pin }}
+        shell: pwsh
+        run: racket scripts/ci-install-windows-deps.rkt
+      - name: Install WiX (v5; v7 requires EULA acceptance, v5 runs the v4 schema)
         run: |
-          KEY_DER="$(mktemp -d)/update-ed25519-private.der"
-          KEY_PEM="$(mktemp)"
-          printf '%s\n' "$UPDATE_ED25519_PRIVATE_KEY" > "$KEY_PEM"
-          openssl pkey -in "$KEY_PEM" -outform DER -out "$KEY_DER"
-          rm -f "$KEY_PEM"
-          export RIVET_UPDATE_PRIVATE_KEY="$KEY_DER"
-          raco rivet release --development
-          rm -f "$KEY_DER"
-          # podlens ships one merged signed feed from the publish job; the
-          # per-windows manifest rivet emits here is not shipped.
-          rm -f dist/update-*.json
+          dotnet tool install --global wix --version 5.0.2
+          echo "$USERPROFILE/.dotnet/tools" >> "$GITHUB_PATH"
         shell: bash
-      - name: Collect MSI + portable zip + checksums
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build web UI and stage public/
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          cd dist
-          # rivet v0.11.0 emits the MSI and the portable zip directly in
-          # family form — no staging directory to compress anymore.
-          sha256sum "podlens-${VERSION}-windows-x64.msi" > "podlens-${VERSION}-windows-x64.msi.sha256"
-          sha256sum "podlens-${VERSION}-windows-x64.zip" > "podlens-${VERSION}-windows-x64.zip.sha256"
+          pnpm install --frozen-lockfile
+          pnpm -r run build
+          mkdir -p public
+          cp -R apps/desktop/dist/. public/
+      # No Windows signing certificate is configured for this repository;
+      # glaze labels the installer unsigned rather than failing the release
+      # (family policy: the Windows certificate is optional).
+      - name: Build MSI + distribution
+        shell: bash
+        run: |
+          raco glaze build \
+            --name podlens \
+            --version "${GITHUB_REF_NAME#v}" \
+            --publisher "Turing Lambda" \
+            --identifier site.jrtx.podlens \
+            --entry main.rkt \
+            --installer \
+            --icon assets/branding/app.ico \
+            --installer-license LICENSE \
+            --installer-banner assets/branding/wizard-banner.bmp \
+            --installer-dialog assets/branding/wizard-dialog.bmp
+          test -s dist/podlens.msi
+      - name: Collect MSI + portable zip + checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $msi = "podlens-$version-windows-x64.msi"
+          Move-Item dist/podlens.msi $msi
+          $hash = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
+          "$hash  $msi" | Set-Content -Encoding ascii "$msi.sha256"
+          # Portable update payload: the whole distribution tree except the
+          # installer itself (exe + dlls + lib/ + public/).
+          $items = Get-ChildItem dist -Exclude *.msi, *.sha256
+          $zip = "podlens-$version-windows-x64.zip"
+          Compress-Archive -Path $items.FullName -DestinationPath $zip
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -Encoding ascii "$zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: |
-            dist/podlens-*-windows-x64.msi
-            dist/podlens-*-windows-x64.msi.sha256
-            dist/podlens-*-windows-x64.zip
-            dist/podlens-*-windows-x64.zip.sha256
+            podlens-*-windows-x64.msi
+            podlens-*-windows-x64.msi.sha256
+            podlens-*-windows-x64.zip
+            podlens-*-windows-x64.zip.sha256
           if-no-files-found: error
 
   linux:
@@ -229,33 +303,28 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - name: Set up embeddable Racket CS
-        uses: turlamai/rivet/.github/actions/setup-embed-racket@994047c310c749d3e16d873f33fc073dca0c6521
-      # Installed after the embeddable runtime so the catalog dependency
-      # closure (cext-lib, crypto-lib, keel) resolves against the minimal
-      # build — it ships no packages of its own. crypto backs the updater.
-      - name: Install Rivet (catalog) and backend packages
+      - name: Install Racket
+        uses: Bogdanp/setup-racket@v1.15
+        with:
+          version: stable
+          distribution: full
+      - name: Install Rivet + Glaze (catalog)
         run: |
-          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
-          raco pkg install --auto --no-docs crypto
-      - name: Install GTK4, GStreamer, rpm and packaging tooling
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ needs.validate.outputs.rivet-pin }}'
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
+      - name: Install packaging tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes \
-            libgtk-4-dev libadwaita-1-dev libjson-glib-dev libsecret-1-dev \
-            libglib2.0-dev cmake ninja-build pkg-config file \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            rpm desktop-file-utils
-      # tar.gz (the update-feed payload) + deb + rpm + AppImage + portable
-      # zip + SBOM, launch smoke included. The deb side-payload ships the
-      # GStreamer plugin closure (base/good + gst-libav) so m4a/mp3 play on
-      # stock Debian/Ubuntu; the AppImage carries its own GTK4 closure, and
-      # APPIMAGE_EXTRACT_AND_RUN lets appimagetool run on the runner.
+          sudo apt-get install --yes rpm desktop-file-utils file
+      # tar.gz (the update-feed payload) + deb + rpm + AppImage. The deb/rpm
+      # payloads declare the WebKitGTK/GStreamer runtime dependencies; the
+      # AppImage carries its own closure, and APPIMAGE_EXTRACT_AND_RUN lets
+      # appimagetool run on the runner.
       - name: Fetch appimagetool (release CDN fallback)
         # GitHub's release-asset download endpoint has returned 504 for
         # appimagetool 1.9.0 while the API asset endpoint stayed healthy.
         # Fetch through the CDN when possible, otherwise through the API,
-        # and still verify Rivet's pinned SHA-256 before use.
+        # and still verify the pinned SHA-256 before use.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -275,8 +344,10 @@ jobs:
           dest="$RUNNER_TEMP/appimagetool-${asset_arch}.AppImage"
           url="https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-${asset_arch}.AppImage"
           if ! curl -fSL --retry 2 --retry-delay 2 -o "$dest" "$url"; then
-            asset_id="$(gh api repos/AppImage/appimagetool/releases/tags/1.9.0               --jq ".assets[] | select(.name==\"appimagetool-${asset_arch}.AppImage\") | .id")"
-            gh api -H 'Accept: application/octet-stream'               "repos/AppImage/appimagetool/releases/assets/${asset_id}" > "$dest"
+            asset_id="$(gh api repos/AppImage/appimagetool/releases/tags/1.9.0 \
+              --jq ".assets[] | select(.name==\"appimagetool-${asset_arch}.AppImage\") | .id")"
+            gh api -H 'Accept: application/octet-stream' \
+              "repos/AppImage/appimagetool/releases/assets/${asset_id}" > "$dest"
           fi
           actual="$(sha256sum "$dest" | awk '{print $1}')"
           if [ "$actual" != "$digest" ]; then
@@ -284,11 +355,40 @@ jobs:
             exit 1
           fi
           chmod +x "$dest"
-          echo "RIVET_APPIMAGETOOL_PATH=$dest" >> "$GITHUB_ENV"
-      - name: Release (tar.gz + deb + rpm + AppImage + portable zip)
+          # glaze locates the tool by name on PATH.
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp "$dest" "$RUNNER_TEMP/bin/appimagetool"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build web UI and stage public/
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm -r run build
+          mkdir -p public
+          cp -R apps/desktop/dist/. public/
+      - name: Build (tar.gz tree + deb + rpm + AppImage)
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
-        run: raco rivet release --without-updates --development
+        run: |
+          set -euo pipefail
+          raco glaze build \
+            --name podlens \
+            --version "${GITHUB_REF_NAME#v}" \
+            --publisher "Turing Lambda" \
+            --identifier site.jrtx.podlens \
+            --entry main.rkt \
+            --installer \
+            --icon assets/branding/app.png
+          test -s dist/podlens.deb
+          test -s dist/podlens.rpm
+          test -s dist/podlens.AppImage
       - name: Flatpak bundle
         run: |
           set -euo pipefail
@@ -297,25 +397,39 @@ jobs:
           case "$ARCH" in x64) FPARCH=x86_64 ;; arm64) FPARCH=aarch64 ;; esac
           sudo apt-get install --yes flatpak flatpak-builder
           # User-level everything: runner accounts install runtimes and
-          # build without root. GNOME 50 is the oldest supported platform
-          # runtime (48 went EOL 2026-03-24); its glibc 2.42 covers the
-          # ubuntu-24.04-built payload.
+          # build without root. GNOME 50 ships WebKitGTK 4.1 (GTK3) and the
+          # GStreamer closure the glaze carrier needs; assert both before
+          # spending time on the bundle.
           flatpak --user remote-add --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
           flatpak --user install -y --noninteractive flathub \
             "org.gnome.Platform/${FPARCH}/50" "org.gnome.Sdk/${FPARCH}/50"
+          flatpak run --command=sh "org.gnome.Sdk/${FPARCH}/50" -c \
+            'ls /usr/lib/*/libwebkit2gtk-4.1.so* /usr/lib/*/libgtk-3.so*'
           # The manifest template carries version/arch/sha placeholders so
-          # the archive source's checksum is exact per release.
-          cp "dist/podlens-${VERSION}-linux-${ARCH}.tar.gz" .
+          # the archive source's checksum is exact per release. The archive
+          # is the glaze portable tree (bin/ + lib/ + public/). The generated
+          # manifest lives at the repo root, so file sources are re-pointed
+          # at flatpak/ and the brand icon; the archive stays root-relative.
+          tar -czf "podlens-${VERSION}-linux-${ARCH}.tar.gz" -C dist bin lib public
           SHA="$(sha256sum "podlens-${VERSION}-linux-${ARCH}.tar.gz" | cut -d' ' -f1)"
           sed -e "s/__VERSION__/${VERSION}/" -e "s/__ARCH__/${ARCH}/" \
               -e "s/__SHA256__/${SHA}/" \
+              -e 's|path: podlens.sh|path: flatpak/podlens.sh|' \
+              -e 's|path: site.jrtx.podlens.desktop|path: flatpak/site.jrtx.podlens.desktop|' \
+              -e 's|path: app.png|path: assets/branding/app.png|' \
               flatpak/site.jrtx.podlens.yml > site.jrtx.podlens.gen.yml
           # --disable-rofiles-fuse: runners have no /dev/fuse.
           flatpak-builder --user --force-clean --disable-rofiles-fuse \
             --repo=flatpak-repo flatpak-build site.jrtx.podlens.gen.yml
           flatpak build-bundle flatpak-repo \
             "podlens-${VERSION}-linux-${ARCH}.flatpak" site.jrtx.podlens stable
+          # Structural smoke: install the exact bundle and check the payload
+          # the carrier resolves at runtime (exe + public/ tree).
+          flatpak --user install -y --noninteractive \
+            "podlens-${VERSION}-linux-${ARCH}.flatpak"
+          flatpak run --command=sh site.jrtx.podlens -c \
+            'test -x /app/podlens/bin/podlens && test -d /app/podlens/public && test -f /app/share/icons/hicolor/512x512/apps/site.jrtx.podlens.png'
           rm -rf flatpak-build flatpak-repo "podlens-${VERSION}-linux-${ARCH}.tar.gz"
           mv "podlens-${VERSION}-linux-${ARCH}.flatpak" dist/
           test -s "dist/podlens-${VERSION}-linux-${ARCH}.flatpak"
@@ -324,9 +438,19 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           ARCH="${{ matrix.arch }}"
+          case "$ARCH" in
+            x64) DEB_ARCH=amd64; RPM_ARCH=x86_64 ;;
+            arm64) DEB_ARCH=arm64; RPM_ARCH=aarch64 ;;
+          esac
+          raco glaze compliance --out dist
           cd dist
-          mv sbom.cdx.json "podlens-${VERSION}-linux-${ARCH}.sbom.cdx.json"
-          mv THIRD_PARTY_NOTICES.txt "podlens-${VERSION}-linux-${ARCH}-THIRD_PARTY_NOTICES.txt"
+          mv podlens.deb "podlens-${VERSION}-linux-${DEB_ARCH}.deb"
+          mv podlens.rpm "podlens-${VERSION}-linux-${RPM_ARCH}.rpm"
+          mv podlens.AppImage "podlens-${VERSION}-linux-${RPM_ARCH}.AppImage"
+          # Portable update payload: the same tree the flatpak bundle wraps.
+          tar -czf "podlens-${VERSION}-linux-${ARCH}.tar.gz" bin lib public
+          mv glaze-sbom.cdx.json "podlens-${VERSION}-linux-${ARCH}.sbom.cdx.json"
+          mv glaze-notices.txt "podlens-${VERSION}-linux-${ARCH}-THIRD_PARTY_NOTICES.txt"
           for f in podlens-*; do
             case "$f" in
               *.sha256) ;;
@@ -359,8 +483,9 @@ jobs:
         with:
           version: stable
           distribution: full
-      - name: Install Rivet (catalog; rivet/distribution signs the wrapper)
-        run: raco pkg install --auto --no-docs 'https://github.com/turlamai/rivet.git#${{ env.RIVET_PIN }}'
+      - name: Install Glaze (catalog; glaze/update signs and gates the feed)
+        run: |
+          raco pkg install --auto --no-docs 'https://github.com/turlamai/glaze.git#${{ needs.validate.outputs.glaze-pin }}'
       - name: Install OpenSSL 3
         run: brew install openssl@3
       - uses: actions/download-artifact@v4
@@ -384,9 +509,8 @@ jobs:
           OPENSSL3="$(brew --prefix openssl@3)/bin/openssl"
           ACTUAL_PUB="$("$OPENSSL3" pkey -in "$KEY_FILE" -pubout -outform DER | tail -c 32 | base64 | tr -d '\r\n')"
           BACKEND_PUB="$(grep -A1 'define update-public-key-b64' racket/update.rkt | grep -oE '"[A-Za-z0-9+/=]+"' | head -1 | tr -d '"')"
-          MACOS_PUB="$(grep -E 'public static let publicKeyBase64 = "' macos-host/Sources/RivetHost/UpdateService.swift | cut -d'"' -f2)"
-          if [[ -z "$ACTUAL_PUB" || "$ACTUAL_PUB" != "$BACKEND_PUB" || "$ACTUAL_PUB" != "$MACOS_PUB" ]]; then
-            echo "::error::Update signing key does not match both shipped clients' pinned Ed25519 public keys"
+          if [[ -z "$ACTUAL_PUB" || "$ACTUAL_PUB" != "$BACKEND_PUB" ]]; then
+            echo "::error::Update signing key does not match the shipped client's pinned Ed25519 public key"
             exit 1
           fi
           bash scripts/make-update-manifest.sh "${{ github.ref_name }}" dist "$KEY_FILE"
@@ -402,7 +526,7 @@ jobs:
           for suffix in \
             macos-arm64.dmg macos-arm64.zip macos-x64.dmg macos-x64.zip \
             windows-x64.msi windows-x64.zip \
-            linux-arm64.tar.gz linux-arm64.zip linux-x64.tar.gz linux-x64.zip \
+            linux-arm64.tar.gz linux-x64.tar.gz \
             linux-amd64.deb linux-arm64.deb \
             linux-aarch64.AppImage linux-x86_64.AppImage \
             linux-x64.flatpak linux-arm64.flatpak \
@@ -422,7 +546,21 @@ jobs:
           cd public
           shasum -a 256 podlens-* | LC_ALL=C sort -k2 > SHA256SUMS
           shasum -a 256 --check SHA256SUMS
-          test "$(grep -c '^' SHA256SUMS)" -eq 22
+          test "$(grep -c '^' SHA256SUMS)" -eq 20
+      - name: Gate signed feed against staged assets
+        run: |
+          set -euo pipefail
+          OPENSSL3="$(brew --prefix openssl@3)/bin/openssl"
+          KEY_FILE=$(mktemp)
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s\n' "$UPDATE_ED25519_PRIVATE_KEY" > "$KEY_FILE"
+          "$OPENSSL3" pkey -in "$KEY_FILE" -pubout -out "$RUNNER_TEMP/update-public.pem"
+          raco glaze verify-release-assets public/update-manifest.json public \
+            "$RUNNER_TEMP/update-public.pem" \
+            --base-url "https://github.com/turlamai/podlens/releases/download/${{ github.ref_name }}" \
+            --json
+        env:
+          UPDATE_ED25519_PRIVATE_KEY: ${{ secrets.UPDATE_ED25519_PRIVATE_KEY }}
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

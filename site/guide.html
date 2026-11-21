@@ -104,8 +104,8 @@ var _hmt = _hmt || [];
         <h2 data-i18n="qs.title">五分钟上手</h2>
         <p data-i18n="qs.intro">下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。</p>
         <ol>
-          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage（自带 GTK4），或安装 deb / rpm / 解压归档。</li>
-          <li data-i18n="qs.s2"><strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。</li>
+          <li data-i18n="qs.s1"><strong>安装。</strong>到 <a href="https://github.com/turlamai/podlens/releases/latest">Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage，或安装 deb / rpm / Flatpak bundle / 解压 tar.gz 后运行 bin/podlens。</li>
+          <li data-i18n="qs.s2"><strong>首次启动。</strong>发布经签名与公证，直接打开即可。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。</li>
           <li data-i18n="qs.s3"><strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。</li>
           <li data-i18n="qs.s4"><strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href="#byok">BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。</li>
           <li data-i18n="qs.s5"><strong>听并听懂。</strong>选一集，点播放。想读懂它：点「一键听懂」，下载、转写、翻译、总结一次完成；逐句稿跟随播放高亮，点句子即跳转。</li>
@@ -119,7 +119,7 @@ var _hmt = _hmt || [];
         <h2 data-i18n="sub.title">订阅管理</h2>
         <p data-i18n="sub.p1">左栏是订阅列表。点 <code>+</code> 添加，粘贴 RSS 地址；「发现」面板内置 16 档经典英文播客（科技 / 安全 / 科学 / 设计 / 商业 / 资讯），也支持全目录搜索（iTunes Search API，无需密钥）。</p>
         <ul>
-          <li data-i18n="sub.l1">自动刷新：每 30 分钟刷新全部订阅，新单集自动出现（macOS 弹系统通知）。</li>
+          <li data-i18n="sub.l1">自动刷新：每 30 分钟刷新全部订阅，新单集自动出现（系统通知）。</li>
           <li data-i18n="sub.l2">未播标记：单集可标已播 / 未播，侧栏徽章显示每档未播数。</li>
           <li data-i18n="sub.l3">取消订阅：右键订阅项即可，已生成的逐句稿和总结保留在本机。</li>
         </ul>
@@ -192,7 +192,7 @@ var _hmt = _hmt || [];
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q3">支持哪些平台？</h3>
-          <p data-i18n="faq.a3">macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、tar.gz/zip），全部在 Releases 页下载。</p>
+          <p data-i18n="faq.a3">macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、Flatpak、tar.gz），全部在 Releases 页下载。</p>
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q4">界面语言和主题怎么换？</h3>
@@ -208,7 +208,7 @@ var _hmt = _hmt || [];
         </div>
         <div class="faq-item">
           <h3 data-i18n="faq.q7">macOS 提示「无法打开」？</h3>
-          <p data-i18n="faq.a7">构建目前为 ad-hoc 签名（公证在路线图上）。右键应用 → 「打开」→ 再点「打开」，之后不再提示。</p>
+          <p data-i18n="faq.a7">发布经 Developer ID 签名与公证。若仍被拦截（例如旧版 ad-hoc 构建），右键应用 → 「打开」→ 再点「打开」。</p>
         </div>
       </section>
     </div>
@@ -216,7 +216,7 @@ var _hmt = _hmt || [];
 </main>
 
 <footer class="footer">
-  <p>PodLens · <a href="index.html" data-i18n="footer.home">首页</a> · <a href="https://github.com/turlamai/podlens">GitHub</a> · AGPL-3.0 · <span data-i18n="footer.built">基于 Rivet 构建</span></p>
+  <p>PodLens · <a href="index.html" data-i18n="footer.home">首页</a> · <a href="https://github.com/turlamai/podlens">GitHub</a> · AGPL-3.0 · <span data-i18n="footer.built">基于 glaze 构建</span></p>
 </footer>
 
 <script>
@@ -231,15 +231,15 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "常见问题", "toc.faq": "FAQ",
     "qs.title": "五分钟上手",
     "qs.intro": "下载、打开、配一次密钥、听一集。教程到这里就结束了——本页其余内容都是可选的。",
-    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage（自带 GTK4），或安装 deb / rpm / 解压归档。",
-    "qs.s2": "<strong>首次启动。</strong>macOS 未公证构建先右键应用选「打开」。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。",
+    "qs.s1": "<strong>安装。</strong>到 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 下载最新版：macOS 把 DMG 里的应用拖进「应用程序」（Apple Silicon 与 Intel 分架构下载）；Windows 双击 MSI 安装，或解压便携 zip 直接运行；Linux 运行 AppImage，或安装 deb / rpm / Flatpak bundle / 解压 tar.gz 后运行 bin/podlens。",
+    "qs.s2": "<strong>首次启动。</strong>发布经签名与公证，直接打开即可。没有账号，不需要注册。首次启动是空库，应用会打开「发现」面板。",
     "qs.s3": "<strong>添加一期播客。</strong>点左下角 <code>+</code>，粘贴一期播客的 RSS 地址，回车。或者从「发现」面板的精选目录里挑一档，一键添加。",
     "qs.s4": "<strong>配置密钥（一次即可）。</strong>按 <code>⌘,</code>（macOS）打开设置，填 <code>api-base</code> 和 <code>api-key</code>（详见下方 <a href='#byok'>BYOK 配置</a>）。转写、翻译、总结都走你自己的大模型 API。",
     "qs.s5": "<strong>听并听懂。</strong>选一集，点播放。想读懂它：点「一键听懂」，下载、转写、翻译、总结一次完成；逐句稿跟随播放高亮，点句子即跳转。",
     "qs.hint": "预期结果：订阅成功后节目出现在媒体库；选择单集可开始播放。配置模型并完成转写后，逐句稿应能跟随播放定位。若没有生成结果，请检查模型配置与处理状态。",
     "sub.title": "订阅管理",
     "sub.p1": "左栏是订阅列表。点 <code>+</code> 添加，粘贴 RSS 地址；「发现」面板内置 16 档经典英文播客（科技 / 安全 / 科学 / 设计 / 商业 / 资讯），也支持全目录搜索（iTunes Search API，无需密钥）。",
-    "sub.l1": "自动刷新：每 30 分钟刷新全部订阅，新单集自动出现（macOS 弹系统通知）。",
+    "sub.l1": "自动刷新：每 30 分钟刷新全部订阅，新单集自动出现（系统通知）。",
     "sub.l2": "未播标记：单集可标已播 / 未播，侧栏徽章显示每档未播数。",
     "sub.l3": "取消订阅：右键订阅项即可，已生成的逐句稿和总结保留在本机。",
     "pipe.title": "转写 / 翻译 / 总结",
@@ -266,7 +266,7 @@ var _hmt = _hmt || [];
     "faq.q2": "需要注册账号吗？",
     "faq.a2": "不需要。没有账号、没有云端依赖。唯一的密钥是你自己的大模型 API key，存在本机。",
     "faq.q3": "支持哪些平台？",
-    "faq.a3": "macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、tar.gz/zip），全部在 Releases 页下载。",
+    "faq.a3": "macOS 14+（Apple Silicon 与 Intel）、Windows 10+（x64，MSI 安装器或便携 zip）和 Linux（x64 / arm64：AppImage、deb、rpm、Flatpak、tar.gz），全部在 Releases 页下载。",
     "faq.q4": "界面语言和主题怎么换？",
     "faq.a4": "打开设置，里面有中文 / English 切换（macOS 快捷键 <code>⌘,</code>）。深浅色主题跟随系统外观。CLI 输出语言由 <code>ui-lang</code> 配置控制。",
     "faq.q5": "怎么卸载？",
@@ -274,8 +274,8 @@ var _hmt = _hmt || [];
     "faq.q6": "应用内更新失败了？",
     "faq.a6": "去 <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> 页手动下载新版覆盖安装：macOS 重新拖一次 DMG，Windows 重跑 MSI 或替换便携目录。更新走 Ed25519 签名清单校验，失败时不会安装半截的更新。",
     "faq.q7": "macOS 提示「无法打开」？",
-    "faq.a7": "构建目前为 ad-hoc 签名（公证在路线图上）。右键应用 → 「打开」→ 再点「打开」，之后不再提示。",
-    "footer.home": "首页", "footer.built": "基于 Rivet 构建"
+    "faq.a7": "发布经 Developer ID 签名与公证。若仍被拦截（例如旧版 ad-hoc 构建），右键应用 → 「打开」→ 再点「打开」。",
+    "footer.home": "首页", "footer.built": "基于 glaze 构建"
   };
   var en = {
     "nav.features": "Features", "nav.guide": "Manual", "nav.download": "Download", "nav.github": "GitHub",
@@ -287,15 +287,15 @@ var _hmt = _hmt || [];
     "toc.faqGroup": "FAQ", "toc.faq": "FAQ",
     "qs.title": "Five-minute start",
     "qs.intro": "Download, open, set a key once, listen. That's the whole tutorial — everything else on this page is optional.",
-    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows; on Linux run the AppImage (GTK4 bundled), or install the deb / rpm / unpack an archive.",
-    "qs.s2": "<strong>First launch.</strong> The macOS build is unnotarized — right-click the app and choose Open first. There is no account and nothing to sign up for. The library starts empty and the Discover panel opens for you.",
+    "qs.s1": "<strong>Install.</strong> Grab the latest build from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page: drag the app from the DMG into Applications on macOS (separate downloads for Apple Silicon and Intel); run the MSI installer or unpack the portable zip on Windows; on Linux run the AppImage, install the deb / rpm / Flatpak bundle, or unpack the tar.gz and run bin/podlens.",
+    "qs.s2": "<strong>First launch.</strong> Releases are signed and notarized — open the app directly. There is no account and nothing to sign up for. The library starts empty and the Discover panel opens for you.",
     "qs.s3": "<strong>Add a podcast.</strong> Click <code>+</code> at the bottom left, paste the show's RSS URL, press Enter. Or pick one from the curated catalog in the Discover panel — one tap.",
     "qs.s4": "<strong>Set your key (once).</strong> Press <code>⌘,</code> (macOS) to open Settings and fill in <code>api-base</code> and <code>api-key</code> (see <a href='#byok'>BYOK setup</a> below). Transcription, translation and summary all run through your own LLM API.",
     "qs.s5": "<strong>Listen and understand.</strong> Pick an episode and press play. To read it: click Understand — download, transcribe, translate and summarize in one job; the transcript highlights along with playback and a click seeks.",
     "qs.hint": "Expected result: the subscribed show appears in your library and an episode can play. After model setup and successful transcription, transcript lines can follow playback. If no result appears, check provider settings and processing status.",
     "sub.title": "Subscriptions",
     "sub.p1": "The left pane lists your shows. Click <code>+</code> and paste an RSS URL; the Discover panel carries 16 classic English shows (tech / security / science / design / business / news) and full-directory search (iTunes Search API, no key needed).",
-    "sub.l1": "Auto refresh: every subscription refreshes every 30 minutes; new episodes appear on their own (macOS posts a system notification).",
+    "sub.l1": "Auto refresh: every subscription refreshes every 30 minutes; new episodes appear on their own (a system notification posts).",
     "sub.l2": "Played marks: mark episodes played / unplayed; a badge per show counts the unplayed ones.",
     "sub.l3": "Unsubscribe: right-click a show. Generated transcripts and summaries stay on your disk.",
     "pipe.title": "Transcribe / translate / summarize",
@@ -322,7 +322,7 @@ var _hmt = _hmt || [];
     "faq.q2": "Do I need an account?",
     "faq.a2": "No. No account, no cloud dependency. The only secret is your own LLM API key, stored locally.",
     "faq.q3": "Which platforms are supported?",
-    "faq.a3": "macOS 14+ (Apple Silicon and Intel), Windows 10+ (x64, MSI installer or portable zip) and Linux (x64 / arm64: AppImage, deb, rpm, tar.gz/zip) — all from the Releases page.",
+    "faq.a3": "macOS 14+ (Apple Silicon and Intel), Windows 10+ (x64, MSI installer or portable zip) and Linux (x64 / arm64: AppImage, deb, rpm, Flatpak, tar.gz) — all from the Releases page.",
     "faq.q4": "How do I change the interface language or theme?",
     "faq.a4": "Settings has a Chinese / English toggle (<code>⌘,</code> on macOS). Dark and light follow the system appearance. CLI output language is controlled by the <code>ui-lang</code> setting.",
     "faq.q5": "How do I uninstall?",
@@ -330,8 +330,8 @@ var _hmt = _hmt || [];
     "faq.q6": "The in-app update failed.",
     "faq.a6": "Download the new version from the <a href='https://github.com/turlamai/podlens/releases/latest'>Releases</a> page and install over the old one: re-drag the DMG on macOS, re-run the MSI or replace the portable folder on Windows. Updates verify an Ed25519-signed manifest — a failed check never installs a half-downloaded update.",
     "faq.q7": "macOS says the app can't be opened.",
-    "faq.a7": "Builds are ad-hoc signed for now (notarization is on the roadmap). Right-click the app → Open → Open again; the prompt won't come back.",
-    "footer.home": "Home", "footer.built": "Built on Rivet"
+    "faq.a7": "Releases are Developer ID signed and notarized. If Gatekeeper still prompts (for example on an old ad-hoc build), right-click the app → Open → Open again.",
+    "footer.home": "Home", "footer.built": "Built on glaze"
   };
   // language dropdown: unified family policy (explicit choice wins; otherwise browser locale)
   var LANGUAGE_OVERRIDE_KEY = "podlens-lang-override-v2";

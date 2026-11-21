@@ -35,7 +35,7 @@ RSS, directory search and audio downloads contact their respective hosts. Transc
 
 ## Known limits
 
-Long-job cancellation is available on macOS, Windows and Linux. Windows MSI updates use a new installer rather than silently replacing the installation. The 0.7 release aligns Windows and Linux with the reading-first information architecture, three reading modes, cancel action and storage transparency; controls remain native WinUI and GTK, and the in-app language switch is macOS-only for now. Windows 125–200% display scaling still needs a dedicated visual pass.
+Long-job cancellation is available on macOS, Windows and Linux. Windows MSI updates use a new installer rather than silently replacing the installation. Since 0.1.0 (the glaze carrier rewrite) all three platforms share one web UI in the system WebView, with the same reading-first information architecture, three reading modes, cancel action, storage transparency and in-app language switch. Windows 125–200% display scaling still needs a dedicated visual pass.
 
 ## Updates and removal
 

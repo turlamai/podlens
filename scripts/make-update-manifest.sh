@@ -3,7 +3,7 @@
 #
 #   scripts/make-update-manifest.sh <tag> <dist-dir> [key-path]
 #
-#   <tag>       release tag, e.g. v1.4.0 (must match the VERSION file)
+#   <tag>       release tag, e.g. v0.1.0 (must match the VERSION file)
 #   <dist-dir>  directory containing the release artifacts, i.e. the names
 #               the release pipeline produces:
 #                 podlens-<ver>-macos-arm64.zip   podlens-<ver>-macos-x64.zip
@@ -15,9 +15,12 @@
 #   <key-path>  Ed25519 private key PEM (default: $UPDATE_KEY_PATH, then
 #               ~/.podlens/update-signing-key.pem)
 #
-# The signing, artifact hashing, schema validation, and feed format live in
-# `raco rivet sign-manifest`; this wrapper keeps PodLens' five artifacts,
-# identity, and the Windows Git Bash path handling.
+# The payload is assembled here (five portable artifacts, PodLens identity);
+# schema validation and the schema-1 Ed25519 wrapper live in
+# `raco glaze manifest-sign`, which verifies with the same pure-Racket
+# ed25519 code installed clients run. Signing itself shells out to OpenSSL 3
+# (macOS ships LibreSSL, which cannot do Ed25519), so an OpenSSL 3 binary is
+# located and put on PATH for the glaze signer.
 set -euo pipefail
 
 TAG="${1:?usage: make-update-manifest.sh <tag> <dist-dir> [key-path]}"
@@ -36,12 +39,12 @@ fi
 
 VERSION="${TAG#v}"
 cd "$ROOT"
-raco rivet check-release-version "$TAG"
+bash scripts/check-release-version.sh "$TAG"
 
-APP_ID="$(sed -nE 's/.*\(identifier \. "([^"]+)"\).*/\1/p' "$ROOT/rivet.rktd" | head -n1)"
-BUILD="$(sed -nE 's/.*\(build \. ([0-9]+)\).*/\1/p' "$ROOT/rivet.rktd" | head -n1)"
+APP_ID="$(sed -nE 's/^\(define app-identifier "([^"]+)"\).*/\1/p' "$ROOT/racket/update.rkt" | head -n1)"
+BUILD="$(sed -nE 's/^\(define app-build ([0-9]+)\).*/\1/p' "$ROOT/racket/update.rkt" | head -n1)"
 [[ -n "$APP_ID" && -n "$BUILD" ]] || {
-  echo "error: could not read application id/build from rivet.rktd" >&2
+  echo "error: could not read application id/build from racket/update.rkt" >&2
   exit 1
 }
 [[ -f "$KEY" ]] || {
@@ -68,28 +71,75 @@ fi
   echo "       or set OPENSSL_BIN=/path/to/openssl)" >&2
   exit 1
 }
+# glaze's signer invokes `openssl` from PATH.
+export PATH="$(dirname "$OPENSSL_BIN"):$PATH"
 
-KEY_DER="$(mktemp "${TMPDIR:-/tmp}/podlens-key-XXXXXX.der")"
-command -v cygpath >/dev/null 2>&1 && KEY_DER="$(cygpath -m "$KEY_DER")"
-trap 'rm -f "$KEY_DER"' EXIT
+PAYLOAD="$(mktemp "${TMPDIR:-/tmp}/podlens-payload-XXXXXX.json")"
+command -v cygpath >/dev/null 2>&1 && PAYLOAD="$(cygpath -m "$PAYLOAD")"
+trap 'rm -f "$PAYLOAD"' EXIT
 
-# rivet's signer reads DER (OneAsymmetricKey); convert the PEM once here.
-"$OPENSSL_BIN" pkey -in "$KEY" -outform DER -out "$KEY_DER"
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  for candidate in python3 python; do
+    # Windows ships a python3 Store-alias stub that exits without running;
+    # only accept an interpreter that actually executes.
+    if command -v "$candidate" >/dev/null 2>&1 \
+       && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      PYTHON_BIN="$candidate"
+      break
+    fi
+  done
+fi
+[[ -n "$PYTHON_BIN" ]] || { echo "error: python3 required to assemble the payload" >&2; exit 1; }
 
-raco rivet sign-manifest \
-  --application-id "$APP_ID" \
-  --version "$VERSION" \
-  --build "$BUILD" \
-  --channel stable \
-  --base-url "$BASE_URL" \
+"$PYTHON_BIN" - "$DIST" "$VERSION" "$APP_ID" "$BUILD" "$BASE_URL" "$PAYLOAD" <<'PY'
+import hashlib, json, os, sys, time
+
+dist, version, app_id, build, base_url, out = sys.argv[1:7]
+artifacts = []
+for platform, arch, installer, suffix in [
+    ("macos", "arm64", "zip", "macos-arm64.zip"),
+    ("macos", "x64", "zip", "macos-x64.zip"),
+    ("windows", "x64", "zip", "windows-x64.zip"),
+    ("linux", "x64", "tar.gz", "linux-x64.tar.gz"),
+    ("linux", "arm64", "tar.gz", "linux-arm64.tar.gz"),
+]:
+    name = "podlens-%s-%s" % (version, suffix)
+    path = os.path.join(dist, name)
+    with open(path, "rb") as source:
+        data = source.read()
+    artifacts.append({
+        "platform": platform,
+        "architecture": arch,
+        "url": "%s/%s" % (base_url, name),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "installer": installer,
+        "arguments": [],
+        "signature": None,
+    })
+payload = {
+    "schema": 1,
+    "application_id": app_id,
+    "version": version,
+    "build": int(build),
+    "channel": "stable",
+    "published_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "minimum_version": "0.0.0",
+    "previous_version": None,
+    "rollback_allowed": True,
+    "rollout": 100,
+    "artifacts": artifacts,
+}
+with open(out, "w", encoding="utf-8") as target:
+    json.dump(payload, target, separators=(",", ":"))
+print("payload: %d artifacts for %s %s" % (len(artifacts), app_id, version))
+PY
+
+raco glaze manifest-sign \
+  --manifest "$PAYLOAD" \
+  --key "$KEY" \
   --key-id podlens-2026-10 \
-  --private-key "$KEY_DER" \
-  --output "$DIST/update-manifest.json" \
-  --artifact "macos:arm64:zip:$DIST/podlens-$VERSION-macos-arm64.zip" \
-  --artifact "macos:x64:zip:$DIST/podlens-$VERSION-macos-x64.zip" \
-  --artifact "windows:x64:zip:$DIST/podlens-$VERSION-windows-x64.zip" \
-  --artifact "linux:x64:targz:$DIST/podlens-$VERSION-linux-x64.tar.gz" \
-  --artifact "linux:arm64:targz:$DIST/podlens-$VERSION-linux-arm64.tar.gz" \
-  --rollback-allowed
+  --out "$DIST/update-manifest.json"
 
 echo "manifest: $DIST/update-manifest.json (5 artifacts, key-id podlens-2026-10)"

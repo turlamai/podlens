@@ -30,9 +30,10 @@
          "update.rkt"
          "version.rkt")
 
-(provide resolve-feed resolve-episode)
+(provide resolve-feed
+         resolve-episode)
 
-;; the version mirrors rivet.rktd (see racket/version.rkt)
+;; the version mirrors the root VERSION file (see racket/version.rkt)
 (define cli-version app-version)
 
 ;; ---- output helpers ----------------------------------------------------------
@@ -77,16 +78,20 @@
 
 (define cli-config (make-parameter #f))
 
-(define (config!) (or (cli-config) (make-config-manager)))
+(define (config!)
+  (or (cli-config) (make-config-manager)))
 
-(define (lang) (config-get (config!) 'ui-lang))
+(define (lang)
+  (config-get (config!) 'ui-lang))
 
 ;; episode lookup or a failed run
 (struct stopped (code))
 
 (define (find-episode-or-stop id)
   (cond
-    [(episode-get id) => values]
+    [(episode-get id)
+     =>
+     values]
     [else (stopped 1)]))
 
 ;; ---- id resolution -------------------------------------------------------------
@@ -101,8 +106,10 @@
           [(1) (car hits)]
           [else 'ambiguous]))))
 
-(define (resolve-feed id) (resolve-row id (feed-all)))
-(define (resolve-episode id) (resolve-row id (episode-all)))
+(define (resolve-feed id)
+  (resolve-row id (feed-all)))
+(define (resolve-episode id)
+  (resolve-row id (episode-all)))
 
 (define (run-command command-name args command-body)
   command-body)
@@ -111,8 +118,7 @@
 
 (define (cmd-add args)
   (cond
-    [(not (= 1 (length args)))
-     (usage! (tr (lang) 'usage))]
+    [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
      (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
        (define parsed (fetch-feed (string-trim (car args))))
@@ -126,16 +132,21 @@
   (define feeds (feed-all))
   (cond
     [(stdout-json?)
-     (emit-ok
-      (hasheq 'feeds
-              (for/list ([f (in-list feeds)])
-                (hasheq 'id (hash-ref f 'id)
-                        'title (hash-ref f 'title)
-                        'author (hash-ref f 'author)
-                        'url (hash-ref f 'url)
-                        'episodeCount (length (episodes-for-feed (hash-ref f 'id)))))))]
+     (emit-ok (hasheq 'feeds
+                      (for/list ([f (in-list feeds)])
+                        (hasheq 'id
+                                (hash-ref f 'id)
+                                'title
+                                (hash-ref f 'title)
+                                'author
+                                (hash-ref f 'author)
+                                'url
+                                (hash-ref f 'url)
+                                'episodeCount
+                                (length (episodes-for-feed (hash-ref f 'id)))))))]
     [else
-     (when (null? feeds) (displayln (tr (lang) 'no-feeds)))
+     (when (null? feeds)
+       (displayln (tr (lang) 'no-feeds)))
      (for ([f (in-list feeds)])
        (displayln (format "~a  ~a  (~a)"
                           (substring (hash-ref f 'id) 0 12)
@@ -154,16 +165,22 @@
        [else
         (define eps (episodes-for-feed (hash-ref f 'id)))
         (if (stdout-json?)
-            (emit-ok
-             (hasheq 'episodes
-                     (for/list ([e (in-list eps)])
-                       (hasheq 'id (hash-ref e 'id)
-                               'title (hash-ref e 'title)
-                               'pubDate (hash-ref e 'pub-date-display)
-                               'durationSec (hash-ref e 'duration-sec #f)
-                               'downloaded (hash-ref e 'downloaded-path #f)
-                               'transcript (hash-ref e 'transcript-status "none")
-                               'positionSec (hash-ref e 'position-sec 0)))))
+            (emit-ok (hasheq 'episodes
+                             (for/list ([e (in-list eps)])
+                               (hasheq 'id
+                                       (hash-ref e 'id)
+                                       'title
+                                       (hash-ref e 'title)
+                                       'pubDate
+                                       (hash-ref e 'pub-date-display)
+                                       'durationSec
+                                       (hash-ref e 'duration-sec #f)
+                                       'downloaded
+                                       (hash-ref e 'downloaded-path #f)
+                                       'transcript
+                                       (hash-ref e 'transcript-status "none")
+                                       'positionSec
+                                       (hash-ref e 'position-sec 0)))))
             (begin
               (for ([e (in-list eps)])
                 (displayln (format "~a  ~a  ~a"
@@ -189,54 +206,56 @@
   (cond
     [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
-     (with-episode
-      (car args)
-      (lambda (e)
-        (define path (ensure-audio! e (progress->stderr "download")))
-        (if (stdout-json?)
-            (emit-ok (hasheq 'path path))
-            (begin (displayln (tr (lang) 'downloaded)) 0))
-        (if (stdout-json?) 0 (void))
-        0))]))
+     (with-episode (car args)
+                   (lambda (e)
+                     (define path (ensure-audio! e (progress->stderr "download")))
+                     (if (stdout-json?)
+                         (emit-ok (hasheq 'path path))
+                         (begin
+                           (displayln (tr (lang) 'downloaded))
+                           0))
+                     (if (stdout-json?)
+                         0
+                         (void))
+                     0))]))
 
 (define (cmd-transcribe args)
   (cond
     [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
-     (with-episode
-      (car args)
-      (lambda (e)
-        (define n (run-transcribe! (cfg-snapshot (config!)) e (progress->stderr "transcribe")))
-        (if (stdout-json?)
-            (emit-ok (hasheq 'segments n))
-            (displayln (tr (lang) 'transcribed n)))
-        0))]))
+     (with-episode (car args)
+                   (lambda (e)
+                     (define n
+                       (run-transcribe! (cfg-snapshot (config!)) e (progress->stderr "transcribe")))
+                     (if (stdout-json?)
+                         (emit-ok (hasheq 'segments n))
+                         (displayln (tr (lang) 'transcribed n)))
+                     0))]))
 
 (define (cmd-translate args)
   (cond
     [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
-     (with-episode
-      (car args)
-      (lambda (e)
-        (define n (run-translate! (cfg-snapshot (config!)) e (progress->stderr "translate")))
-        (if (stdout-json?)
-            (emit-ok (hasheq 'segments n))
-            (displayln (tr (lang) 'translated n)))
-        0))]))
+     (with-episode (car args)
+                   (lambda (e)
+                     (define n
+                       (run-translate! (cfg-snapshot (config!)) e (progress->stderr "translate")))
+                     (if (stdout-json?)
+                         (emit-ok (hasheq 'segments n))
+                         (displayln (tr (lang) 'translated n)))
+                     0))]))
 
 (define (cmd-summarize args)
   (cond
     [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
-     (with-episode
-      (car args)
-      (lambda (e)
-        (run-summarize! (cfg-snapshot (config!)) e (progress->stderr "summarize"))
-        (if (stdout-json?)
-            (emit-ok (hasheq 'summarized #t))
-            (displayln (tr (lang) 'summarized)))
-        0))]))
+     (with-episode (car args)
+                   (lambda (e)
+                     (run-summarize! (cfg-snapshot (config!)) e (progress->stderr "summarize"))
+                     (if (stdout-json?)
+                         (emit-ok (hasheq 'summarized #t))
+                         (displayln (tr (lang) 'summarized)))
+                     0))]))
 
 (define (cmd-pipeline args)
   ;; one-click "understand this episode": download → transcribe → translate
@@ -244,18 +263,17 @@
   (cond
     [(not (= 1 (length args))) (usage! (tr (lang) 'usage))]
     [else
-     (with-episode
-      (car args)
-      (lambda (e)
-        (define stages
-          (run-pipeline! (cfg-snapshot (config!)) e (progress->stderr "pipeline")))
-        (if (stdout-json?)
-            (emit-ok (hasheq 'stages stages))
-            (begin
-              (displayln (tr (lang) 'pipelined))
-              (for ([s (in-list stages)])
-                (displayln (format "  ✓ ~a" s)))))
-        0))]))
+     (with-episode (car args)
+                   (lambda (e)
+                     (define stages
+                       (run-pipeline! (cfg-snapshot (config!)) e (progress->stderr "pipeline")))
+                     (if (stdout-json?)
+                         (emit-ok (hasheq 'stages stages))
+                         (begin
+                           (displayln (tr (lang) 'pipelined))
+                           (for ([s (in-list stages)])
+                             (displayln (format "  ✓ ~a" s)))))
+                     0))]))
 
 (define (cmd-estimate args)
   ;; what a pipeline run would cost — sentence/char counts before committing
@@ -272,8 +290,7 @@
             (emit-ok (hasheq 'estimate est))
             (begin
               (displayln (format "duration-sec: ~a" (hash-ref est 'durationSec)))
-              (displayln (format "transcript:   ~a"
-                                 (if (hash-ref est 'transcriptKnown) "yes" "no")))
+              (displayln (format "transcript:   ~a" (if (hash-ref est 'transcriptKnown) "yes" "no")))
               (displayln (format "sentences:    ~a" (hash-ref est 'sentences)))
               (displayln (format "chars:        ~a" (hash-ref est 'chars)))
               (displayln (format "translated:   ~a" (hash-ref est 'translated)))
@@ -299,10 +316,13 @@
        [else
         (define rid (hash-ref e 'id))
         (episode-set-done! rid done?)
-        (unless done? (episode-set-position! rid 0))
+        (unless done?
+          (episode-set-position! rid 0))
         (if (stdout-json?)
             (emit-ok (hasheq 'id rid 'done done?))
-            (displayln (if done? (tr (lang) 'marked-done) (tr (lang) 'marked-undone))))
+            (displayln (if done?
+                           (tr (lang) 'marked-done)
+                           (tr (lang) 'marked-undone))))
         0])]))
 
 (define (cmd-export args)
@@ -341,48 +361,57 @@
 (define (export-markdown e feed t)
   (define summary (hash-ref t 'summary #f))
   (string-join
-   (append
-    (list (format "# ~a" (hash-ref e 'title ""))
-          ""
-          (format "- Podcast: ~a" (if feed (hash-ref feed 'title "") ""))
-          (format "- Published: ~a" (hash-ref e 'pub-date-display ""))
-          "")
-    (if summary
-        (append
-         (list "## TL;DR" "" (hash-ref summary 'tldr "") "")
-         (if (pair? (hash-ref summary 'key-points '()))
-             (append (list "## Key points" "")
-                     (for/list ([p (in-list (hash-ref summary 'key-points))])
-                       (format "- ~a" p))
-                     (list ""))
-             '())
-         (if (pair? (hash-ref summary 'quotes '()))
-             (append (list "## Notable quotes" "")
-                     (for/list ([q (in-list (hash-ref summary 'quotes))])
-                       (format "> ~a~a"
-                               (hash-ref q 'text "")
-                               (let ([tr-q (hash-ref q 'translation "")])
-                                 (if (blank-string? tr-q) "" (format "\n> — ~a" tr-q)))))
-                     (list ""))
-             '())
-         (if (pair? (hash-ref summary 'topics '()))
-             (append (list "## Topics" ""
-                           (string-join
-                            (for/list ([tp (in-list (hash-ref summary 'topics))])
-                              (format "`~a`" tp))
-                            " · ")
-                           "")
-                     (list ""))
-             '()))
-        '())
-    (list "## Transcript" "")
-    (append*
-     (let ([trans (hash-ref t 'translation '())])
-       (for/list ([s (in-list (hash-ref t 'segments '()))] [i (in-naturals)])
-         (define tr-line (if (< i (length trans)) (list-ref trans i) ""))
-         (list (format "- `~a` ~a" (mmss (hash-ref s 'start 0)) (hash-ref s 'text ""))
-               (if (blank-string? tr-line) "" (format "  ~a" tr-line))))))
-    (list ""))
+   (append (list (format "# ~a" (hash-ref e 'title ""))
+                 ""
+                 (format "- Podcast: ~a"
+                         (if feed
+                             (hash-ref feed 'title "")
+                             ""))
+                 (format "- Published: ~a" (hash-ref e 'pub-date-display ""))
+                 "")
+           (if summary
+               (append (list "## TL;DR" "" (hash-ref summary 'tldr "") "")
+                       (if (pair? (hash-ref summary 'key-points '()))
+                           (append (list "## Key points" "")
+                                   (for/list ([p (in-list (hash-ref summary 'key-points))])
+                                     (format "- ~a" p))
+                                   (list ""))
+                           '())
+                       (if (pair? (hash-ref summary 'quotes '()))
+                           (append (list "## Notable quotes" "")
+                                   (for/list ([q (in-list (hash-ref summary 'quotes))])
+                                     (format "> ~a~a"
+                                             (hash-ref q 'text "")
+                                             (let ([tr-q (hash-ref q 'translation "")])
+                                               (if (blank-string? tr-q)
+                                                   ""
+                                                   (format "\n> — ~a" tr-q)))))
+                                   (list ""))
+                           '())
+                       (if (pair? (hash-ref summary 'topics '()))
+                           (append (list "## Topics"
+                                         ""
+                                         (string-join (for/list ([tp (in-list (hash-ref summary
+                                                                                        'topics))])
+                                                        (format "`~a`" tp))
+                                                      " · ")
+                                         "")
+                                   (list ""))
+                           '()))
+               '())
+           (list "## Transcript" "")
+           (append* (let ([trans (hash-ref t 'translation '())])
+                      (for/list ([s (in-list (hash-ref t 'segments '()))]
+                                 [i (in-naturals)])
+                        (define tr-line
+                          (if (< i (length trans))
+                              (list-ref trans i)
+                              ""))
+                        (list (format "- `~a` ~a" (mmss (hash-ref s 'start 0)) (hash-ref s 'text ""))
+                              (if (blank-string? tr-line)
+                                  ""
+                                  (format "  ~a" tr-line))))))
+           (list ""))
    "\n"))
 
 (define (cmd-show args)
@@ -398,26 +427,29 @@
         (define t (transcript-load id))
         (if (stdout-json?)
             (begin
-              (write-json
-               (hasheq 'ok #t
-                       'episode (hasheq 'id id 'title (hash-ref e 'title))
-                       'transcript
-                       (if t
-                           (for/list ([s (in-list (hash-ref t 'segments '()))])
-                             (hasheq 'start (hash-ref s 'start)
-                                     'end (hash-ref s 'end)
-                                     'text (hash-ref s 'text)))
-                           '())
-                       'summary (and t (hash-ref t 'summary #f))))
+              (write-json (hasheq 'ok
+                                  #t
+                                  'episode
+                                  (hasheq 'id id 'title (hash-ref e 'title))
+                                  'transcript
+                                  (if t
+                                      (for/list ([s (in-list (hash-ref t 'segments '()))])
+                                        (hasheq 'start
+                                                (hash-ref s 'start)
+                                                'end
+                                                (hash-ref s 'end)
+                                                'text
+                                                (hash-ref s 'text)))
+                                      '())
+                                  'summary
+                                  (and t (hash-ref t 'summary #f))))
               (newline)
               0)
             (begin
               (when t
                 (for ([s (in-list (hash-ref t 'segments '()))])
-                  (displayln (format "[~a → ~a] ~a"
-                                     (hash-ref s 'start)
-                                     (hash-ref s 'end)
-                                     (hash-ref s 'text)))))
+                  (displayln
+                   (format "[~a → ~a] ~a" (hash-ref s 'start) (hash-ref s 'end) (hash-ref s 'text)))))
               (when (and t (hash-ref t 'summary #f))
                 (displayln (hash-ref (hash-ref t 'summary) 'tldr "")))
               0))])]))
@@ -443,19 +475,24 @@
   ;; list the curated catalog; mark entries already subscribed
   (define subscribed-urls
     (list->set (map (lambda (f) (string-trim (hash-ref f 'url ""))) (feed-all))))
-  (define wanted (if (null? args) #f (car args)))
-  (define rows
-    (filter (lambda (r) (or (not wanted) (equal? (car r) wanted)))
-            (catalog-entries)))
+  (define wanted
+    (if (null? args)
+        #f
+        (car args)))
+  (define rows (filter (lambda (r) (or (not wanted) (equal? (car r) wanted))) (catalog-entries)))
   (if (stdout-json?)
-      (emit-ok
-       (hasheq 'catalog
-               (for/list ([e (in-list rows)])
-                 (hasheq 'id (catalog-entry-id e)
-                         'category (catalog-entry-category e)
-                         'name (catalog-entry-name e)
-                         'url (catalog-entry-url e)
-                         'added (if (set-member? subscribed-urls (catalog-entry-url e)) #t #f)))))
+      (emit-ok (hasheq 'catalog
+                       (for/list ([e (in-list rows)])
+                         (hasheq 'id
+                                 (catalog-entry-id e)
+                                 'category
+                                 (catalog-entry-category e)
+                                 'name
+                                 (catalog-entry-name e)
+                                 'url
+                                 (catalog-entry-url e)
+                                 'added
+                                 (if (set-member? subscribed-urls (catalog-entry-url e)) #t #f)))))
       (begin
         (for ([e (in-list rows)])
           (displayln (format "~a  [~a]~a  ~a"
@@ -474,25 +511,28 @@
     [else
      (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
        (define query (string-join args))
-       (define rows
-         (itunes-search-podcasts query (config-number (config!) 'search-limit)))
+       (define rows (itunes-search-podcasts query (config-number (config!) 'search-limit)))
        (if (stdout-json?)
-           (emit-ok
-            (hasheq 'results
-                    (for/list ([r (in-list rows)])
-                      (hasheq 'id (hash-ref r 'id)
-                              'title (hash-ref r 'title)
-                              'artist (hash-ref r 'artist)
-                              'genre (hash-ref r 'genre)
-                              'feedUrl (hash-ref r 'feed-url)
-                              'homepage (hash-ref r 'homepage)))))
+           (emit-ok (hasheq 'results
+                            (for/list ([r (in-list rows)])
+                              (hasheq 'id
+                                      (hash-ref r 'id)
+                                      'title
+                                      (hash-ref r 'title)
+                                      'artist
+                                      (hash-ref r 'artist)
+                                      'genre
+                                      (hash-ref r 'genre)
+                                      'feedUrl
+                                      (hash-ref r 'feed-url)
+                                      'homepage
+                                      (hash-ref r 'homepage)))))
            (begin
-             (when (null? rows) (displayln (tr (lang) 'no-results)))
+             (when (null? rows)
+               (displayln (tr (lang) 'no-results)))
              (for ([r (in-list rows)])
-               (displayln (format "~a  [~a]  ~a"
-                                  (hash-ref r 'title)
-                                  (hash-ref r 'genre)
-                                  (hash-ref r 'artist)))
+               (displayln
+                (format "~a  [~a]  ~a" (hash-ref r 'title) (hash-ref r 'genre) (hash-ref r 'artist)))
                (displayln (format "    ~a" (hash-ref r 'feed-url))))
              0)))]))
 
@@ -504,21 +544,28 @@
      (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
        (define rows (peek-rows (fetch-feed (string-trim (car args)))))
        (if (stdout-json?)
-           (emit-ok
-            (hasheq 'feed
-                    (if (null? rows)
-                        (hasheq 'title "" 'author "" 'artwork "")
-                        (hasheq 'title (list-ref (car rows) 0)
-                                'author (list-ref (car rows) 1)
-                                'artwork (list-ref (car rows) 2)))
-                    'episodes
-                    (for/list ([r (in-list rows)])
-                      (hasheq 'enclosureUrl (list-ref r 3)
-                              'title (list-ref r 4)
-                              'pubDate (list-ref r 5)
-                              'durationSec (list-ref r 6)))))
+           (emit-ok (hasheq 'feed
+                            (if (null? rows)
+                                (hasheq 'title "" 'author "" 'artwork "")
+                                (hasheq 'title
+                                        (list-ref (car rows) 0)
+                                        'author
+                                        (list-ref (car rows) 1)
+                                        'artwork
+                                        (list-ref (car rows) 2)))
+                            'episodes
+                            (for/list ([r (in-list rows)])
+                              (hasheq 'enclosureUrl
+                                      (list-ref r 3)
+                                      'title
+                                      (list-ref r 4)
+                                      'pubDate
+                                      (list-ref r 5)
+                                      'durationSec
+                                      (list-ref r 6)))))
            (begin
-             (when (null? rows) (displayln (tr (lang) 'no-results)))
+             (when (null? rows)
+               (displayln (tr (lang) 'no-results)))
              (unless (null? rows)
                (displayln (tr (lang) 'peeked (list-ref (car rows) 0) (length rows)))
                (for ([r (in-list rows)])
@@ -534,7 +581,8 @@
     [else
      (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
        (define rows (peek-rows (fetch-feed (string-trim (car args)))))
-       (when (null? rows) (error 'preview (tr (lang) 'no-results)))
+       (when (null? rows)
+         (error 'preview (tr (lang) 'no-results)))
        (define enclosure (list-ref (car rows) 3))
        (when (blank-string? enclosure)
          (error 'preview (tr (lang) 'preview-no-enclosure)))
@@ -558,22 +606,27 @@
                    [t (in-value (transcript-load (hash-ref e 'id)))]
                    #:when t
                    [s (in-list (hash-ref t 'segments '()))]
-                   #:do [(define text
-                           (string-downcase (hash-ref s 'text "")))
+                   #:do [(define text (string-downcase (hash-ref s 'text "")))
                          (define hit?
                            (for/and ([term (in-list terms)])
                              (string-contains? text term)))]
                    #:when hit?)
-         (hasheq 'episodeId (hash-ref e 'id)
-                 'episodeTitle (hash-ref e 'title "")
-                 'start (hash-ref s 'start 0)
-                 'end (hash-ref s 'end 0)
-                 'text (hash-ref s 'text ""))))
+         (hasheq 'episodeId
+                 (hash-ref e 'id)
+                 'episodeTitle
+                 (hash-ref e 'title "")
+                 'start
+                 (hash-ref s 'start 0)
+                 'end
+                 (hash-ref s 'end 0)
+                 'text
+                 (hash-ref s 'text ""))))
      (define limited (take matches (min (length matches) 200)))
      (if (stdout-json?)
          (emit-ok (hasheq 'total (length matches) 'matches limited))
          (begin
-           (when (null? matches) (displayln (tr (lang) 'no-results)))
+           (when (null? matches)
+             (displayln (tr (lang) 'no-results)))
            (for ([m (in-list limited)])
              (displayln (format "~a  ~a  ~a"
                                 (mmss (hash-ref m 'start))
@@ -583,16 +636,21 @@
 
 (define (cmd-refresh args)
   (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
-    (define ids (if (null? args) (map (lambda (f) (hash-ref f 'id)) (feed-all)) args))
+    (define ids
+      (if (null? args)
+          (map (lambda (f) (hash-ref f 'id)) (feed-all))
+          args))
     (define total
       (for/sum ([id (in-list ids)])
-        (define f (resolve-feed id))
-        (unless f (error 'refresh (tr (lang) 'no-feed)))
-        (when (eq? f 'ambiguous) (error 'refresh (tr (lang) 'ambiguous-id id)))
-        (define fid (hash-ref f 'id))
-        (define before (length (episodes-for-feed fid)))
-        (feed-add! (hash-ref f 'url) (fetch-feed (hash-ref f 'url)))
-        (- (length (episodes-for-feed fid)) before)))
+               (define f (resolve-feed id))
+               (unless f
+                 (error 'refresh (tr (lang) 'no-feed)))
+               (when (eq? f 'ambiguous)
+                 (error 'refresh (tr (lang) 'ambiguous-id id)))
+               (define fid (hash-ref f 'id))
+               (define before (length (episodes-for-feed fid)))
+               (feed-add! (hash-ref f 'url) (fetch-feed (hash-ref f 'url)))
+               (- (length (episodes-for-feed fid)) before)))
     (if (stdout-json?)
         (emit-ok (hasheq 'newEpisodes total))
         (displayln (tr (lang) 'refreshed total)))
@@ -602,9 +660,7 @@
 ;; issues and shell transcripts. The vault still resolves it internally.
 (define (public-setting key value)
   (if (equal? key "api-key")
-      (if (and (string? value) (non-empty-string? (string-trim value)))
-          secret-value-mask
-          "")
+      (if (and (string? value) (non-empty-string? (string-trim value))) secret-value-mask "")
       value))
 
 (define (cmd-config args)
@@ -615,10 +671,9 @@
        (for/list ([k (in-list (config-keys))])
          (cons k (public-setting k (config-get c k)))))
      (if (stdout-json?)
-         (emit-ok
-          (hasheq 'config
-                  (for/hasheq ([row (in-list rows)])
-                    (values (string->symbol (car row)) (cdr row)))))
+         (emit-ok (hasheq 'config
+                          (for/hasheq ([row (in-list rows)])
+                            (values (string->symbol (car row)) (cdr row)))))
          (begin
            (for ([row (in-list rows)])
              (displayln (format "~a = ~a" (car row) (cdr row))))
@@ -630,7 +685,9 @@
         (define v (public-setting key (config-get c key)))
         (if (stdout-json?)
             (emit-ok (hasheq (string->symbol key) v))
-            (begin (displayln v) 0))])]
+            (begin
+              (displayln v)
+              0))])]
     [(list key value)
      (with-handlers ([exn:fail? (lambda (e) (fail! 2 (exn-message e)))])
        (unless (member key (config-keys))
@@ -667,64 +724,77 @@
   (define secret-backend (config-secret-backend (config!)))
   (define ffmpeg-ok? (has-ffmpeg?))
   (if (stdout-json?)
-      (emit-ok
-       (hasheq 'dataDir (path->string (data-dir))
-               'dataWritable data-ok?
-               'apiConfigured api-ok?
-               'secretBackend (symbol->string secret-backend)
-               'secretSecure (and (secret-backend-secure? secret-backend) #t)
-               'ffmpeg ffmpeg-ok?))
+      (emit-ok (hasheq 'dataDir
+                       (path->string (data-dir))
+                       'dataWritable
+                       data-ok?
+                       'apiConfigured
+                       api-ok?
+                       'secretBackend
+                       (symbol->string secret-backend)
+                       'secretSecure
+                       (and (secret-backend-secure? secret-backend) #t)
+                       'ffmpeg
+                       ffmpeg-ok?))
       (begin
         (displayln (format "data-dir:   ~a — ~a" (path->string (data-dir)) (tr (lang) 'doctor-data)))
-        (displayln (format "api:        ~a" (if api-ok? (tr (lang) 'doctor-api) (tr (lang) 'doctor-no-api))))
-        (displayln (format "api store:  ~a~a"
-                           (secret-backend-label secret-backend)
-                           (if (secret-backend-secure? secret-backend)
-                               ""
-                               (if (equal? secret-backend 'file)
-                                   " (file fallback; OS vault unavailable)"
-                                   ""))))
-        (displayln (format "ffmpeg:     ~a" (if ffmpeg-ok? (tr (lang) 'doctor-ffmpeg) (tr (lang) 'doctor-no-ffmpeg))))))
+        (displayln (format "api:        ~a"
+                           (if api-ok?
+                               (tr (lang) 'doctor-api)
+                               (tr (lang) 'doctor-no-api))))
+        (displayln
+         (format "api store:  ~a~a"
+                 (secret-backend-label secret-backend)
+                 (if (secret-backend-secure? secret-backend)
+                     ""
+                     (if (equal? secret-backend 'file) " (file fallback; OS vault unavailable)" ""))))
+        (displayln (format "ffmpeg:     ~a"
+                           (if ffmpeg-ok?
+                               (tr (lang) 'doctor-ffmpeg)
+                               (tr (lang) 'doctor-no-ffmpeg))))))
   (if data-ok? 0 1))
 
 (define (cmd-version _args)
-  (if (stdout-json?) (emit-ok (hasheq 'version cli-version)) (displayln cli-version))
+  (if (stdout-json?)
+      (emit-ok (hasheq 'version cli-version))
+      (displayln cli-version))
   0)
 
 (define help-text
-  (string-append
-   "PodLens " cli-version " — podcasts, in your language\n"
-   "\n"
-   "  add <rss-url>              subscribe to a podcast feed\n"
-   "  list                       show subscriptions\n"
-   "  episodes <feed-id>         list episodes of a feed\n"
-   "  refresh [feed-id]…         refresh feeds for new episodes\n"
-   "  catalog [category]         list the curated catalog\n"
-   "  search <terms>             search the full podcast directory\n"
-   "  peek <rss-url>             newest episodes of a feed, no subscribe\n"
-   "  preview <rss-url>          cache the newest episode for one audition\n"
-   "  download <episode-id>      cache the episode audio\n"
-   "  pipeline <episode-id>      download+transcribe+translate+summarize\n"
-   "  estimate <episode-id>      what a pipeline run would cost\n"
-   "  transcribe <episode-id>    speech-to-text via the ASR API\n"
-   "  translate <episode-id>     translate the transcript\n"
-   "  summarize <episode-id>     TL;DR + key points + quotes\n"
-   "  show <episode-id>          print transcript and summary\n"
-   "  export <episode-id> [file] transcript+summary as Markdown (@mm:ss)\n"
-   "  find <terms>…              full-text search across transcripts\n"
-   "  done <episode-id> [0|1]    mark played (1, default) or unplayed (0)\n"
-   "  position <episode-id> <s>  remember a playback position\n"
-   "  config [key [value]]       read or set settings\n"
-   "  check-updates              signed update check\n"
-   "  version                    print the app version\n"
-   "  doctor                     health check\n"
-   "  --json                     machine-readable output\n"
-   "\n"
-   "Feed and episode ids accept the full 40-char id or an unambiguous\n"
-   "prefix (the 12-char form shown by list/episodes/find).\n"
-   "\n"
-   "Exit codes: 0 ok, 1 operation failed, 2 usage error.\n"
-   "Data lives in ~/.podlens (override with PODLENS_DATA_DIR).\n"))
+  (string-append "PodLens "
+                 cli-version
+                 " — podcasts, in your language\n"
+                 "\n"
+                 "  add <rss-url>              subscribe to a podcast feed\n"
+                 "  list                       show subscriptions\n"
+                 "  episodes <feed-id>         list episodes of a feed\n"
+                 "  refresh [feed-id]…         refresh feeds for new episodes\n"
+                 "  catalog [category]         list the curated catalog\n"
+                 "  search <terms>             search the full podcast directory\n"
+                 "  peek <rss-url>             newest episodes of a feed, no subscribe\n"
+                 "  preview <rss-url>          cache the newest episode for one audition\n"
+                 "  download <episode-id>      cache the episode audio\n"
+                 "  pipeline <episode-id>      download+transcribe+translate+summarize\n"
+                 "  estimate <episode-id>      what a pipeline run would cost\n"
+                 "  transcribe <episode-id>    speech-to-text via the ASR API\n"
+                 "  translate <episode-id>     translate the transcript\n"
+                 "  summarize <episode-id>     TL;DR + key points + quotes\n"
+                 "  show <episode-id>          print transcript and summary\n"
+                 "  export <episode-id> [file] transcript+summary as Markdown (@mm:ss)\n"
+                 "  find <terms>…              full-text search across transcripts\n"
+                 "  done <episode-id> [0|1]    mark played (1, default) or unplayed (0)\n"
+                 "  position <episode-id> <s>  remember a playback position\n"
+                 "  config [key [value]]       read or set settings\n"
+                 "  check-updates              signed update check\n"
+                 "  version                    print the app version\n"
+                 "  doctor                     health check\n"
+                 "  --json                     machine-readable output\n"
+                 "\n"
+                 "Feed and episode ids accept the full 40-char id or an unambiguous\n"
+                 "prefix (the 12-char form shown by list/episodes/find).\n"
+                 "\n"
+                 "Exit codes: 0 ok, 1 operation failed, 2 usage error.\n"
+                 "Data lives in ~/.podlens (override with PODLENS_DATA_DIR).\n"))
 
 (define (cmd-help _args)
   (display help-text)
@@ -733,30 +803,54 @@
 ;; ---- dispatch ------------------------------------------------------------------
 
 (define commands
-  (hasheq 'add cmd-add
-          'list cmd-list
-          'episodes cmd-episodes
-          'refresh cmd-refresh
-          'catalog cmd-catalog
-          'search cmd-search
-          'peek cmd-peek
-          'preview cmd-preview
-          'download cmd-download
-          'pipeline cmd-pipeline
-          'estimate cmd-estimate
-          'transcribe cmd-transcribe
-          'translate cmd-translate
-          'summarize cmd-summarize
-          'show cmd-show
-          'export cmd-export
-          'find cmd-find
-          'done cmd-done
-          'position cmd-position
-          'config cmd-config
-          'check-updates cmd-check-updates
-          'doctor cmd-doctor
-          'version cmd-version
-          'help cmd-help))
+  (hasheq 'add
+          cmd-add
+          'list
+          cmd-list
+          'episodes
+          cmd-episodes
+          'refresh
+          cmd-refresh
+          'catalog
+          cmd-catalog
+          'search
+          cmd-search
+          'peek
+          cmd-peek
+          'preview
+          cmd-preview
+          'download
+          cmd-download
+          'pipeline
+          cmd-pipeline
+          'estimate
+          cmd-estimate
+          'transcribe
+          cmd-transcribe
+          'translate
+          cmd-translate
+          'summarize
+          cmd-summarize
+          'show
+          cmd-show
+          'export
+          cmd-export
+          'find
+          cmd-find
+          'done
+          cmd-done
+          'position
+          cmd-position
+          'config
+          cmd-config
+          'check-updates
+          cmd-check-updates
+          'doctor
+          cmd-doctor
+          'version
+          cmd-version
+          'help
+          cmd-help))
 
 (module+ main
   (require racket/match)
@@ -767,11 +861,12 @@
   (cli-config (make-config-manager))
   (library-load!)
   (exit
-   (with-handlers
-       ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
+   (with-handlers ([exn:fail? (lambda (e) (fail! 1 (exn-message e)))])
      (match args
        ['() (cmd-help '())]
-       [(list (or "help" "-h" "--help" "version" "--version")) ((hash-ref commands (if (member (car args) '("version" "--version")) 'version 'help) cmd-help) (cdr args))]
+       [(list (or "help" "-h" "--help" "version" "--version"))
+        ((hash-ref commands (if (member (car args) '("version" "--version")) 'version 'help) cmd-help)
+         (cdr args))]
        [(cons cmd rest)
         (define command (hash-ref commands (string->symbol cmd) #f))
         (cond

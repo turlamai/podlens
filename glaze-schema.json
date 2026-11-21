@@ -1,0 +1,900 @@
+{
+  "format": "glaze-schema",
+  "format-version": 1,
+  "glz": 1,
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/rpc/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-add"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-remove"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-refresh"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-refresh-all"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/catalog-list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/catalog-search"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/feed-peek"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/preview-audio"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-recent"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-download"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-transcribe"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-translate"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-summarize"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-remove-audio"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-pipeline"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-estimate"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-set-done"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/resume-last"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-chapters"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-transcript"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/episode-summary"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/position-save"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/job-status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/job-cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/settings-list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/security-status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/ai-test"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/settings-set"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/update-check"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/start-download"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/update-state"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rpc/open-releases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/reveal"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/open_external"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/autostart"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/autostart_set"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/e2e"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/e2e_report"
+    },
+    {
+      "method": "POST",
+      "path": "/api/host/e2e_fs"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audio/:id"
+    }
+  ],
+  "schema": {
+    "commands": [
+      {
+        "errors": [
+          "invalid-args",
+          "capability-denied",
+          "token-required",
+          "timed-out",
+          "cancelled",
+          "internal"
+        ],
+        "name": "audioId",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "health",
+        "parameters": [],
+        "result": {
+          "kind": "reference",
+          "name": "Health"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostAutostart",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostAutostart_set",
+        "parameters": [
+          {
+            "name": "enabled",
+            "type": {
+              "kind": "scalar",
+              "name": "Bool"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostE2e",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostE2e_fs",
+        "parameters": [
+          {
+            "name": "op",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "data",
+            "type": {
+              "element": {
+                "kind": "scalar",
+                "name": "String"
+              },
+              "kind": "optional"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostE2e_report",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "ok",
+            "type": {
+              "kind": "scalar",
+              "name": "Bool"
+            }
+          },
+          {
+            "name": "detail",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostOpen_external",
+        "parameters": [
+          {
+            "name": "url",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "hostReveal",
+        "parameters": [
+          {
+            "name": "path",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcAiTest",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcCatalogList",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcCatalogSearch",
+        "parameters": [
+          {
+            "name": "query",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeChapters",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeDownload",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeEstimate",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeList",
+        "parameters": [
+          {
+            "name": "feedId",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodePipeline",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeRecent",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeRemoveAudio",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeSetDone",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "done",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeSummarize",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeTranscribe",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeTranscript",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcEpisodeTranslate",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedAdd",
+        "parameters": [
+          {
+            "name": "url",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedList",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedPeek",
+        "parameters": [
+          {
+            "name": "url",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedRefresh",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Int64"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedRefreshAll",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Int64"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcFeedRemove",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcHealth",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcJobCancel",
+        "parameters": [
+          {
+            "name": "jobId",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcOpenReleases",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcPositionSave",
+        "parameters": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "seconds",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "done",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcPreviewAudio",
+        "parameters": [
+          {
+            "name": "enclosureUrl",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcResumeLast",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcSecurityStatus",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "String"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcSettingsList",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcSettingsSet",
+        "parameters": [
+          {
+            "name": "key",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "value",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "result": {
+          "kind": "scalar",
+          "name": "Bool"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcStartDownload",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcUpdateCheck",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      },
+      {
+        "errors": [],
+        "name": "rpcUpdateState",
+        "parameters": [],
+        "result": {
+          "kind": "scalar",
+          "name": "Value"
+        }
+      }
+    ],
+    "contract": 1,
+    "enums": [],
+    "events": [],
+    "id": "glaze-routes",
+    "records": [
+      {
+        "fields": [
+          {
+            "name": "ok",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          },
+          {
+            "name": "version",
+            "type": {
+              "kind": "scalar",
+              "name": "String"
+            }
+          }
+        ],
+        "name": "Health"
+      }
+    ],
+    "revision": 1,
+    "states": []
+  }
+}

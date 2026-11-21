@@ -163,9 +163,11 @@ def main() -> None:
 
     write_icns(master, BRANDING / "app.icns")
 
-    # Linux: one 512x512 PNG, consumed via rivet.rktd's linux-icon.
+    # Linux: one 512x512 PNG (flatpak desktop entry / future glaze Linux
+    # icon support; glaze currently ships a generated placeholder there).
     master.resize((512, 512), Image.LANCZOS).save(BRANDING / "app.png")
-    # Windows installer wizard bitmaps (rivet.rktd windows-installer-bitmaps).
+    # Windows installer wizard bitmaps (release.yml --installer-banner /
+    # --installer-dialog).
     write_wizard_bitmap(BRANDING / "wizard-banner.bmp", 493, 58,
                         mark_edge=44, mark_xy=(16, 7),
                         wordmark_size=26, wordmark_xy=(110, 29))
