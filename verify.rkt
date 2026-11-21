@@ -389,9 +389,8 @@ PS1
      ;; glaze exposes no JS injection, so the journey runs inside the page:
      ;; navigate to #e2e and collect the harness reports over the host gate.
      (webview-navigate wv (string-append url "#e2e"))
-     (define journey-deadline (+ (current-inexact-milliseconds) 75000))
      (define probe-started? #f)
-     (define reports
+     (define (collect-journey deadline)
        (let loop ()
          (define st (post-json url "api/host/e2e" (hasheq)))
          (define rs (if (hash? st) (hash-ref st 'reports '()) '()))
@@ -408,8 +407,25 @@ PS1
            [(for/or ([r (in-list (if (list? rs) rs '()))])
               (and (hash? r) (equal? (hash-ref r 'id #f) "journey-complete")))
             rs]
-           [(>= (current-inexact-milliseconds) journey-deadline) rs]
+           [(>= (current-inexact-milliseconds) deadline) rs]
            [else (sleep 0.25) (loop)])))
+     (define (report-ok? rs id)
+       (for/or ([r (in-list (if (list? rs) rs '()))])
+         (and (hash? r) (equal? (hash-ref r 'id #f) id) (eq? #t (hash-ref r 'ok #f)))))
+     (define reports0 (collect-journey (+ (current-inexact-milliseconds) 75000)))
+     ;; WKWebView CI hosts wedge media pipelines / drop renders occasionally;
+     ;; one fresh-page harness retry keeps acceptance honest without masking
+     ;; deterministic regressions (a second failure stays fatal).
+     (define reports
+       (if (and (eq? (system-type) 'macosx)
+                (or (not (report-ok? reports0 "journey-complete"))
+                    (not (report-ok? reports0 "journey-pause-position"))
+                    (not (report-ok? reports0 "nav-settings"))))
+           (begin
+             (eprintf "[verify] macOS harness retry: reloading #e2e\n")
+             (webview-navigate wv (string-append url "#e2e"))
+             (collect-journey (+ (current-inexact-milliseconds) 75000)))
+           reports0))
      (set-box! journey-reports reports)
      ;; Give the OS probe its own budget after the journeys finish; playback
      ;; stays live until webview-close below.

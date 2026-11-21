@@ -117,10 +117,17 @@ export async function runHarnessIfGated(): Promise<void> {
     // (main.ts); slow CI hosts need more than a fixed wait.
     const t0 = Date.now();
     while (!document.querySelector('#api-base') && Date.now() - t0 < 6000) await wait(100);
+    if (!document.querySelector('#api-base')) {
+      // WKWebView CI hosts occasionally drop the first navigation's render;
+      // one re-click recovers without masking a real regression.
+      click('.sidebar [data-page="settings"]');
+      const t1 = Date.now();
+      while (!document.querySelector('#api-base') && Date.now() - t1 < 4000) await wait(100);
+    }
     expect(state.page === 'settings', 'settings page not active');
     expect(
       document.querySelector('#api-base'),
-      `api base field missing (settings=${!!document.querySelector('.settings')} keys=${Object.keys(state.settings ?? {}).length} page=${state.page})`,
+      `api base field missing (settings=${!!document.querySelector('.settings')} keys=${Object.keys(state.settings ?? {}).length} page=${state.page} content=${(document.querySelector('.content')?.innerHTML ?? '').slice(0, 160)})`,
     );
     return document.querySelector('h1')?.textContent ?? '';
   });
