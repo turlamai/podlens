@@ -98,7 +98,10 @@ export async function runHarnessIfGated(): Promise<void> {
     const t0 = Date.now();
     while (!document.querySelector('#api-base') && Date.now() - t0 < 6000) await wait(100);
     expect(state.page === 'settings', 'settings page not active');
-    expect(document.querySelector('#api-base'), 'api base field missing');
+    expect(
+      document.querySelector('#api-base'),
+      `api base field missing (settings=${!!document.querySelector('.settings')} keys=${Object.keys(state.settings ?? {}).length} page=${state.page})`,
+    );
     return document.querySelector('h1')?.textContent ?? '';
   });
   await step('theme-toggle', async () => {
