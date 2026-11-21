@@ -53,6 +53,7 @@
          (prefix-in upd: "update.rkt"))
 
 (provide start
+         start/ports
          app-version)
 
 ;; ---- States / Events ------------------------------------------------------
@@ -459,7 +460,7 @@
 
 ;; ---- lifecycle --------------------------------------------------------------------------
 
-(define (start in-fd out-fd)
+(define (init-runtime!)
   (ensure-data-dir!)
   (define mgr (make-config-manager))
   (define jobs (make-job-manager
@@ -468,5 +469,16 @@
   (library-load!)
   (current-config mgr)
   (current-jobs jobs)
-  (state-set! version app-version)
+  (state-set! version app-version))
+
+(define (start in-fd out-fd)
+  (init-runtime!)
   (serve-fds in-fd out-fd))
+
+;; Additive adapter seam (#63): the same lifecycle on a port pair. The
+;; glaze adapter drives the engine over in-process pipes (backend/rvt1.rkt),
+;; which are ports, not OS file descriptors. `start`, the wire contract
+;; and every RPC behavior are unchanged.
+(define (start/ports in-port out-port)
+  (init-runtime!)
+  (serve in-port out-port))

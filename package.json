@@ -1,0 +1,13 @@
+{
+  "name": "podlens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PodLens — one Racket engine, one web UI in native glaze hosts (macOS / Windows / Linux).",
+  "scripts": {
+    "check": "pnpm -r run check",
+    "build": "pnpm -r run build",
+    "gen:rpc": "python scripts/gen-rpc-types.py",
+    "gen:i18n": "python scripts/gen-web-i18n.py"
+  },
+  "packageManager": "pnpm@11.3.0"
+}

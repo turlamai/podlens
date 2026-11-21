@@ -50,28 +50,30 @@ intact.
 
 ```bash
 raco test tests/                       # backend contract tests
-raco make racket/backend.rkt              # backend compiles against the RVT1 contract
-bash scripts/check-release-version.sh  # VERSION == rivet.rktd == racket/version.rkt == generated clients
+raco make backend/main.rkt             # host compiles against the typed contract
+bash scripts/check-release-version.sh  # VERSION == racket/version.rkt
 racket scripts/verify-catalog.rkt      # catalog feeds must parse on the live wire
+racket verify.rkt                      # real-window acceptance journeys (this platform)
 ```
 
-These mirror the CI jobs; the platform hosts compile in their own CI
-jobs. If you touch `macos-host/`, `windows/` or `linux/`, say whether
-you were able to build locally.
+These mirror the CI jobs; the per-platform real-window acceptance runs in
+`.github/workflows/acceptance.yml`. If you touch the web UI
+(`apps/desktop/`), run `npm --prefix apps/desktop run check` and say
+whether you were able to run `verify.rkt` locally.
 
 ## Releasing
 
-Releases are tag-driven (`v*`). A release bump moves `VERSION`,
-`rivet.rktd` and `racket/version.rkt` in the same commit and regenerates
-the clients — `scripts/check-release-version.sh` enforces all four
-identities and the dated CHANGELOG entry. The pipeline refuses to
-publish without the Ed25519 update signing key and signs one merged
-feed from the publish job.
+Releases are tag-driven (`v*`). A release bump moves `VERSION` and
+`racket/version.rkt` in the same commit —
+`scripts/check-release-version.sh` enforces the alignment and the tag
+validator rejects a tag without a dated CHANGELOG entry. The pipeline
+refuses to publish without the Ed25519 update signing key and signs one
+merged feed from the publish job.
 
 ## Areas that especially want help
 
-- Linux playback polish: the GStreamer plugin closure and AppImage
-  bundling (`linux/CMakeLists.txt`, `scripts/e2e/e2e-linux.sh`)
+- Linux playback polish: the GStreamer plugin closure in the deb/rpm
+  packages and WebKitGTK media behavior under the glaze carrier
 - Keeping the Chinese user path in lockstep with the English one
   (`README.zh-CN.md`, `docs/USER-GUIDE.zh-CN.md`) — the language policy
   in [AGENTS.md](AGENTS.md) requires reciprocal updates

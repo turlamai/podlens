@@ -10,26 +10,25 @@ name: Published upgrade qualification (N -> N+1)
 # offline tests never prove an upgrade; the evidence artifact this workflow
 # uploads does.
 #
-# Install shape: PodLens's feed carries the tar.gz for Linux (the Linux
-# install form is "extract anywhere, run RivetHost"; upgrades extract the
-# newer tarball over the app directory — docs/UPDATE.md). The workflow
+# Install shape: PodLens's feed carries the tar.gz for Linux — the glaze
+# portable tree (bin/ + lib/ + public/, launcher bin/podlens). The Linux
+# install form is "extract anywhere, run bin/podlens"; upgrades extract the
+# newer tarball over the app directory (docs/UPDATE.md). The workflow
 # qualifies exactly that path and records `installShape` in the evidence;
 # the file name keeps the family workflow name.
 #
-# Updater note: the workflow checks out the N tag but overlays the driver
-# from main. N already ships a correct updater (the ten-argument
-# updater-config call with the component the feed stamps), so no updater
-# overlay is needed; if a future published tag ever ships a broken updater,
-# overlay racket/update.rkt from main the same way the driver is overlaid.
+# Both published tags are glaze-stack releases (the version line restarted
+# at 0.1.0 with #63), so the N tag ships the updater and the qualification
+# driver under test — no overlay from main is needed or applied.
 
 on:
   workflow_dispatch:
 
-# Fallback so the file is self-consistent for the release gate's static pin
-# check; the "Read the rivet pin" step below always overwrites this with the
-# pin the published N release was actually built against.
+# Fallback so the file is self-consistent for static pin checks; the "Read
+# the glaze pin" step below always overwrites this with the pin the
+# published N release was actually built against.
 env:
-  RIVET_PIN: 78ca0c0cb234ee75c0bca54db6c12d0faf4c3b91
+  GLAZE_PIN: 717a751b94182a38b16bb1b5417c4445d73b879b
 
 permissions:
   contents: read
@@ -67,59 +66,38 @@ jobs:
           echo "to-version=${to_tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Check out the updater under test (N)
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.releases.outputs.from-tag }}
 
-      - name: Overlay the qualification driver from main
+      - name: Read the glaze pin the N release was built against
         run: |
           set -euo pipefail
-          git fetch origin main --depth 1
-          # The driver requires the updater module by repo path; since the
-          # engine moved to racket/ on main, published tags still carry the
-          # old app/ layout, so overlay the module beside the driver (the
-          # N tag's own updater stays in control of the executed behavior).
-          # The updater pulls core/paths.rkt and version.rkt relative to the
-          # new layout, so the whole racket/ tree comes with it — the N tag
-          # predates that directory and nothing else claims the path.
-          git checkout FETCH_HEAD -- scripts/acceptance/upgrade-qualification.rkt racket
-          # The overlaid version.rkt carries main's version, and the updater
-          # identifies as that when it consults the live feed — with 0.8.0 in
-          # the tree the feed correctly answers "up to date" and there is no
-          # upgrade to qualify. Restore the version identity of the installed
-          # N release (0.7.5 shipped app/version.rkt; 0.8.0+ racket/).
-          git show "${{ steps.releases.outputs.from-tag }}:app/version.rkt" > racket/version.rkt 2>/dev/null || \
-            git show "${{ steps.releases.outputs.from-tag }}:racket/version.rkt" > racket/version.rkt
-          grep -q "$(echo "${{ steps.releases.outputs.from-tag }}" | sed 's/^v//')" racket/version.rkt
-          echo "OVERLAY_SHA=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
-
-      - name: Read the rivet pin the N release was built against
-        run: |
-          set -euo pipefail
-          pin="$(grep -m1 -E '^ *RIVET_PIN:' .github/workflows/ci.yml | sed -E 's/.*RIVET_PIN:[[:space:]]*//')"
+          pin="$(grep -m1 -E '^ *GLAZE_PIN:' .github/workflows/ci.yml | sed -E 's/.*GLAZE_PIN:[[:space:]]*//')"
           test -n "$pin"
-          echo "RIVET_PIN=$pin" >> "$GITHUB_ENV"
+          echo "GLAZE_PIN=$pin" >> "$GITHUB_ENV"
+          echo "UPDATER_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Install headless GUI runtime + accessibility tools
         run: |
           sudo apt-get update
           sudo apt-get install -y -o Acquire::Retries=5 --no-install-recommends \
-            libgtk-4-1 libadwaita-1-0 libjson-glib-1.0-0 libsecret-1-0 \
-            libgstreamer1.0-0 gstreamer1.0-plugins-base liblz4-1 \
+            libgtk-3-0 libwebkit2gtk-4.1-0 \
+            libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad liblz4-1 \
             zlib1g libncurses6 libx11-6 libxtst6 \
             xvfb at-spi2-core dbus python3-pyatspi libglib2.0-bin
 
-      - uses: Bogdanp/setup-racket@v1.16
+      - uses: Bogdanp/setup-racket@v1.15
         with:
           version: '9.3'
           architecture: ${{ matrix.racket-arch }}
           distribution: full
           variant: CS
 
-      - name: Install the rivet release N was built against
+      - name: Install the glaze release N was built against
         run: |
-          raco pkg install --auto --no-docs "https://github.com/turlamai/rivet.git#${RIVET_PIN}"
-          raco pkg install --auto --no-docs --skip-installed crypto
+          raco pkg install --auto --no-docs "https://github.com/turlamai/glaze.git#${GLAZE_PIN}"
 
       - name: Fetch published N, N+1 and the live signed feed
         env:
@@ -156,10 +134,10 @@ jobs:
         run: |
           cat > /tmp/qual/boot-probe.py <<'EOF'
           #!/usr/bin/env python3
-          # Boot proof: the "PodLens" frame maps and the RVT1 backend
-          # readiness signal (or the seeded library content) is visible in
-          # the a11y tree — the first assertions of
-          # scripts/e2e/linux-atspi.py, without the listening journey.
+          # Boot proof: the "PodLens" frame maps and the seeded library
+          # content (or the readiness signal) is visible in the a11y tree —
+          # the first assertions of the real-window acceptance journeys,
+          # without the listening journey.
           import argparse, json, time
           from pathlib import Path
           import pyatspi
@@ -232,11 +210,11 @@ jobs:
           EOF
           cat > /tmp/qual/boot-verify.sh <<'EOF'
           #!/usr/bin/env bash
-          # Boot a packaged PodLens tree headlessly (Xvfb + at-spi, the
-          # scripts/e2e/e2e-linux.sh pattern) and run the boot probe.
+          # Boot a packaged PodLens tree headlessly (Xvfb + at-spi) and run
+          # the boot probe. The tree root holds bin/ + lib/ + public/.
           set -euo pipefail
           app_dir="$1"; out="$2"
-          exe="$app_dir/RivetHost"
+          exe="$app_dir/bin/podlens"
           test -x "$exe"
           mkdir -p "$out"
           export HOME=/tmp/qual/home
@@ -292,14 +270,13 @@ jobs:
       - name: Install N (tarball extract) and seed the library
         run: |
           set -euo pipefail
-          APPDIR="podlens-linux-${{ matrix.arch }}"
-          mkdir -p /tmp/qual/install /tmp/qual/data
-          tar -xzf "$FROM_TAR" -C /tmp/qual/install
-          test -x "/tmp/qual/install/$APPDIR/RivetHost"
+          mkdir -p /tmp/qual/install/n /tmp/qual/data
+          tar -xzf "$FROM_TAR" -C /tmp/qual/install/n
+          test -x /tmp/qual/install/n/bin/podlens
           # retain N beside the install for the executed rollback
-          cp -a "/tmp/qual/install/$APPDIR" "/tmp/qual/install/$APPDIR.previous"
-          # host settings shaped like scripts/e2e/e2e-linux.sh seeds, then
-          # the deterministic offline library fixture (show + episode)
+          cp -a /tmp/qual/install/n /tmp/qual/install/n.previous
+          # host settings shaped like the acceptance seeds, then the
+          # deterministic offline library fixture (show + episode)
           printf '%s\n' '{"ui-lang":"en","check-updates-enabled":"false","last-update-check":2000000000}' \
             > /tmp/qual/data/config.json
           PODLENS_DATA_DIR=/tmp/qual/data racket scripts/e2e/seed-listening-fixture.rkt
@@ -308,9 +285,8 @@ jobs:
       - name: Boot N headlessly (the install works, the library loads)
         run: |
           set -euo pipefail
-          APPDIR="podlens-linux-${{ matrix.arch }}"
           dbus-run-session -- bash /tmp/qual/boot-verify.sh \
-            "/tmp/qual/install/$APPDIR" /tmp/qual/boot-n
+            /tmp/qual/install/n /tmp/qual/boot-n
           touch /tmp/qual/boot-n.ok
 
       - name: Refuse a one-byte-tampered live feed (bad signature)
@@ -352,41 +328,38 @@ jobs:
       - name: Install N+1 over the app directory and verify the tree
         run: |
           set -euo pipefail
-          APPDIR="podlens-linux-${{ matrix.arch }}"
           mkdir -p /tmp/qual/reference /tmp/qual/from-reference
           tar -xzf "$TO_TAR" -C /tmp/qual/reference
           tar -xzf "$FROM_TAR" -C /tmp/qual/from-reference
-          tar -xzf "$(jq -r .downloadedPath /tmp/qual/upgrade.json)" -C /tmp/qual/install
+          tar -xzf "$(jq -r .downloadedPath /tmp/qual/upgrade.json)" -C /tmp/qual/install/n
           # the replaced tree must equal the published N+1 tree (no stale files)
-          diff -r --brief "/tmp/qual/install/$APPDIR" "/tmp/qual/reference/$APPDIR"
+          diff -r --brief /tmp/qual/install/n /tmp/qual/reference
           # the retained tree must still be N byte for byte
-          diff -r --brief "/tmp/qual/install/$APPDIR.previous" "/tmp/qual/from-reference/$APPDIR"
+          diff -r --brief /tmp/qual/install/n.previous /tmp/qual/from-reference
 
       - name: Boot N+1 headlessly (data must survive the upgrade)
         run: |
           set -euo pipefail
-          APPDIR="podlens-linux-${{ matrix.arch }}"
           dbus-run-session -- bash /tmp/qual/boot-verify.sh \
-            "/tmp/qual/install/$APPDIR" /tmp/qual/boot-n1
+            /tmp/qual/install/n /tmp/qual/boot-n1
           grep -q "PodLens Acceptance Radio" /tmp/qual/data/library.json
           touch /tmp/qual/boot-n1.ok
 
       - name: Execute the documented rollback and boot N again
         run: |
           set -euo pipefail
-          APPDIR="podlens-linux-${{ matrix.arch }}"
-          rm -rf "/tmp/qual/install/$APPDIR"
-          cp -a "/tmp/qual/install/$APPDIR.previous" "/tmp/qual/install/$APPDIR"
-          diff -r --brief "/tmp/qual/install/$APPDIR" "/tmp/qual/from-reference/$APPDIR"
+          rm -rf /tmp/qual/install/n
+          cp -a /tmp/qual/install/n.previous /tmp/qual/install/n
+          diff -r --brief /tmp/qual/install/n /tmp/qual/from-reference
           dbus-run-session -- bash /tmp/qual/boot-verify.sh \
-            "/tmp/qual/install/$APPDIR" /tmp/qual/boot-rollback
+            /tmp/qual/install/n /tmp/qual/boot-rollback
           touch /tmp/qual/rollback.ok
 
       - name: Write evidence
         if: always()
         run: |
           set -euo pipefail
-          mkdir -p .rivet/qualification
+          mkdir -p .glaze/qualification
           jq -n \
             --arg arch "${{ matrix.arch }}" \
             --arg fromTag "${{ steps.releases.outputs.from-tag }}" \
@@ -397,7 +370,7 @@ jobs:
             --arg toSha256 "${TO_SHA:-unknown}" \
             --arg feedUrl "${LIVE_FEED_URL:-unknown}" \
             --arg manifestKeyId "${FEED_KEY_ID:-unknown}" \
-            --arg updaterSource "${OVERLAY_SHA:-unknown}" \
+            --arg updaterSource "${UPDATER_SHA:-unknown}" \
             --arg runUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --argjson bootN "$([[ -f /tmp/qual/boot-n.ok ]] && echo true || echo false)" \
             --argjson badSignature "$([[ -f /tmp/qual/bad-signature.ok ]] && echo true || echo false)" \
@@ -408,9 +381,9 @@ jobs:
             --argjson badSignatureDetail "$(cat /tmp/qual/bad-signature.json 2>/dev/null || echo null)" \
             '{
               format: "podlens-published-upgrade-qualification",
-              formatVersion: 1,
+              formatVersion: 2,
               arch: $arch,
-              installShape: "tar.gz extracted over the app directory (feed entry linux/targz; the Linux install form is extract-anywhere, upgrades overlay the newer tarball)",
+              installShape: "tar.gz extracted over the app directory (feed entry linux/tar.gz; the glaze portable tree bin/ + lib/ + public/, launcher bin/podlens; upgrades overlay the newer tarball)",
               throttleBypass: "direct updater entry points; the 4h silent-check throttle lives in the hosts and is never consulted",
               updaterSource: $updaterSource,
               feedUrl: $feedUrl,
@@ -426,12 +399,12 @@ jobs:
               badSignatureDetail: $badSignatureDetail,
               dataPersistence: "seeded library (PodLens Acceptance Radio) present in the data directory across upgrade and rollback boots",
               runUrl: $runUrl
-            }' > .rivet/qualification/evidence.json
-          cat .rivet/qualification/evidence.json
+            }' > .glaze/qualification/evidence.json
+          cat .glaze/qualification/evidence.json
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: published-upgrade-${{ matrix.arch }}
-          path: .rivet/qualification/evidence.json
+          path: .glaze/qualification/evidence.json
           if-no-files-found: warn

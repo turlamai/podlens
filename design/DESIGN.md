@@ -1,6 +1,6 @@
 # PodLens — visual and interaction contract
 
-This editable prototype defines information architecture and interaction semantics for the macOS, Windows, and Linux implementations. Native controls follow each platform's conventions. The HTML prototype is a design reference, not a replacement for the Racket engine or native hosts.
+This editable prototype defines information architecture and interaction semantics for the macOS, Windows, and Linux implementations, which share one web UI on the glaze system-WebView carrier. Platform mechanisms follow each host's conventions through the carrier. The HTML prototype is a design reference and the landed visual baseline, not a replacement for the Racket engine.
 
 ## Scope and entry points
 
@@ -88,19 +88,61 @@ Desktop uses a 232px sidebar, normal-flow content, and a player that reserves it
 | Mechanism | macOS | Windows | Linux |
 |---|---|---|---|
 | Shortcut modifier | Command | Ctrl | Ctrl |
-| Native interface | SwiftUI | WinUI 3 | GTK4 |
-| Settings presentation | Native settings window | Native settings surface | Native settings surface |
+| Carrier | glaze system WebView (WKWebView) | glaze system WebView (WebView2) | glaze system WebView (WebKitGTK) |
+| Settings presentation | In-app settings view | Same | Same |
 | Appearance choice | Follow System / Light / Dark (menu ⇧⌘T quick toggle) | Same three states in settings | Same three states in settings |
-| Single-key shortcuts | F and / via a local key monitor; F also on the menu as ⌘⇧F | F and / via accelerators | F and / via key controller |
+| Single-key shortcuts | F and / via the web key handler | Same | Same |
 | Shared contract | Information architecture, action semantics, reading continuity, status vocabulary | Same | Same |
 
-The prototype uses one platform-neutral interface. No macOS traffic lights are presented as universal desktop window controls.
+One web UI runs on all three carriers; platform mechanisms (tray, close-to-tray,
+OS Now Playing, shortcuts modifiers) map through the glaze carrier and the
+host bridge, never through per-platform UI forks.
+
+## Glaze carrier rewrite record — #63 (2026-11-20)
+
+- Family design standard read before the UI slices: revision
+  `2026-11-20-minimal-family` (tlai-product references/design-standard.md),
+  together with policy.md. Product start SHA for the rewrite:
+  `1f62220` (main before the glaze rewrite branch).
+- Carrier decision: glaze (system WebView + HTML/CSS/JS UI). No rivet hard
+  trigger applies: the tray/close-to-tray behavior is the glaze carrier's
+  own tray, not a product-deep integration; no mobile roadmap; not an
+  all-day resident low-footprint app. Declared in podlens#63 for owner
+  correction.
+- OS Now Playing carrier decision (2026-11-20, glaze#153 / glaze PR#154):
+  host-owned publication, not the web engine's MediaSession bridge.
+  Evidence chain: WebKitGTK never owns an MPRIS name on headless CI
+  (WebKit bug 279362; bus-identity forensics in podlens#63), and macOS 26
+  private MediaRemote returns nothing even for audible playback. macOS
+  uses public MediaPlayer.framework; Linux owns MPRIS2 over GIO/GDBus;
+  Windows keeps the verified WebView2 web MediaSession → SMTC path (host
+  stub inert). Page syncs via `api/host/now-playing`; OS commands return
+  over SSE `now-playing-command`; acceptance probes read the host surface
+  (`api/host/now-playing_os` readback / owned MPRIS name / SMTC probe).
+- Main task: resume listening and resume reading one episode; primary
+  action = play/pause in the reserved player; secondary = jump back to the
+  current transcript sentence.
+- Accent role: existing terracotta pair (light `#AC4B2D` / dark `#EBAB8A`)
+  serves primary action, selection and focus; one high-emphasis action per
+  task region. Density: standard preset (16–24 content padding, 36px
+  controls); the transcript reading column uses the reading preset
+  (16px serif body, 1.7–1.9 line height) — the family-allowed reading
+  exception, self-hosted/system serif fallback, no runtime remote fonts.
+- Font/icon mapping: system UI stack per family baseline for chrome;
+  serif only for transcript/summary reading body; existing family linear
+  SVG icon set (Lucide-outline compatible) retained, 16/20/24 viewBoxes.
+- Exceptions registered: serif reading body (reading preset); typographic
+  cover artwork for example shows (content, not chrome).
+- UI acceptance evidence lives in podlens#63 (per-slice comments with
+  platform screenshots and the real-window acceptance envelope); the
+  prototype entries above remain the landed visual baseline the web UI
+  was ported from.
 
 ## Exit and remaining implementation work
 
 This revision delivers editable visual and local interaction source. No browser preview, screenshots, audio playback, or automated validation was performed in this revision. It does not establish production readiness or native implementation parity.
 
-Before native release: verify real playback/reading continuity across navigation and restart; secure key storage; service errors, retry and cancellation; actual download/offline behavior; large and empty libraries; font scaling; screen reader output; keyboard focus; and all three native hosts. These remain release work, not claims about this prototype.
+Before release: verify real playback/reading continuity across navigation and restart; secure key storage; service errors, retry and cancellation; actual download/offline behavior; large and empty libraries; font scaling; screen reader output; keyboard focus; and all three glaze carriers. These remain release work, not claims about this prototype.
 
 ## Interaction check — 2026-11-14
 
