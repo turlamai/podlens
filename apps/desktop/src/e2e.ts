@@ -93,7 +93,10 @@ export async function runHarnessIfGated(): Promise<void> {
   });
   await step('nav-settings', async () => {
     click('.sidebar [data-page="settings"]');
-    await wait(400);
+    // Settings nav awaits a settings RPC round-trip before rendering
+    // (main.ts); slow CI hosts need more than a fixed wait.
+    const t0 = Date.now();
+    while (!document.querySelector('#api-base') && Date.now() - t0 < 6000) await wait(100);
     expect(state.page === 'settings', 'settings page not active');
     expect(document.querySelector('#api-base'), 'api base field missing');
     return document.querySelector('h1')?.textContent ?? '';

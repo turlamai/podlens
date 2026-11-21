@@ -28,7 +28,7 @@ on:
 # the glaze pin" step below always overwrites this with the pin the
 # published N release was actually built against.
 env:
-  GLAZE_PIN: 478503e60050a21f3c3567aac91be3b5220ac9bc
+  GLAZE_PIN: 610c1c22d62557cbaba3bf529a0cf690077d3811
 
 permissions:
   contents: read
