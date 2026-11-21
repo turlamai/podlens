@@ -103,6 +103,14 @@ export async function runHarnessIfGated(): Promise<void> {
   (window as unknown as Record<string, unknown>).__podlensE2E = true;
   const report = (id: string, ok: boolean, detail: string): Promise<unknown> =>
     postRetry('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
+  // Page-level deaths (WebKit WebContent crash, unhandled rejection outside
+  // a step) must leave evidence instead of silently truncating the trace.
+  window.addEventListener('error', (e) => {
+    void report('harness-died', false, `error: ${e.message}`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    void report('harness-died', false, `rejection: ${String((e as PromiseRejectionEvent).reason)}`);
+  });
   const step = async (id: string, fn: () => Promise<string | void>): Promise<void> => {
     try {
       // Whole-step backstop: any wedged await (media pipeline, RPC, timer
@@ -315,6 +323,7 @@ export async function runHarnessIfGated(): Promise<void> {
     return `reading=${state.reading}`;
   });
   await step('journey-summary-anchors', async () => {
+    await report('summary-enter', true, `page=${state.page} playing=${state.playing}`);
     click('[data-page="summary"]');
     await wait(600);
     const points = [...document.querySelectorAll('.point')];
