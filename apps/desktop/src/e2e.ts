@@ -36,7 +36,7 @@ function expect(cond: unknown, message: string): void {
 function withTimeout<T>(p: Promise<T> | undefined, ms: number, what: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(`timeout waiting for ${what}`)), ms);
-    Promise.resolve(p).then(
+    Promise.resolve(p as Promise<T>).then(
       (v) => {
         clearTimeout(t);
         resolve(v);
