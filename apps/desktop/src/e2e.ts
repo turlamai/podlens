@@ -236,7 +236,8 @@ export async function runHarnessIfGated(): Promise<void> {
       expect(os.playing === true, `host now-playing playing ${String(os.playing)}`);
       hostNote = `host=${hostTitle}`;
     }
-    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''} muted=${a0?.muted} vol=${a0?.volume} playErr=${(window as unknown as Record<string, unknown>).__podlensPlayError ?? 'none'} ${hostNote}`;
+    const hw = window as unknown as Record<string, unknown>;
+    return `${ms.metadata?.title ?? ''}${mutedFallback ? ' [muted-fallback]' : ''} muted=${a0?.muted} vol=${a0?.volume} playErr=${(window as unknown as Record<string, unknown>).__podlensPlayError ?? 'none'} ${hostNote} sync=${hw.__podlensHostSyncCalls ?? 0}/${hw.__podlensHostSyncOk ?? 0} syncErr=${hw.__podlensHostSyncError ?? 'none'}`;
   });
   await step('journey-follow-sync', async () => {
     try {

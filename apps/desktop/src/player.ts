@@ -55,6 +55,8 @@ let lastHostSyncAt = 0;
 let lastHostKey = '';
 
 function hostNowPlayingSync(force = false): void {
+  const w = window as unknown as Record<string, unknown>;
+  w.__podlensHostSyncCalls = ((w.__podlensHostSyncCalls as number) ?? 0) + 1;
   const ep = episodeOf(state.episode);
   if (!ep) {
     if (lastHostKey) {
@@ -79,7 +81,13 @@ function hostNowPlayingSync(force = false): void {
   if (!force && (key === lastHostKey || now - lastHostSyncAt < 2000)) return;
   lastHostKey = key;
   lastHostSyncAt = now;
-  void apiPost('api/host/now-playing', info).catch(() => {});
+  void apiPost('api/host/now-playing', info)
+    .then(() => {
+      w.__podlensHostSyncOk = ((w.__podlensHostSyncOk as number) ?? 0) + 1;
+    })
+    .catch((e) => {
+      w.__podlensHostSyncError = String(e);
+    });
 }
 
 function installHostNowPlayingCommands(): void {
