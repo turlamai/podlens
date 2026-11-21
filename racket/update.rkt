@@ -44,6 +44,7 @@
          update-configured?
          platform-symbol
          architecture-symbol
+         arch-symbol
          payload-extension
          manifest-url
          destination-path
@@ -133,10 +134,17 @@
     [(windows) 'windows]
     [else 'linux]))
 
-(define (architecture-symbol)
-  (case (system-type 'arch)
-    [(arm64) 'arm64]
+;; Racket reports macOS arm64 as 'arm64 but Linux aarch64 as 'aarch64; both
+;; map to the release pipeline's arm64 symbol. Without the aarch64 alias the
+;; else-branch offered Linux arm64 hosts the x64 payload (published-upgrade
+;; qualification run 44943194176 downloaded the x64 tarball on arm64).
+(define (arch-symbol raw)
+  (case raw
+    [(arm64 aarch64) 'arm64]
     [else 'x64]))
+
+(define (architecture-symbol)
+  (arch-symbol (system-type 'arch)))
 
 ;; payload-extension stays local on purpose: it answers "what extension does
 ;; THIS platform's PodLens update payload carry" (portable feed artifacts).

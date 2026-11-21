@@ -78,6 +78,10 @@ deleted. The Racket engine and its data formats are unchanged; an existing
 
 ### Fixed
 
+- Linux arm64 updates: Racket reports the architecture as `aarch64` on
+  Linux (macOS uses `arm64`); the updater's symbol mapping now accepts
+  both, so arm64 hosts select the arm64 feed artifact instead of falling
+  through to the x64 payload.
 - Windows status-line errors and accent-filled controls no longer use
   hardcoded colors that ignored dark mode; summary payload objects no
   longer leak their JSON key names into the rendered points.

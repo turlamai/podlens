@@ -83,6 +83,15 @@
                   [(macosx) 'macos] [(windows) 'windows] [else 'linux]))
   (check-not-false (memq (architecture-symbol) '(arm64 x64))))
 
+(test-case "linux aarch64 maps to the arm64 feed symbol"
+  ;; Racket's (system-type 'arch) is 'aarch64 on Linux arm64 and 'arm64 on
+  ;; macOS arm64; the feed only carries arm64/x64, so both must select arm64
+  ;; (regression: qualification run 44943194176 arm64 downloaded x64).
+  (check-equal? (arch-symbol 'aarch64) 'arm64)
+  (check-equal? (arch-symbol 'arm64) 'arm64)
+  (check-equal? (arch-symbol 'x86_64) 'x64)
+  (check-equal? (arch-symbol 'i386) 'x64))
+
 (test-case "embedded public key decodes as SPKI DER"
   ;; update-public-key-b64 is the raw 32 bytes; the SPKI prefix turns it
   ;; into the DER blob release-side tooling parses (the same construction
