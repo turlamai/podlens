@@ -45,12 +45,17 @@ export function hasBackend(): Promise<boolean> {
   return probe;
 }
 
-/** POST JSON to the backend; returns the parsed response. */
+/** POST JSON to the backend; returns the parsed response.
+ *  Always same-origin fetch: the native bridge invoke channel wedges on
+ *  macOS CI hosts once media playback starts (podlens#63), while the host
+ *  HTTP server answers fetch reliably on every platform. */
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  const g = nativeBridge();
-  if (g) {
-    return (await g.invoke(path, body ?? {})) as T;
-  }
+  return apiPostFetch<T>(path, body);
+}
+
+/** Fetch-only POST: bypasses the native bridge invoke channel, which wedges
+ *  on macOS CI hosts once media playback starts (podlens#63). */
+export async function apiPostFetch<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

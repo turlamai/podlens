@@ -3,7 +3,7 @@
 // route; the bootstrap cookie authenticates it. Positions persist through
 // position-save (throttled), resume through resume-last. MediaSession /
 // Now Playing integration lands in slice 3.
-import { audioUrl, positionSave, episodeDownload, episodeChapters, apiPost, onEngineEvent } from '@podlens/core';
+import { audioUrl, positionSave, episodeDownload, episodeChapters, apiPostFetch, onEngineEvent } from '@podlens/core';
 import { state, episodeOf, feedOfEpisode, currentSentence, t, type Episode } from './state';
 
 let audio: HTMLAudioElement | null = null;
@@ -61,7 +61,7 @@ function hostNowPlayingSync(force = false): void {
   if (!ep) {
     if (lastHostKey) {
       lastHostKey = '';
-      void apiPost('api/host/now-playing', { info: { clear: true } }).catch(() => {});
+      void apiPostFetch('api/host/now-playing', { info: { clear: true } }).catch(() => {});
     }
     return;
   }
@@ -81,7 +81,7 @@ function hostNowPlayingSync(force = false): void {
   if (!force && (key === lastHostKey || now - lastHostSyncAt < 2000)) return;
   lastHostKey = key;
   lastHostSyncAt = now;
-  void apiPost('api/host/now-playing', { info })
+  void apiPostFetch('api/host/now-playing', { info })
     .then(() => {
       w.__podlensHostSyncOk = ((w.__podlensHostSyncOk as number) ?? 0) + 1;
     })
