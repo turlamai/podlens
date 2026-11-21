@@ -126,6 +126,12 @@ export async function runHarnessIfGated(): Promise<void> {
   // flag (WebKitGTK pauses muted-autoplay media when unmuted without a real
   // gesture; acceptance asserts the clock/bridge, not audibility).
   (window as unknown as Record<string, unknown>).__podlensE2E = true;
+  // WKWebView suspends the WebContent process of occluded pages once media
+  // stops (macOS CI): the harness freezes mid-step with no error. Loop the
+  // fixture so media never ends while journeys run; the pause journey still
+  // exercises pause/save explicitly.
+  const loopAudio = document.getElementById('audio') as HTMLAudioElement | null;
+  if (loopAudio) loopAudio.loop = true;
   const report = (id: string, ok: boolean, detail: string): Promise<unknown> =>
     postRetry('api/host/e2e_report', { id, ok, detail }).catch(() => undefined);
   // Page-level deaths (WebKit WebContent crash, unhandled rejection outside
