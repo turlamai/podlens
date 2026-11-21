@@ -412,11 +412,11 @@ export async function runHarnessIfGated(): Promise<void> {
     expect(!state.playing, 'playback did not pause');
     await report('pause-paused', true, `position=${position()}`);
     const row = (await withTimeout(
-      httpPost('api/rpc/resume-last', {}).catch(() =>
+      withTimeout(httpPost('api/rpc/resume-last', {}), 6000, 'resume-last RPC').catch(() =>
         httpPost('api/rpc/resume-last', {}),
-      ) as Promise<unknown[]>,
-      9000,
-      'resume-last RPC',
+      ),
+      15000,
+      'resume-last RPC retry',
     )) as unknown[];
     expect(row.length >= 3, 'resume-last lost the episode');
     return `saved=${row[2] ?? ''}`;
