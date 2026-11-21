@@ -5,27 +5,32 @@
 import { state } from './state';
 import { position, preload } from './player';
 
-// Hidden/occluded WKWebView pages clamp setTimeout to ~1/min (macOS CI
-// windows lose focus mid-journey), which silently freezes every harness
-// wait and backstop. MessageChannel macrotasks are not throttled, so the
-// harness clock runs on a message pump instead of timers.
-const tickChannel = new MessageChannel();
-let tickWaiters: Array<() => void> = [];
-tickChannel.port1.onmessage = () => {
-  const waiters = tickWaiters;
-  tickWaiters = [];
-  for (const w of waiters) w();
+// Hidden/occluded WKWebView pages clamp setTimeout to ~1/min and suspend
+// the WebContent process once media stops (macOS CI). Dedicated-worker
+// timers are not page-visibility throttled and do not flood the macrotask
+// queue (a MessageChannel spin starved the WebKitGTK media pipeline).
+const timerWorker = new Worker(
+  URL.createObjectURL(
+    new Blob(['onmessage=(e)=>{setTimeout(()=>postMessage(e.data.id),e.data.ms)};'], {
+      type: 'text/javascript',
+    }),
+  ),
+);
+let timerSeq = 0;
+const timerWaiters = new Map<number, () => void>();
+timerWorker.onmessage = (e: MessageEvent<number>) => {
+  const w = timerWaiters.get(e.data);
+  if (w) {
+    timerWaiters.delete(e.data);
+    w();
+  }
 };
-function nextTick(): Promise<void> {
-  return new Promise((resolve) => {
-    tickWaiters.push(resolve);
-    tickChannel.port2.postMessage(0);
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    const id = ++timerSeq;
+    timerWaiters.set(id, resolve);
+    timerWorker.postMessage({ id, ms });
   });
-}
-const wait = async (ms: number): Promise<void> => {
-  const end = Date.now() + ms;
-  while (Date.now() < end) await nextTick();
-};
 
 // Condition polling instead of fixed sleeps: slow CI runners add latency
 // between click and media-clock start, so fixed waits either flake or
@@ -61,11 +66,7 @@ function withTimeout<T>(p: Promise<T> | undefined, ms: number, what: string): Pr
         fn();
       }
     };
-    void (async () => {
-      const end = Date.now() + ms;
-      while (Date.now() < end && !settled) await nextTick();
-      finish(() => reject(new Error(`timeout waiting for ${what}`)));
-    })();
+    void wait(ms).then(() => finish(() => reject(new Error(`timeout waiting for ${what}`))));
     Promise.resolve(p as Promise<T>).then(
       (v) => finish(() => resolve(v)),
       (e) => finish(() => reject(e)),
