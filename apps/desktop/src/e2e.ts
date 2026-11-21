@@ -335,6 +335,7 @@ export async function runHarnessIfGated(): Promise<void> {
     return 'anchors ok';
   });
   await step('journey-pause-position', async () => {
+    await report('pause-enter', true, `playing=${state.playing} page=${state.page}`);
     if (!state.playing) {
       // Fixture may have run out on a very slow runner; rewind to sentence 0
       // and restart so the pause-save path is still exercised.
@@ -343,9 +344,11 @@ export async function runHarnessIfGated(): Promise<void> {
       click('.player [data-action="toggle"]');
       await until(() => state.playing, 2500, 'restart for pause check');
     }
+    await report('pause-restarted', true, `playing=${state.playing}`);
     click('.player [data-action="toggle"]');
     await wait(500);
     expect(!state.playing, 'playback did not pause');
+    await report('pause-paused', true, `position=${position()}`);
     const row = (await withTimeout(
       httpPost('api/rpc/resume-last', {}).catch(() =>
         httpPost('api/rpc/resume-last', {}),

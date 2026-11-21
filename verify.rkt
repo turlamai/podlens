@@ -535,5 +535,11 @@ PS1
     (when (and (hash? r) (not (eq? #t (hash-ref r 'ok #f))))
       (eprintf "[verify] harness ~a failed: ~a\n"
                (hash-ref r 'id "?") (hash-ref r 'detail ""))))
+  (eprintf "[verify] report trace: ~a\n"
+           (string-join
+            (map (lambda (r)
+                   (format "~a:~a" (hash-ref r 'id "?") (hash-ref r 'ok "?")))
+                 (if (list? (unbox journey-reports)) (unbox journey-reports) '()))
+            ", "))
   (exit 1))
 (displayln "[verify] ALL PASS")
