@@ -154,3 +154,83 @@ The check stubs scrolling and native dialog methods; it does not establish rende
 ## Prototype source checkpoint — 2026-11-15
 
 `index.html` opens the primary prototype directly. Screen-directory launchers have been removed. All local scripts, styles and referenced assets needed by this checkpoint are versioned under this directory; OpenDesign metadata is excluded. This is an editable prototype checkpoint, not a claim that the native product or external services implement these interactions.
+
+## Mobile views (iOS)
+
+### Product-line declaration
+
+Desktop = glaze carrier (per #63, 2026-11-20, unchanged); Mobile = native iOS app (Swift), owner decision 2026-11-22.
+
+This section and `prototype/mobile-*.html` are the design contract for the iOS app. Binding/sync architecture (companion vs standalone) will be decided when implementation is initiated; this prototype does not lock that architecture. Adding native iOS does not move the desktop UI to a different carrier or extend the glaze carrier onto mobile. The earlier #63 statement that no mobile roadmap existed describes that historical decision, superseded for mobile by this owner decision.
+
+### Deliverables and entry points
+
+Each screen has an independent HTML entry referencing the same-directory `shared.css` and `app.js`, with no remote assets or additional runtime packages:
+
+- `prototype/mobile-home.html`: current episode cover, title, shared progress, play/pause, continue reading, and recent subscription updates.
+- `prototype/mobile-now-playing.html`: large typographic artwork, progress seeking, play/pause, minus/plus 15-second controls, current-sentence jump, and end playback.
+- `prototype/mobile-episodes.html`: subscribed episode list, downloaded filter, show-specific lists, processing/canceled/missing transcript labels, and episode playback.
+- `prototype/mobile-discover.html`: local example search, add/remove subscriptions, and opening a show's episodes.
+- `prototype/mobile-transcript.html`: bilingual sentence reading, current-row marker, original/translation/bilingual selection, and an in-view Summary tab with source-time anchors. No seventh mobile-summary page is introduced.
+- `prototype/mobile-settings.html`: appearance, follow preference, playback rate, non-sensitive service preferences, inline URL validation, subscription management, and prototype limitations.
+
+`index.html` is restored as the requested grouped navigation page, with Desktop and Mobile sections and links to local mobile state examples. The previous direct home redirect is superseded by this request. Existing desktop screen files remain unchanged.
+
+### Design contract
+
+- Each mobile page is a pure content canvas with a 390px maximum width centered on the existing neutral canvas token. It shrinks naturally on narrower viewports. There is no phone bezel, hardware frame, Dynamic Island, fake status bar, glass, glow, texture, or decorative gradient.
+- The shared stylesheet remains the token source. Mobile rules are scoped beneath `.mobile-prototype`, reference its existing semantic variables, and introduce no new color palette or font family. The existing typographic sample-cover artwork and inline outline SVG set are reused.
+- Chrome uses the existing system UI font stack. Mobile interface text is 15–16px, supporting text 12–13px, page titles 24–28px. Transcript original and summary body reuse the serif reading preset at 20px/1.65; translation uses the existing sans translation role at 16px/1.7.
+- Content padding is 16px on the shared 4px rhythm. Targets and list rows are at least 44 logical pixels. Rounded shapes retain the 4/8/12 embedded/control/panel hierarchy and single-pixel rules. A large player button remains an 8px control, not a new floating decorative shape.
+- The existing terracotta pair is the only product action accent. Each task region has at most one filled primary action. The mini-player uses quiet transport so it does not compete with the home or full-player primary button.
+- Light and dark use the same existing `:root`/`.dark` mechanism; both theme foregrounds and surfaces change. Focus remains visible. The current sentence is indicated by text and a semantic background, never by color alone.
+- Motion uses the existing 180ms token, within the requested 120–200ms range. The shared reduced-motion rule disables smooth scrolling and transitions.
+- The app frame uses normal-flow header, a scrolling main region, and reserved bottom chrome. Bottom navigation and the mini-player consume their own layout space rather than covering reading content. Real safe-area inset padding is supported without drawing decorative system UI.
+
+### Navigation and state
+
+The bottom tabs are Home / Discover / Episodes / Settings, labeled in the existing Chinese UI language as 主页 / 发现 / 单集 / 设置. Detail pages expose an explicit back action. Mini-player taps open Now Playing; it remains available for a loaded episode whether playing or paused, and disappears when no episode is selected. It is omitted on Now Playing to avoid duplicating transport.
+
+In-page navigation preserves the active episode, per-episode position, reading selection/language, follow state, subscriptions, search text, list filter/show selection, and non-sensitive service draft. Back restores the previous view and scroll position; tab changes retain each view's context. Local storage is a prototype convenience, isolated from the desktop prototype state; it does not declare an iOS binding/sync design. Reload restores local content state with playback paused. Storage-denied previews retain in-memory interactions and disclose the limit.
+
+The mobile seek mapping is minus/plus 15 seconds as explicitly requested. This is a documented mobile control mapping; desktop's existing minus 15 / plus 30 behavior remains unchanged. Sentence taps only demonstrate playback-position changes; no audio is fetched or played. Summary anchors select their source sentence, switch back to the transcript, and retain the position without claiming generated content for unrelated episodes.
+
+### Applicable states and recovery
+
+- No active episode: Home and Now Playing explain the empty state and lead to Episodes; no inactive mini-player is drawn. End Playback preserves saved positions while clearing the loaded episode.
+- Empty subscriptions: Home and Episodes lead to Discover; the catalog can add subscriptions without automatically starting playback.
+- Processing: the existing Sky example shows an explicitly labeled sample 46% state and a direct cancel action. Playback stays available. This percentage is seeded demonstration data, not claimed backend telemetry.
+- Failed processing: an explicitly labeled failure example preserves episode and position, offers retry information and access to service settings. It does not pretend to restart an unconnected API task.
+- Missing content: other episodes do not reuse the interfaces sample transcript or summary. They display an explanation and the existing pre-generation information.
+- Settings error: malformed/non-HTTPS service addresses get a local inline error, retain the entered draft, and can be corrected in place. Valid format is not represented as successful connectivity. No real keys are requested or saved.
+- Loading: HTML entries show a brief loading message while the local script initializes; there are no remote-loading dependencies or fake ongoing network states.
+- Offline, permission, and OS-media integration behavior require native implementation evidence and are not simulated as real capabilities.
+
+State deep links are `?state=empty-player`, `?state=empty-subscriptions`, `?state=processing`, and `?state=error`; Summary is reachable with `?section=summary`. State-example sessions do not overwrite normal saved content. These links live in the directory, not as designer controls inside the product UI.
+
+### Exit conditions and family UI checklist
+
+- [ ] All six mobile key screens exist with functioning local navigation.
+- [ ] Back navigation, tab changes, playback position, reading position, and list/search context remain consistent.
+- [ ] Light and dark work through existing tokens; text contrast meets 4.5:1 and control/state semantics do not rely on color alone.
+- [ ] There are zero external runtime resources, and all relative dependencies resolve.
+- [ ] Touch targets are at least 44×44; necessary controls remain reachable with expanded text and reduced motion.
+- [ ] Applicable family checks cover subtraction, shared family typography/components, full text layout, empty/processing/error/canceled states, focus and recovery, themes/accessibility, and truthful platform scope.
+- [ ] Native iOS reading, VoiceOver, Dynamic Type, real audio, system media, safe areas, secure storage, installation, and lifecycle behavior are verified during Swift implementation; HTML checks cannot certify those behaviors.
+
+Family guidance used: `tlai-product` design-standard revision `2026-11-20-minimal-family`. The project workspace has no Git metadata, so no starting SHA or commit/push result is asserted. Validation evidence for this mobile slice is recorded below after the requested checks; unperformed host checks remain explicitly unverified.
+
+### Mobile slice self-check — 2026-11-22
+
+Requested source/DOM checks passed: 53/53, plus JavaScript syntax checking. Evidence was collected from the six actual mobile HTML entries, their shared stylesheet/script, all local fixture entries, and the six desktop entries as regressions.
+
+- Local-resource scan: all six mobile HTML entries use only same-directory `shared.css` / `app.js`; the directory's relative page links resolve. Shared CSS contains no imports, image URLs, or remote font resources. The mobile CSS adds no literal color values or alternative font stack. Service URL text is editable configuration content, not a fetched resource.
+- DOM initialization: six mobile entries render one main heading and four tabs inside a maximum-width 390px content canvas. No desktop sidebar/player or device/statusbar decoration mounts in a mobile entry. Existing desktop entries still initialize their original workspace without mobile tabs.
+- Interactions: current episode/progress agrees between Home, mini-player, and Now Playing; seek boundaries and minus/plus 15 seconds work; explicit back returns to the previous view; sentence selection, language changes, Summary anchors, theme persistence, reload-paused behavior, search/tab context, subscription mutation, empty recovery, cancellation, settings correction, and storage-denied operation passed.
+- Theme contrast: CSS-computed foreground/background checks for visible mobile text roles passed at least 4.5:1 in both themes on all six initial screens. This checks semantic color application, not a photographed or native-rendered result.
+- Touch sizing: active controls' declared CSS heights are at least 44px; primary/icon/tab controls declare minimum widths of at least 44px, range control is explicitly at least 44px high, and the checkbox has a full-width label with a 44px minimum hit height. Flow widths allocate space to text controls. Pixel-level overlap and hit-testing still require rendered-browser or native verification.
+- Fixture checks cover empty playback, empty subscriptions, processing/cancel, failure/recovery, and Summary anchors. Fixture interactions do not write normal stored state. No uncaught application errors were observed in the checked flows.
+
+These are source/DOM tests, not browser visual previews. DOM checks stub native dialog open/close and scrolling; they do not prove rendered geometry, actual modal focus trapping, VoiceOver, 200% text layout, or iOS lifecycle behavior. No screenshots, real audio playback, API calls, Swift build, or physical-device acceptance was performed. Those applicable host checks remain unverified; no full family-UI acceptance claim is made.
+
+For this prototype slice, the first four exit conditions above are met at the source/DOM level. Touch declarations are checked, while expanded-text/actual hit testing remains pending. Native iOS conditions and the remaining rendered family checks are implementation/acceptance work rather than missing prototype files.
