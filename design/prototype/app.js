@@ -70,6 +70,7 @@ const position = () => state.positions[getEpisode().id] || 0;
 const cover = (id,mini=false) => { const s=getShow(id);return `<div class="cover ${id}${mini?' mini':''}" aria-label="${escape(s.name)} 示例封面"><small>${s.tag}</small><strong>${mini?id.toUpperCase():s.cover}</strong><span class="cover-line"></span></div>`; };
 const button = (text,action,cls='',attrs='') => `<button type="button" class="btn ${cls}" data-action="${action}" ${attrs}>${text}</button>`;
 const navButton = (label,page,glyph,attrs='') => `<button type="button" class="nav-btn ${state.page===page && !state.show?'active':''}" data-page="${page}" ${attrs}>${icon(glyph)}<span>${label}</span></button>`;
+if(document.body.dataset.surface==='mobile'){initMobile();return;}
 function sidebar() {
  return `<aside class="sidebar" aria-label="主导航"><button type="button" class="brand" data-page="home" style="border:0;background:none;text-align:left"><span class="brand-mark">${icon('lens')}</span>PodLens</button>
  <nav class="nav-group">${navButton('主页','home','home')}${navButton('发现','discover','compass')}</nav>
@@ -264,4 +265,190 @@ setInterval(()=>{
 },1000);
 window.addEventListener('pagehide',persist);
 render();
+/* Mobile prototype UI. This is a Swift app design contract, not an implementation architecture. */
+function initMobile() {
+ const entry=document.body.dataset.page||'home';
+ const titles={home:'主页','now-playing':'正在播放',episodes:'单集',discover:'发现',transcript:'逐句稿',settings:'设置'};
+ const storageKey='podlens-mobile-prototype-v1';
+ const fixture=new URLSearchParams(location.search).get('state');
+ let saved={},storageAvailable=true;
+ try{saved=JSON.parse(localStorage.getItem(storageKey)||'{}')||{};}catch(_){storageAvailable=false;}
+ const m={page:entry,tab:['home','discover','episodes','settings'].includes(entry)?entry:'episodes',selected:'interfaces',positions:{interfaces:38},reading:37,language:'bilingual',follow:true,dark:false,rate:1,subscriptions:['td','ds','mc','lg'],job:'processing',query:'',filter:'all',show:null,section:'transcript',draft:{base:'https://api.openai.com/v1',chat:'gpt-4o-mini'},...saved,playing:false};
+ m.page=entry;m.positions={interfaces:38,...saved.positions};m.draft={base:'https://api.openai.com/v1',chat:'gpt-4o-mini',...saved.draft};
+ m.subscriptions=Array.isArray(m.subscriptions)?m.subscriptions.filter(id=>shows.some(s=>s.id===id)):['td','ds','mc','lg'];
+ if(!episodes.some(e=>e.id===m.selected))m.selected=null;
+ if(fixture==='empty-player')m.selected=null;
+ if(fixture==='empty-subscriptions'){m.subscriptions=[];m.selected=null;}
+ if(fixture==='processing'){m.selected='sky';m.job='processing';}
+ if(fixture==='error'){m.selected='sky';m.job='failed';}
+ if(new URLSearchParams(location.search).get('section')==='summary'){m.selected='interfaces';m.section='summary';}
+ const history=[],scrolls={};
+ let returnFocus=null,feedbackTimer;
+ const ep=()=>episodes.find(e=>e.id===m.selected)||null;
+ const pos=()=>ep()?Number(m.positions[m.selected]||0):0;
+ const btn=(label,action,cls='',attrs='')=>`<button type="button" class="m-button ${cls}" data-mobile-action="${action}" ${attrs}>${label}</button>`;
+ const go=(label,page,cls='',attrs='')=>`<button type="button" class="m-button ${cls}" data-mobile-page="${page}" ${attrs}>${label}</button>`;
+ const art=(show,cls='')=>`<div class="m-art ${cls}" role="img" aria-label="${escape(getShow(show).name)} 排版式示例封面">${cover(show)}</div>`;
+ const save=()=>{
+  if(fixture)return;
+  const {page,playing,tab,...data}=m;
+  try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(_){storageAvailable=false;}
+ };
+ const toast=text=>{const el=$('#feedback');el.textContent=text;el.hidden=false;clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>{el.hidden=true;},4000);};
+ function dialog(title,text,actions=''){
+  const d=$('#info-dialog');returnFocus=document.activeElement;
+  $('#dialog-title').textContent=title;$('#dialog-copy').textContent=text;
+  $('#dialog-actions').innerHTML=actions+btn('关闭','close-dialog');
+  if(!d.open)d.showModal();
+ }
+ $('#info-dialog').addEventListener('close',()=>{if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});else $('.m-heading')?.focus({preventScroll:true});returnFocus=null;});
+ function status(e){
+  if(e.id==='sky')return m.job==='processing'?'转写中 · 示例 46%':m.job==='failed'?'转写失败 · 示例':'已取消转写';
+  return e.ready?'双语稿已就绪':e.downloaded?'已下载 · 尚无逐句稿':'尚无逐句稿';
+ }
+ function rowMobile(e){
+  return `<article class="m-episode">${art(e.show,'m-art-small')}<div class="m-fill"><button type="button" class="m-episode-title" data-mobile-action="open-episode" data-id="${e.id}">${escape(e.title)}</button><p class="m-meta">${getShow(e.show).name} · ${e.duration/60} 分钟</p><p class="m-status ${e.id==='sky'&&m.job==='failed'?'m-error':''}">${status(e)}</p></div>${btn(icon(m.selected===e.id&&m.playing?'pause':'play'),'play-episode','m-icon',`data-id="${e.id}" aria-label="${m.selected===e.id&&m.playing?'暂停':'播放'} ${escape(e.title)}"`)}</article>`;
+ }
+ function noPlayback(){return `<section class="m-empty"><h2>还没有正在播放的单集</h2><p>从单集里选一集开始，随时回到文字继续读。</p>${go('选择单集','episodes','m-primary')}</section>`;}
+ function homeMobile(){
+  const e=ep();const list=episodes.filter(e=>m.subscriptions.includes(e.show)&&e.id!==m.selected).slice(0,3);
+  return `<h1 class="m-heading" tabindex="-1">主页</h1>${e?`<section class="m-current"><p class="m-eyebrow">继续收听</p><div class="m-current-top">${art(e.show,'m-art-medium')}<div class="m-fill"><h2>${escape(e.title)}</h2><p class="m-meta">${getShow(e.show).name}</p></div></div><div class="m-progress-label"><span data-mobile-time>${time(pos())}</span><span>${time(e.duration)}</span></div><progress max="${e.duration}" value="${pos()}" data-mobile-progress aria-label="当前单集收听进度"></progress><div class="m-current-actions">${btn(`${icon(m.playing?'pause':'play')} ${m.playing?'暂停':'继续收听'}`,'toggle','m-primary')}${btn('继续阅读','current','m-quiet')}</div>${e.ready?`<p class="m-reading-memory">上次读到 ${time(m.reading)}</p>`:''}</section>`:noPlayback()}
+  <section class="m-section"><div class="m-section-title"><h2>最近更新</h2>${go('查看全部','episodes','m-quiet')}</div>${list.length?list.map(rowMobile).join(''):`<div class="m-empty m-compact"><h3>订阅后，新内容会出现在这里</h3><p>先到发现页选择一档节目。</p>${go('发现播客','discover','m-quiet')}</div>`}</section>`;
+ }
+ function fullPlayer(){
+  const e=ep();if(!e)return `<h1 class="m-heading" tabindex="-1">正在播放</h1>${noPlayback()}`;
+  return `<h1 class="m-heading m-player-heading" tabindex="-1">正在播放</h1><section class="m-full-player">${art(e.show,'m-art-large')}<div class="m-player-description"><p class="m-eyebrow">${getShow(e.show).name}</p><h2>${escape(e.title)}</h2><p class="m-meta">${m.playing?'演示播放中':'已暂停'} · 无真实音频</p></div><label class="sr-only" for="mobile-seek">播放位置</label><input id="mobile-seek" type="range" min="0" max="${e.duration}" value="${pos()}" aria-valuetext="${time(pos())}"><div class="m-progress-label"><span data-mobile-time>${time(pos())}</span><span data-mobile-remaining>−${time(e.duration-pos())}</span></div><div class="m-transport">${btn(`${icon('replay')}<span>15 秒</span>`,'back','m-seek-button','aria-label="快退15秒"')}${btn(icon(m.playing?'pause':'play'),'toggle','m-primary m-big-play',`aria-label="${m.playing?'暂停':'播放'}"`)}${btn(`${icon('replay')}<span>15 秒</span>`,'forward','m-seek-button m-forward','aria-label="快进15秒"')}</div><div class="m-player-links">${btn(`${icon('book')} 当前句`,'current','m-quiet')}${btn('结束播放','stop','m-quiet')}</div></section>`;
+ }
+ function episodesMobile(){
+  const list=episodes.filter(e=>(m.show?e.show===m.show:m.subscriptions.includes(e.show))&&(m.filter!=='downloaded'||e.downloaded));
+  return `<h1 class="m-heading" tabindex="-1">${m.show?escape(getShow(m.show).name):'单集'}</h1><div class="m-filter" aria-label="单集筛选">${[['all','全部'],['downloaded','已下载']].map(([id,t])=>btn(t,'filter',m.filter===id?'m-selected':'',`data-filter="${id}" aria-pressed="${m.filter===id}"`)).join('')}</div>${m.show?btn('查看全部订阅','clear-show','m-quiet'):''}${list.length?list.map(rowMobile).join(''):`<section class="m-empty"><h2>${m.filter==='downloaded'?'这里还没有下载内容':'还没有订阅节目'}</h2><p>${m.filter==='downloaded'?'切换到全部，查看已有单集示例。':'到发现页添加节目，再选择想听的一集。'}</p>${m.filter==='downloaded'?btn('查看全部','clear-filter','m-quiet'):go('发现播客','discover','m-primary')}</section>`}`;
+ }
+ function discoverCards(){
+  const q=m.query.trim().toLowerCase();const list=shows.filter(s=>`${s.name} ${s.category} ${s.description}`.toLowerCase().includes(q));
+  return list.length?list.map(s=>`<article class="m-discover-card"><div class="m-discover-title">${art(s.id,'m-art-medium')}<div class="m-fill"><h2>${s.name}</h2><p class="m-meta">${s.category}</p></div></div><p>${s.description}</p><div class="m-discover-actions">${btn(m.subscriptions.includes(s.id)?`${icon('check')} 已订阅`:`${icon('plus')} 添加订阅`,'subscribe','',`data-id="${s.id}" aria-pressed="${m.subscriptions.includes(s.id)}"`)}${btn('查看单集','show','m-quiet',`data-id="${s.id}"`)}</div></article>`).join(''):`<div class="m-empty"><h2>没有匹配的节目</h2><p>试试“设计”或“科学”，也可以清空搜索。</p>${btn('清空搜索','clear-search','m-quiet')}</div>`;
+ }
+ function discoverMobile(){
+  return `<h1 class="m-heading" tabindex="-1">发现</h1><p class="m-meta">${m.subscriptions.length?`已订阅 ${m.subscriptions.length} 档节目`:'还没有订阅，先挑一档喜欢的。'}</p><label class="m-search" for="mobile-search">${icon('search')}<input id="mobile-search" type="search" placeholder="搜索示例节目" value="${escape(m.query)}"></label><p class="m-caption">仅搜索本地示例节目，不连接播客目录。</p><div id="mobile-results">${discoverCards()}</div>`;
+ }
+ function missingTranscript(e){
+  const working=e?.id==='sky'&&m.job==='processing',failed=e?.id==='sky'&&m.job==='failed';
+  if(working)return `<section class="m-empty m-processing"><h2>逐句稿正在转写</h2><p>示例任务 · 46%。播放与转写互不阻塞。</p><progress value="46" max="100" aria-label="示例转写进度46%"></progress>${btn('取消转写','cancel-job','m-quiet')}</section>`;
+  if(failed)return `<section class="m-empty"><h2>转写未完成</h2><p class="m-error" role="status">转写失败（示例）。已保留原单集，可以继续播放。</p>${btn('查看重试说明','retry-job','m-primary')}${go('检查服务设置','settings','m-quiet')}</section>`;
+  return `<section class="m-empty"><h2>${e?'这集还没有逐句稿':'先选择一集开始阅读'}</h2><p>${e?.id==='sky'?'转写已取消，已有内容和播放位置保留。':'此处只提供已就绪的示例文本，不会把其他单集的稿件放到这里。'}</p>${e?btn('了解生成流程','generate','m-quiet'):go('选择单集','episodes','m-primary')}</section>`;
+ }
+ function summaryMobile(){
+  return `<div class="m-summary"><p class="m-caption">示例内容提要 · 时间锚点返回原句</p><section><h2>一句话总结</h2><p class="m-summary-body">好的界面靠做减法赢得注意力，让排版、默认值与清晰的引导，安静地托住内容。</p></section><section><h2>值得带走的要点</h2>${[[6,'每多一个控件，就多索取一次注意力。'],[29,'逐句稿是阅读界面，行高与栏宽应当服务于阅读。'],[53,'每一个默认值，都应该有清楚的理由。']].map(([sec,text])=>`<div class="m-summary-point"><p>${text}</p>${btn(`${time(sec)} · 查看原句`,'anchor','m-quiet',`data-sec="${sec}"`)}</div>`).join('')}</section><section><h2>值得重听的话</h2><blockquote><p lang="en">“Defaults are the most honest part of a product.”</p><p class="m-caption">默认状态是一个产品最诚实的部分。</p>${btn(`${icon('play')} 从 00:53 重听`,'anchor','m-quiet','data-sec="53"')}</blockquote></section></div>`;
+ }
+ function transcriptMobile(){
+  const e=ep();
+  return `<h1 class="m-heading m-detail-title" tabindex="-1">${e?escape(e.title):'逐句稿'}</h1>${e?`<p class="m-meta">${getShow(e.show).name}</p>`:''}<nav class="m-reading-tabs" aria-label="单集内容">${[['transcript','逐句稿'],['summary','总结']].map(([id,t])=>btn(t,'section',m.section===id?'m-current-tab':'',`data-section="${id}" aria-pressed="${m.section===id}"`)).join('')}</nav>${!e?.ready?missingTranscript(e):m.section==='summary'?summaryMobile():`<div class="m-reading-controls"><label for="mobile-language" class="sr-only">阅读语言</label><select id="mobile-language" aria-label="阅读语言">${[['bilingual','双语'],['original','原文'],['translation','译文']].map(([id,t])=>`<option value="${id}" ${m.language===id?'selected':''}>${t}</option>`).join('')}</select>${btn('当前句','current','m-quiet')}</div><div class="m-transcript" data-language="${m.language}">${sentences.map(([sec,en,zh])=>`<div class="m-sentence ${sec===m.reading?'is-current':''}" role="button" tabindex="0" data-mobile-action="sentence" data-sec="${sec}" aria-label="定位至 ${time(sec)}：${escape(zh)}"><div class="m-sentence-meta"><span>${time(sec)}</span><span class="m-current-marker" aria-hidden="true">当前</span></div><p class="m-en" lang="en">${en}</p><p class="m-zh" lang="zh-CN">${zh}</p></div>`).join('')}</div><p class="m-caption m-transcript-note">点击句子仅定位演示进度，无真实音频。示例文本截至 01:09。</p>`}`;
+ }
+ function settingsMobile(){
+  return `<h1 class="m-heading" tabindex="-1">设置</h1><section class="m-settings-section"><h2>阅读与播放</h2><div class="m-setting"><label for="mobile-theme">外观</label><select id="mobile-theme"><option value="light" ${!m.dark?'selected':''}>浅色</option><option value="dark" ${m.dark?'selected':''}>深色</option></select></div><div class="m-setting"><label class="m-toggle-label" for="mobile-follow"><span>跟随当前句</span><input id="mobile-follow" type="checkbox" ${m.follow?'checked':''}></label></div><div class="m-setting"><label for="mobile-rate">播放倍速</label><select id="mobile-rate">${[1,1.25,1.5,2,2.5,3].map(v=>`<option value="${v}" ${m.rate===v?'selected':''}>${v}×</option>`).join('')}</select></div></section><section class="m-settings-section"><h2>模型服务</h2><p class="m-caption">原型未连接服务，不产生费用。请勿输入真实密钥。</p><div class="m-form-field"><label for="mobile-base">服务地址</label><input id="mobile-base" type="url" value="${escape(m.draft.base)}" autocomplete="off" spellcheck="false" aria-describedby="mobile-base-error"><p id="mobile-base-error" class="m-error" hidden role="alert"></p></div><div class="m-form-field"><label for="mobile-model">聊天模型</label><input id="mobile-model" value="${escape(m.draft.chat)}" autocomplete="off"></div><p class="m-caption">未连接 · 未保存密钥</p>${btn('保存非敏感偏好','save-settings','m-primary')}<p id="mobile-save-result" class="m-caption" role="status"></p></section><section class="m-settings-section"><h2>资料库</h2><p class="m-meta">${m.subscriptions.length} 档示例订阅 · ${episodes.length} 集示例内容</p>${go('管理订阅','discover','m-quiet')}${m.selected?btn('结束当前播放','stop','m-quiet'):''}</section><p class="m-caption">${storageAvailable?'阅读位置和非敏感偏好保存在浏览器本地。预览限制存储时，仅在当前页面保留。':'当前预览不允许本地存储，状态仅在当前页面保留。'}<br>这是原生 iOS 应用的交互设计示意，无真实音频与 API 调用。</p>`;
+ }
+ function miniPlayer(){
+  const e=ep();if(!e||m.page==='now-playing')return '';
+  return `<div class="m-mini-player"><button type="button" class="m-mini-open" data-mobile-page="now-playing" aria-label="打开正在播放：${escape(e.title)}">${art(e.show,'m-art-mini')}<span class="m-fill"><span class="m-mini-title">${escape(e.title)}</span><span class="m-mini-state">${m.playing?'演示播放中':'已暂停'} · ${getShow(e.show).name}</span></span></button>${btn(icon(m.playing?'pause':'play'),'toggle','m-icon',`aria-label="${m.playing?'暂停':'播放'}"`)}</div>`;
+ }
+ function tabbar(){return `<nav class="m-tabs" aria-label="主导航">${[['home','主页','home'],['discover','发现','compass'],['episodes','单集','grid'],['settings','设置','settings']].map(([id,t,glyph])=>`<button type="button" data-mobile-tab="${id}" class="m-tab ${m.tab===id?'is-active':''}" ${m.tab===id?'aria-current="page"':''}>${icon(glyph)}<span>${t}</span></button>`).join('')}</nav>`;}
+ function renderMobile(){
+  const previous=$('.m-main')?.scrollTop||0;
+  const focused=document.activeElement,focusId=focused?.id,key=focused?.dataset?JSON.stringify(focused.dataset):'';
+  document.documentElement.classList.toggle('dark',m.dark);
+  document.title=`PodLens — ${titles[m.page]||'主页'} · iPhone`;
+  const detail=['transcript','now-playing'].includes(m.page);
+  $('#app').className='mobile-app';
+  $('#app').innerHTML=`<header class="m-header">${detail?btn(`${icon('arrow')}<span>返回</span>`,'back-page','m-back'):'<span class="m-brand">PodLens</span>'}<span class="m-header-space"></span><span class="m-demo-label">交互示例</span>${btn(icon(m.dark?'sun':'moon'),'theme','m-icon',`aria-label="切换到${m.dark?'浅色':'深色'}主题"`)}</header><main class="m-main" id="main"><div class="m-content">${({home:homeMobile,'now-playing':fullPlayer,episodes:episodesMobile,discover:discoverMobile,transcript:transcriptMobile,settings:settingsMobile}[m.page]||homeMobile)()}</div></main><footer class="m-bottom">${miniPlayer()}${tabbar()}</footer>`;
+  $('.m-main').scrollTop=previous;
+  if(focusId&&document.getElementById(focusId))document.getElementById(focusId).focus({preventScroll:true});
+  else if(key&&key!=='{}')$$('[data-mobile-action],[data-mobile-page],[data-mobile-tab]').find(el=>JSON.stringify(el.dataset)===key)?.focus({preventScroll:true});
+  save();
+ }
+ function navigateMobile(page,{back=false,tab=false}={}){
+  scrolls[m.page]=$('.m-main')?.scrollTop||0;
+  if(!back&&!tab&&page!==m.page)history.push({page:m.page,tab:m.tab});
+  if(tab){history.length=0;m.tab=page;}
+  m.page=page;renderMobile();$('.m-main').scrollTop=scrolls[page]||0;
+  $('.m-heading')?.focus({preventScroll:true});
+ }
+ function selectEpisode(id){m.selected=id;m.reading=id==='interfaces'?37:0;}
+ function seekMobile(value){
+  if(!ep())return;
+  m.positions[m.selected]=Math.max(0,Math.min(ep().duration,Number(value)));
+  if(ep().ready&&m.follow&&pos()<=77){const match=[...sentences].reverse().find(s=>s[0]<=pos())||sentences[0];m.reading=match[0];}
+  $$('[data-mobile-time]').forEach(el=>el.textContent=time(pos()));
+  $$('[data-mobile-remaining]').forEach(el=>el.textContent='−'+time(ep().duration-pos()));
+  $$('[data-mobile-progress]').forEach(el=>el.value=pos());
+  const slider=$('#mobile-seek');if(slider){slider.value=pos();slider.setAttribute('aria-valuetext',time(pos()));}
+  const before=$('.m-sentence.is-current')?.dataset.sec;
+  $$('.m-sentence').forEach(el=>el.classList.toggle('is-current',Number(el.dataset.sec)===m.reading));
+  if(m.follow&&m.playing&&before!==String(m.reading))$('.m-sentence.is-current')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  save();
+ }
+ function currentMobile(){
+  if(ep()?.ready&&pos()<=77)m.reading=([...sentences].reverse().find(s=>s[0]<=pos())||sentences[0])[0];
+  m.section='transcript';navigateMobile('transcript');
+  if(pos()>77)toast('当前位置超出示例文本，已返回上次阅读句。');
+  $('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:'smooth'});
+ }
+ function generationMobile(retry=false){
+  dialog(retry?'重试转写':'生成前确认',`${ep()?.title||'所选单集'}。真实产品会先估算处理量和费用，再执行转写、翻译与总结。此原型未连接服务，不提交任务或扣费。`,go('检查服务设置','settings','m-primary'));
+ }
+ function validateMobile(){
+  const input=$('#mobile-base'),error=$('#mobile-base-error');if(!input||!error)return false;
+  let valid=false;try{const url=new URL(input.value.trim());valid=url.protocol==='https:'&&!url.username&&!url.password;}catch(_){}
+  error.hidden=valid;error.textContent=valid?'':'请输入完整的 HTTPS 服务地址，例如 https://api.example.com/v1';
+  input.setAttribute('aria-invalid',String(!valid));if(!valid)input.focus();return valid;
+ }
+ document.addEventListener('click',event=>{
+  const target=event.target.closest('[data-mobile-action],[data-mobile-page],[data-mobile-tab]');if(!target)return;
+  if(target.dataset.mobileTab){navigateMobile(target.dataset.mobileTab,{tab:true});return;}
+  if(target.dataset.mobilePage){if($('#info-dialog').open)$('#info-dialog').close();navigateMobile(target.dataset.mobilePage);return;}
+  switch(target.dataset.mobileAction){
+   case 'back-page':{const previous=history.pop();if(previous){m.tab=previous.tab;navigateMobile(previous.page,{back:true});}else navigateMobile(m.tab,{tab:true});break;}
+   case 'theme':m.dark=!m.dark;renderMobile();break;
+   case 'toggle':if(!ep()){navigateMobile('episodes',{tab:true});break;}m.playing=!m.playing;renderMobile();break;
+   case 'play-episode':if(m.selected===target.dataset.id)m.playing=!m.playing;else{selectEpisode(target.dataset.id);m.playing=true;}renderMobile();break;
+   case 'open-episode':if(m.selected!==target.dataset.id){selectEpisode(target.dataset.id);m.playing=false;}m.section='transcript';navigateMobile('transcript');break;
+   case 'current':currentMobile();break;
+   case 'back':seekMobile(pos()-15);break;
+   case 'forward':seekMobile(pos()+15);break;
+   case 'stop':m.playing=false;m.selected=null;renderMobile();toast('已结束播放，收听位置仍然保留。');break;
+   case 'sentence':m.reading=Number(target.dataset.sec);seekMobile(m.reading);renderMobile();$('.m-sentence.is-current')?.focus({preventScroll:true});break;
+   case 'anchor':m.reading=Number(target.dataset.sec);m.section='transcript';seekMobile(m.reading);renderMobile();$('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:'smooth'});toast('已定位到原句，仅演示播放位置。');break;
+   case 'section':m.section=target.dataset.section;renderMobile();$('.m-reading-tabs [data-section="'+m.section+'"]')?.focus({preventScroll:true});break;
+   case 'filter':m.filter=target.dataset.filter;renderMobile();break;
+   case 'clear-filter':m.filter='all';renderMobile();break;
+   case 'clear-show':m.show=null;renderMobile();break;
+   case 'show':m.show=target.dataset.id;m.filter='all';navigateMobile('episodes');break;
+   case 'subscribe':{const id=target.dataset.id;m.subscriptions=m.subscriptions.includes(id)?m.subscriptions.filter(x=>x!==id):[...m.subscriptions,id];renderMobile();toast(m.subscriptions.includes(id)?'已添加到订阅。':'已取消订阅。');break;}
+   case 'clear-search':m.query='';renderMobile();$('#mobile-search')?.focus();break;
+   case 'cancel-job':m.job='canceled';renderMobile();toast('已取消示例任务，播放不受影响。');break;
+   case 'retry-job':generationMobile(true);break;
+   case 'generate':generationMobile();break;
+   case 'save-settings':if(validateMobile()){save();$('#mobile-save-result').textContent=storageAvailable?'偏好已保存；未测试服务连接，也未保存密钥。':'偏好暂存在当前页面；预览不允许本地存储。';}break;
+   case 'close-dialog':$('#info-dialog').close();break;
+  }
+ });
+ document.addEventListener('input',event=>{
+  const el=event.target;
+  if(el.id==='mobile-seek')seekMobile(el.value);
+  if(el.id==='mobile-search'){m.query=el.value;$('#mobile-results').innerHTML=discoverCards();}
+  if(el.id==='mobile-base'){m.draft.base=el.value;$('#mobile-save-result').textContent='';}
+  if(el.id==='mobile-model'){m.draft.chat=el.value;$('#mobile-save-result').textContent='';}
+ });
+ document.addEventListener('change',event=>{
+  const el=event.target;
+  if(el.id==='mobile-theme'){m.dark=el.value==='dark';document.documentElement.classList.toggle('dark',m.dark);save();}
+  if(el.id==='mobile-follow'){m.follow=el.checked;save();}
+  if(el.id==='mobile-rate'){m.rate=Number(el.value);save();}
+  if(el.id==='mobile-language'){m.language=el.value;renderMobile();}
+ });
+ document.addEventListener('focusout',event=>{if(event.target.id==='mobile-base'&&$('#mobile-base'))validateMobile();});
+ document.addEventListener('keydown',event=>{if(event.isComposing)return;if(event.target.matches('.m-sentence')&&(event.key==='Enter'||event.code==='Space')){event.preventDefault();event.target.click();}});
+ setInterval(()=>{if(m.playing&&ep()){seekMobile(pos()+m.rate);if(pos()>=ep().duration){m.playing=false;renderMobile();}}},1000);
+ window.addEventListener('pagehide',save);
+ renderMobile();
+}
+
 })();
