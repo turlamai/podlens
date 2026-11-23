@@ -782,7 +782,7 @@ deleted. The Racket engine and its data formats are unchanged; an existing
   labels now use `%g` and read 1×, 1.5×, 2.5×, 3×.
 - Update checks no longer rely on a drifted hardcoded version: the backend
   and CLI share one `app/version.rkt` mirroring `rivet.rktd` (the
-  deployment identity is not yet exposed by Rivet — turinglambdaai/rivet#97).
+  deployment identity is not yet exposed by Rivet — turlamai/rivet#97).
   Released 1.2.0 builds kept reporting "update available" against
   themselves through the backend RPC and CLI paths.
 - RFC 822 feed dates with numeric UTC offsets were read as wall-clock UTC:
@@ -800,8 +800,8 @@ deleted. The Racket engine and its data formats are unchanged; an existing
   the chunk window instead of collapsing subsequent timestamps; the
   multipart upload path closes its connection; the vendored pure-Racket
   SHA-256 was removed (digest utilities proposed upstream as
-  turinglambdaai/rivet#99; the port-probing test workaround is
-  turinglambdaai/rivet#98).
+  turlamai/rivet#99; the port-probing test workaround is
+  turlamai/rivet#98).
 
 ## 1.2.0 - 2026-09-30
 

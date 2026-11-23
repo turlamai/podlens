@@ -284,4 +284,4 @@ agent 用两条 CLI 命令完成「订阅并取回某集的中文要点」。
 存储提示、品牌 tokens）。下一刀：Windows 125–200% 缩放截图矩阵、三端
 运行时语言切换、M4 移动伴随端（等 Rivet 设备通道）。
 
-执行场景与完成标准见[本仓审查 issue](https://github.com/turlamai/podlens/issues/13)及家族[交付标准](https://github.com/turlamai/turinglambdaai.github.io/blob/master/docs/PRODUCT-STANDARD.md)。未完成的跨平台、硬件或真实支付验证仍是显式门禁；本节不表示这些验证已通过。后续一次认领一个切片，证据回填本文件与 issue。
+执行场景与完成标准见[本仓审查 issue](https://github.com/turlamai/podlens/issues/13)及家族[交付标准](https://github.com/turlamai/turlamai.github.io/blob/master/docs/PRODUCT-STANDARD.md)。未完成的跨平台、硬件或真实支付验证仍是显式门禁；本节不表示这些验证已通过。后续一次认领一个切片，证据回填本文件与 issue。
