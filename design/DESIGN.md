@@ -2,6 +2,8 @@
 
 This editable prototype defines information architecture and interaction semantics for the macOS, Windows, and Linux implementations, which share one web UI on the glaze system-WebView carrier. Platform mechanisms follow each host's conventions through the carrier. The HTML prototype is a design reference and the landed visual baseline, not a replacement for the Racket engine.
 
+**Source of truth**: token, font, spacing, corner and motion values live only in `prototype/shared.css` (light/dark pairs); this document records semantic names, usage, decisions and boundaries only (slimmed 2026-11-23 to the family minimal-docs standard). Change values in CSS; change semantics here.
+
 ## Scope and entry points
 
 - `prototype/home.html`: continue listening and resume reading.
@@ -22,30 +24,18 @@ The home screen prioritizes the current episode, one primary playback action, an
 
 ## Tokens
 
-| Token | Light | Dark |
-|---|---|---|
-| accent | `#AC4B2D` | `#EBAB8A` |
-| accent-deep | `#893A23` | `#F5C1A6` |
-| accent-soft | `#F6E8E1` | `#3B2C25` |
-| on-accent | `#FFFFFF` | `#281B14` |
-| canvas | `#FAF7F2` | `#1A1917` |
-| surface | `#FFFFFF` | `#22211F` |
-| raised | `#F2EEE8` | `#2B2925` |
-| hairline | `#E4DED5` | `#403D37` |
-| ink | `#252521` | `#F1EEE8` |
-| ink-soft | `#69675F` | `#B2ADA3` |
-| positive | `#276742` | `#8DD1A3` |
-| danger | `#A52C2C` | `#F4A09A` |
+| Token | Usage |
+|---|---|
+| accent / accent-deep / accent-soft / on-accent | primary action, selection and focus / hover-deep / quiet fill / foreground on accent |
+| canvas / surface / raised / hairline | page canvas / cards and sheets / raised areas / structural rules |
+| ink / ink-soft | primary text / secondary text |
+| positive / danger | success state / error and destructive state |
 
 Accent foreground/background pairs change together in dark mode. This is a contrast-oriented refinement of the prior palette, not a new palette system. Native implementation token mirrors still require an explicit implementation change; this prototype does not update those source files.
 
-- UI: system sans stack with Chinese platform fallbacks.
-- Reading: system serif, Georgia, Songti; English 20px / 1.65, translation 16px / 1.7.
-- Body: 16px; secondary labels 13–14px; timestamps 11–12px monospace.
-- Titles: 24–32px, with a larger serif episode title in the home continue section.
-- Spacing: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48px.
-- Corners: 4px labels, 8px controls and covers, 12px major containers.
-- Icons: one outlined SVG family, 24-unit viewBox, 1.6-unit stroke; no character-based control glyphs.
+- UI: system sans stack with Chinese platform fallbacks. Reading: system serif (Georgia / Songti fallbacks) for transcript and summary body only.
+- Type roles: reading (original and translation), body, secondary labels, timestamps (monospace), titles, and a larger serif episode title in the home continue section — sizes and line heights per `shared.css`.
+- Spacing rhythm, the embedded/control/panel corner hierarchy and the single outlined SVG icon family (no character-based control glyphs) are defined in `shared.css`.
 - Controls use visible focus, accessible names, and text paired with status colors.
 - Reduced motion disables animated scrolling. No decorative continuous animation.
 
@@ -83,7 +73,7 @@ Real product work still needs provider-derived cost estimation before execution,
 
 ## Responsive and platform behavior
 
-Desktop uses a 232px sidebar, normal-flow content, and a player that reserves its own space. Medium windows simplify columns; narrow windows use an expandable navigation area and reorganized player. Primary controls remain available at 375px without a simulated desktop titlebar. Focus mode remains available on every width.
+Desktop uses a fixed-width sidebar (see CSS), normal-flow content, and a player that reserves its own space. Medium windows simplify columns; narrow windows use an expandable navigation area and reorganized player. Primary controls remain available at phone width without a simulated desktop titlebar. Focus mode remains available on every width.
 
 | Mechanism | macOS | Windows | Linux |
 |---|---|---|---|
@@ -122,12 +112,12 @@ host bridge, never through per-platform UI forks.
 - Main task: resume listening and resume reading one episode; primary
   action = play/pause in the reserved player; secondary = jump back to the
   current transcript sentence.
-- Accent role: existing terracotta pair (light `#AC4B2D` / dark `#EBAB8A`)
+- Accent role: the existing terracotta pair (values in `shared.css`)
   serves primary action, selection and focus; one high-emphasis action per
-  task region. Density: standard preset (16–24 content padding, 36px
-  controls); the transcript reading column uses the reading preset
-  (16px serif body, 1.7–1.9 line height) — the family-allowed reading
-  exception, self-hosted/system serif fallback, no runtime remote fonts.
+  task region. Density: standard preset for chrome; the transcript reading
+  column uses the family reading preset (serif body, taller line height) —
+  the family-allowed reading exception, self-hosted/system serif fallback,
+  no runtime remote fonts.
 - Font/icon mapping: system UI stack per family baseline for chrome;
   serif only for transcript/summary reading body; existing family linear
   SVG icon set (Lucide-outline compatible) retained, 16/20/24 viewBoxes.
@@ -178,13 +168,13 @@ Each screen has an independent HTML entry referencing the same-directory `shared
 
 ### Design contract
 
-- Each mobile page is a pure content canvas with a 390px maximum width centered on the existing neutral canvas token. It shrinks naturally on narrower viewports. There is no phone bezel, hardware frame, Dynamic Island, fake status bar, glass, glow, texture, or decorative gradient.
+- Each mobile page is a pure content canvas with a phone-width maximum (see CSS) centered on the existing neutral canvas token. It shrinks naturally on narrower viewports. There is no phone bezel, hardware frame, Dynamic Island, fake status bar, glass, glow, texture, or decorative gradient.
 - The shared stylesheet remains the token source. Mobile rules are scoped beneath `.mobile-prototype`, reference its existing semantic variables, and introduce no new color palette or font family. The existing typographic sample-cover artwork and inline outline SVG set are reused.
-- Chrome uses the existing system UI font stack. Mobile interface text is 15–16px, supporting text 12–13px, page titles 24–28px. Transcript original and summary body reuse the serif reading preset at 20px/1.65; translation uses the existing sans translation role at 16px/1.7.
-- Content padding is 16px on the shared 4px rhythm. Targets and list rows are at least 44 logical pixels. Rounded shapes retain the 4/8/12 embedded/control/panel hierarchy and single-pixel rules. A large player button remains an 8px control, not a new floating decorative shape.
+- Chrome uses the existing system UI font stack; mobile interface text, supporting text and page titles keep their own roles (sizes in the `.mobile-prototype` rules). Transcript original and summary body reuse the serif reading preset; translation uses the existing sans translation role.
+- Content padding follows the shared rhythm. Targets and list rows are at least 44 logical pixels. Rounded shapes retain the embedded/control/panel hierarchy and single-pixel rules. A large player button remains a control shape, not a new floating decorative shape.
 - The existing terracotta pair is the only product action accent. Each task region has at most one filled primary action. The mini-player uses quiet transport so it does not compete with the home or full-player primary button.
 - Light and dark use the same existing `:root`/`.dark` mechanism; both theme foregrounds and surfaces change. Focus remains visible. The current sentence is indicated by text and a semantic background, never by color alone.
-- Motion uses the existing 180ms token, within the requested 120–200ms range. The shared reduced-motion rule disables smooth scrolling and transitions.
+- Motion uses the existing motion token (within the requested short range). The shared reduced-motion rule disables smooth scrolling and transitions.
 - The app frame uses normal-flow header, a scrolling main region, and reserved bottom chrome. Bottom navigation and the mini-player consume their own layout space rather than covering reading content. Real safe-area inset padding is supported without drawing decorative system UI.
 
 ### Navigation and state
@@ -225,7 +215,7 @@ Family guidance used: `tlai-product` design-standard revision `2026-11-20-minima
 Requested source/DOM checks passed: 53/53, plus JavaScript syntax checking. Evidence was collected from the six actual mobile HTML entries, their shared stylesheet/script, all local fixture entries, and the six desktop entries as regressions.
 
 - Local-resource scan: all six mobile HTML entries use only same-directory `shared.css` / `app.js`; the directory's relative page links resolve. Shared CSS contains no imports, image URLs, or remote font resources. The mobile CSS adds no literal color values or alternative font stack. Service URL text is editable configuration content, not a fetched resource.
-- DOM initialization: six mobile entries render one main heading and four tabs inside a maximum-width 390px content canvas. No desktop sidebar/player or device/statusbar decoration mounts in a mobile entry. Existing desktop entries still initialize their original workspace without mobile tabs.
+- DOM initialization: six mobile entries render one main heading and four tabs inside a maximum-width phone content canvas. No desktop sidebar/player or device/statusbar decoration mounts in a mobile entry. Existing desktop entries still initialize their original workspace without mobile tabs.
 - Interactions: current episode/progress agrees between Home, mini-player, and Now Playing; seek boundaries and minus/plus 15 seconds work; explicit back returns to the previous view; sentence selection, language changes, Summary anchors, theme persistence, reload-paused behavior, search/tab context, subscription mutation, empty recovery, cancellation, settings correction, and storage-denied operation passed.
 - Theme contrast: CSS-computed foreground/background checks for visible mobile text roles passed at least 4.5:1 in both themes on all six initial screens. This checks semantic color application, not a photographed or native-rendered result.
 - Touch sizing: active controls' declared CSS heights are at least 44px; primary/icon/tab controls declare minimum widths of at least 44px, range control is explicitly at least 44px high, and the checkbox has a full-width label with a 44px minimum hit height. Flow widths allocate space to text controls. Pixel-level overlap and hit-testing still require rendered-browser or native verification.
