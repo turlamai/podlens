@@ -9,8 +9,8 @@ permission to turn on billing.
 
 Authoritative policy read for this audit:
 
-- [`PRICING.md`](../PRICING.md) — `2026-10-auth-1` (2026-10-23), free BYOK,
-  no Permit/Commerce product gate.
+- Family portfolio decisions — `PORTFOLIO.md` in turlamai.github.io
+  (2026-11-19): PodLens is quality-first, no Permit/Commerce product gate.
 - [`AGENTS.md`](../AGENTS.md) — authorization preamble and portfolio
   placement (`2026-10-v2`).
 - Product contract: [`racket/backend.rkt`](../racket/backend.rkt) and
@@ -33,9 +33,9 @@ Authoritative policy read for this audit:
 
 Grep evidence from the tree at the audited revision: no matches for
 `Permit`, `Commerce`, `checkout`, `license-key`, `activation` or `trial`
-outside documentation that explicitly forbids them. `PRICING.md` is the only
-place a future price is mentioned, and it marks prices as launch targets,
-not live offers.
+outside documentation that explicitly forbids them. No future price is advertised anywhere in this tree; any future change
+follows the family portfolio decisions, which stay separate from a live
+offer.
 
 ## 2. User-data and rights obligations
 
@@ -84,8 +84,8 @@ Consequently:
 
 A future paid edition must pass this gate **before** any UI claims it exists:
 
-1. Record a new policy revision in `PRICING.md` and the authorization
-   preamble; do not reuse `2026-10-auth-1` for paid work.
+1. Record a new owner decision in the family portfolio decisions and the
+   authorization preamble; do not reuse `2026-10-auth-1` for paid work.
 2. Define feature identities and the free floor. Reading, exporting,
    backing up and recovering the user's own data stay free.
 3. Put rights verification in the shared core through Permit Protocol v1;
@@ -131,5 +131,6 @@ No permit, commerce or trial code was added. The classification remains
 | Export/recovery/credential protections | Implemented and covered by backend tests |
 | Real payment evidence | None claimed |
 
-Owner: the next commercial slice. Re-read `PRICING.md` and this document at
-that boundary; do not treat this audit as permission to enable billing.
+Owner: the next commercial slice. Re-read the family portfolio decisions
+and this document at that boundary; do not treat this audit as permission
+to enable billing.
