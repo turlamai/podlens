@@ -17,12 +17,13 @@ const paths = {
  book:'<path d="M12 5v15M3 4c4-1 7 0 9 2 2-2 5-3 9-2v15c-4-1-7 0-9 2-2-2-5-3-9-2z"/>',
  arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',
  replay:'<path d="M4 9a8 8 0 1 1 0 6M4 3v6h6"/>',
- moon:'<path d="M20 14A9 9 0 0 1 10 3a9 9 0 1 0 10 11z"/>',
+ // Theme glyphs follow the family outline set; the icon shows the theme you are in.
+ moon:'<path d="M20 15.2A8.2 8.2 0 0 1 8.8 4a8.4 8.4 0 1 0 11.2 11.2Z"/>',
  search:'<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',
  check:'<path d="m5 12 4 4L20 5"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
  focus:'<path d="M9 3H3v6m12-6h6v6M3 15v6h6m6 0h6v-6"/>',
  close:'<path d="m5 5 14 14M19 5 5 19"/>',
- sun:'<circle cx="12" cy="12" r="4"/><path d="M12 1v2m0 18v2M1 12h2m18 0h2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/>'
+ sun:'<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>'
 };
 const icon = name => `<svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.book}</svg>`;
 const shows = [
@@ -69,12 +70,13 @@ const time = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.flo
 const position = () => state.positions[getEpisode().id] || 0;
 const cover = (id,mini=false) => { const s=getShow(id);return `<div class="cover ${id}${mini?' mini':''}" aria-label="${escape(s.name)} 示例封面"><small>${s.tag}</small><strong>${mini?id.toUpperCase():s.cover}</strong><span class="cover-line"></span></div>`; };
 const button = (text,action,cls='',attrs='') => `<button type="button" class="btn ${cls}" data-action="${action}" ${attrs}>${text}</button>`;
-const navButton = (label,page,glyph,attrs='') => `<button type="button" class="nav-btn ${state.page===page && !state.show?'active':''}" data-page="${page}" ${attrs}>${icon(glyph)}<span>${label}</span></button>`;
+// Library entries share one page; only the entry matching the active filter is current.
+const navButton = (label,page,glyph,attrs='',filter=null) => `<button type="button" class="nav-btn ${state.page===page && !state.show && (filter===null || filter===state.filter)?'active':''}" data-page="${page}" ${attrs}>${icon(glyph)}<span>${label}</span></button>`;
 if(document.body.dataset.surface==='mobile'){initMobile();return;}
 function sidebar() {
  return `<aside class="sidebar" aria-label="主导航"><button type="button" class="brand" data-page="home" style="border:0;background:none;text-align:left"><span class="brand-mark">${icon('lens')}</span>PodLens</button>
  <nav class="nav-group">${navButton('主页','home','home')}${navButton('发现','discover','compass')}</nav>
- <nav class="nav-group"><div class="nav-title">资料库</div>${navButton('最近更新','episodes','clock','data-filter="all"')}${navButton('节目','episodes','grid','data-filter="shows"')}${navButton('已下载','episodes','download','data-filter="downloaded"')}</nav>
+ <nav class="nav-group"><div class="nav-title">资料库</div>${navButton('最近更新','episodes','clock','data-filter="all"','all')}${navButton('节目','episodes','grid','data-filter="shows"','shows')}${navButton('已下载','episodes','download','data-filter="downloaded"','downloaded')}</nav>
  <nav class="nav-group"><div class="nav-title">我的订阅</div>${shows.filter(s=>state.subscriptions.includes(s.id)).map(s=>`<button type="button" class="nav-btn ${state.show===s.id?'active':''}" data-page="episodes" data-show="${s.id}">${cover(s.id,true)}<span class="od-field od-fill"><span class="od-truncate">${s.name}</span><span class="sub">${s.category}</span></span></button>`).join('')}${button(`${icon('plus')} 添加订阅`,'discover','text')}</nav>
  <div class="side-bottom">${navButton('设置','settings','settings')}<p>本地交互原型 · 不连接 API</p></div></aside>`;
 }
@@ -135,15 +137,18 @@ function settings() {
  <section class="settings-group"><h2>本地数据</h2><p class="meta">${state.subscriptions.length} 档示例订阅 · ${episodes.length} 集示例内容。${memoryOnly?'当前预览不允许本地存储，状态仅在当前页面保留。':'阅读位置与非敏感偏好尝试保存在浏览器本地；若预览限制存储，仅在当前页面保留。'}</p></section></div>`;
 }
 const labels={home:'主页',episodes:'资料库',transcript:'逐句稿',summary:'总结',discover:'发现',settings:'设置'};
+// Topbar theme toggle: the icon is the current theme; name and tooltip name the theme a click switches to.
+const themeToggle = () => `<button type="button" class="icon-btn" data-action="theme" aria-label="切换到${state.dark?'浅色':'深色'}模式" title="切换到${state.dark?'浅色':'深色'}模式">${icon(state.dark?'moon':'sun')}</button>`;
 function render() {
  const focused=document.activeElement;
- const focusKey=focused?.dataset ? JSON.stringify(focused.dataset) : '';
+ // Only an invoking control inside the app is restored; body also carries data-page and would match a nav button on first render.
+ const focusKey=focused?.closest?.('#app') ? JSON.stringify(focused.dataset) : '';
  const focusId=focused?.id;
  const previousScroll=$('.main-scroll')?.scrollTop||0;
  document.documentElement.classList.toggle('dark',state.dark);
  document.title=`PodLens — ${labels[state.page]||'主页'}`;
  $('#app').className=`app${state.focus?' focus-mode':''}`;
- $('#app').innerHTML=`${sidebar()}<div class="workspace"><header class="topbar"><button type="button" class="icon-btn mobile-menu" data-action="menu" aria-label="打开导航" aria-expanded="false">${icon('menu')}</button><span class="breadcrumb">资料库 <span aria-hidden="true">/</span> ${labels[state.page]||'主页'}</span><span class="mode-label">示例内容 · 无真实音频</span><button type="button" class="icon-btn" data-action="theme" aria-label="切换到${state.dark?'浅色':'深色'}模式">${icon(state.dark?'sun':'moon')}</button></header><main class="main-scroll" id="main"><div class="content">${({home,episodes:listPage,transcript,summary,discover,settings}[state.page]||home)()}</div></main>${player()}</div>`;
+ $('#app').innerHTML=`${sidebar()}<div class="workspace"><header class="topbar"><button type="button" class="icon-btn mobile-menu" data-action="menu" aria-label="打开导航" aria-expanded="false">${icon('menu')}</button><span class="breadcrumb">资料库 <span aria-hidden="true">/</span> ${labels[state.page]||'主页'}</span><span class="mode-label">示例内容 · 无真实音频</span>${themeToggle()}</header><main class="main-scroll" id="main"><div class="content">${({home,episodes:listPage,transcript,summary,discover,settings}[state.page]||home)()}</div></main>${player()}</div>`;
  $('.main-scroll').scrollTop=previousScroll;
  if(focusId && document.getElementById(focusId)) document.getElementById(focusId).focus({preventScroll:true});
  else if(focusKey && focusKey!=='{}') {
@@ -245,7 +250,7 @@ document.addEventListener('change',event=>{
  const el=event.target;
  if(el.id==='rate'){state.rate=Number(el.value);persist();}
  if(el.id==='sleep'){state.sleep=Number(el.value);sleepDeadline=state.sleep?Date.now()+state.sleep*60000:0;notify(state.sleep?`${state.sleep} 分钟后停止演示进度。`:'已关闭定时。');}
- if(el.id==='theme-choice'){state.dark=el.value==='dark';document.documentElement.classList.toggle('dark',state.dark);persist();}
+ if(el.id==='theme-choice'){state.dark=el.value==='dark';document.documentElement.classList.toggle('dark',state.dark);$('[data-action=theme]').outerHTML=themeToggle();persist();}
  if(el.id==='auto-follow'){state.follow=el.checked;persist();}
 });
 document.addEventListener('focusout',event=>{if(event.target.id==='base')checkSettings();});
@@ -288,6 +293,8 @@ function initMobile() {
  const pos=()=>ep()?Number(m.positions[m.selected]||0):0;
  const btn=(label,action,cls='',attrs='')=>`<button type="button" class="m-button ${cls}" data-mobile-action="${action}" ${attrs}>${label}</button>`;
  const go=(label,page,cls='',attrs='')=>`<button type="button" class="m-button ${cls}" data-mobile-page="${page}" ${attrs}>${label}</button>`;
+ // Header theme toggle: the icon is the current theme; name and tooltip name the target theme.
+ const themeBtn=()=>btn(icon(m.dark?'moon':'sun'),'theme','m-icon',`aria-label="切换到${m.dark?'浅色':'深色'}主题" title="切换到${m.dark?'浅色':'深色'}主题"`);
  const art=(show,cls='')=>`<div class="m-art ${cls}" role="img" aria-label="${escape(getShow(show).name)} 排版式示例封面">${cover(show)}</div>`;
  const save=()=>{
   if(fixture)return;
@@ -358,7 +365,7 @@ function initMobile() {
   document.title=`PodLens — ${titles[m.page]||'主页'} · iPhone`;
   const detail=['transcript','now-playing'].includes(m.page);
   $('#app').className='mobile-app';
-  $('#app').innerHTML=`<header class="m-header">${detail?btn(`${icon('arrow')}<span>返回</span>`,'back-page','m-back'):'<span class="m-brand">PodLens</span>'}<span class="m-header-space"></span><span class="m-demo-label">交互示例</span>${btn(icon(m.dark?'sun':'moon'),'theme','m-icon',`aria-label="切换到${m.dark?'浅色':'深色'}主题"`)}</header><main class="m-main" id="main"><div class="m-content">${({home:homeMobile,'now-playing':fullPlayer,episodes:episodesMobile,discover:discoverMobile,transcript:transcriptMobile,settings:settingsMobile}[m.page]||homeMobile)()}</div></main><footer class="m-bottom">${miniPlayer()}${tabbar()}</footer>`;
+  $('#app').innerHTML=`<header class="m-header">${detail?btn(`${icon('arrow')}<span>返回</span>`,'back-page','m-back'):'<span class="m-brand">PodLens</span>'}<span class="m-header-space"></span><span class="m-demo-label">交互示例</span>${themeBtn()}</header><main class="m-main" id="main"><div class="m-content">${({home:homeMobile,'now-playing':fullPlayer,episodes:episodesMobile,discover:discoverMobile,transcript:transcriptMobile,settings:settingsMobile}[m.page]||homeMobile)()}</div></main><footer class="m-bottom">${miniPlayer()}${tabbar()}</footer>`;
   $('.m-main').scrollTop=previous;
   if(focusId&&document.getElementById(focusId))document.getElementById(focusId).focus({preventScroll:true});
   else if(key&&key!=='{}')$$('[data-mobile-action],[data-mobile-page],[data-mobile-tab]').find(el=>JSON.stringify(el.dataset)===key)?.focus({preventScroll:true});
@@ -439,7 +446,7 @@ function initMobile() {
  });
  document.addEventListener('change',event=>{
   const el=event.target;
-  if(el.id==='mobile-theme'){m.dark=el.value==='dark';document.documentElement.classList.toggle('dark',m.dark);save();}
+  if(el.id==='mobile-theme'){m.dark=el.value==='dark';document.documentElement.classList.toggle('dark',m.dark);$('[data-mobile-action=theme]').outerHTML=themeBtn();save();}
   if(el.id==='mobile-follow'){m.follow=el.checked;save();}
   if(el.id==='mobile-rate'){m.rate=Number(el.value);save();}
   if(el.id==='mobile-language'){m.language=el.value;renderMobile();}
