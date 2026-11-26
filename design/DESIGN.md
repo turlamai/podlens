@@ -12,7 +12,7 @@ This editable prototype defines information architecture and interaction semanti
 - `prototype/summary.html`: content overview and links back to source sentences.
 - `prototype/discover.html`: local example search and subscription changes.
 - `prototype/settings.html`: appearance, reading preferences, and service configuration form.
-- `index.html`: opens the main listening view directly; no screen directory is retained.
+- `index.html`: navigation page listing every desktop and mobile entry by its page title, with a link to this contract.
 
 All six entries share `prototype/shared.css` and `prototype/app.js`. In-app navigation changes the mounted view without depending on native document navigation. Each HTML file is also a direct entry. The prototype does not introduce new backend RPCs, a queue, favorites, waveform processing, or chapter-summary features.
 
@@ -224,3 +224,38 @@ Requested source/DOM checks passed: 53/53, plus JavaScript syntax checking. Evid
 These are source/DOM tests, not browser visual previews. DOM checks stub native dialog open/close and scrolling; they do not prove rendered geometry, actual modal focus trapping, VoiceOver, 200% text layout, or iOS lifecycle behavior. No screenshots, real audio playback, API calls, Swift build, or physical-device acceptance was performed. Those applicable host checks remain unverified; no full family-UI acceptance claim is made.
 
 For this prototype slice, the first four exit conditions above are met at the source/DOM level. Touch declarations are checked, while expanded-text/actual hit testing remains pending. Native iOS conditions and the remaining rendered family checks are implementation/acceptance work rather than missing prototype files.
+
+## Prototype polish — family baseline check (2026-11-26)
+
+Aligned with the family design standard revision `2026-11-20-minimal-family`, starting from `d086042`. Values stay in `prototype/shared.css`; this section records decisions, evidence and open items.
+
+### Decisions
+
+- Theme control: the icon is the theme you are in (moon in dark, sun in light), drawn with the family outline glyphs through the existing `od-icon` class. The accessible name and tooltip name the theme a click switches to — `切换到浅色模式` / `切换到深色模式` on desktop, `切换到浅色主题` / `切换到深色主题` on mobile — and follow every path that changes the theme (topbar button, header button, Settings select). The desktop `.icon-btn` is a quiet icon button shared by the theme, menu and focus-mode controls: no border at rest, secondary text colour, surface tint on hover, shared focus ring. The mobile header button keeps its 44px target, and the `index.html` theme button follows the same naming rule.
+- Type floor: no interface text under 12px. The cover tagline counts as interface text and was raised too; no exception is recorded.
+- Density: the sidebar uses the compact vertical rhythm so that Settings and the footnote fit an 800px-high window; its rows keep a 44px minimum hit height. Chrome elsewhere stays on the standard preset.
+- Navigation: only the library entry matching the active filter is current.
+- Focus: focus is restored only to the invoking control inside the app, so nothing is focused at load; the search field shows the shared ring.
+
+### Checks
+
+| Check | Result | Evidence / limit |
+|---|---|---|
+| Type floor, source | Pass | No `font-size` or `font` value under 12px under `design/` |
+| Type floor, rendered | Pass | 12 entries × 2 themes at 1280×800 and 390×844: 0 visible text nodes under 12px (15 per theme before) |
+| Theme control | Pass | Toggle and Settings select keep icon, `aria-label` and `title` in step on desktop and mobile; keyboard focus returns to the toggle |
+| Focus visible, reduced motion | Pass | Shared ring covers buttons, links, inputs, selects, `summary`, sentences and the search field; reduced-motion rule unchanged |
+| Accessible names | Pass | 0 unnamed controls on all 24 renders; icons are `aria-hidden` |
+| Integrity | Pass | No remote resources, every local `href`/`src` resolves, 0 page errors and 0 failed loads; `index.html` lists every entry |
+| Layout | Pass | Sidebar content is 767px high and fits 1280×800, 1200×800, 1024×768 and 768×800 without scrolling; no horizontal overflow at the checked widths (390–1920px); episode rows reflow without overlap below 768px |
+| Contrast | Pass, approximate | 0 text pairs under 4.5:1 in the render check on both themes; gradients are skipped |
+| Repo gates | Not applicable | No CI job, script or test reads `design/`; `app.js` passes a syntax check |
+
+Evidence: headless Chromium renders of all 12 entries in both themes, reviewed on 2026-11-26. Contact sheets are review artifacts and are not versioned.
+
+### Open
+
+- Typographic cover titles are cropped mid-word at 56px and 80px (list rows, discover cards, detail heading). Fit, bleed or abbreviation is a cover-art decision; unchanged.
+- Just above the 768px breakpoint the episode rows are cramped but not clipped; stacking their actions there is a layout decision; unchanged.
+- The product UI (`apps/desktop/src/shared.css`, `views.ts`) still carries the earlier values and markup copied from this prototype; align it in its next UI slice.
+- Windows text scaling, screen-reader output and the real WebViews are not covered by these renders.
