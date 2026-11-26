@@ -335,7 +335,7 @@ function initMobile() {
   return list.length?list.map(s=>`<article class="m-discover-card"><div class="m-discover-title">${art(s.id,'m-art-medium')}<div class="m-fill"><h2>${s.name}</h2><p class="m-meta">${s.category}</p></div></div><p>${s.description}</p><div class="m-discover-actions">${btn(m.subscriptions.includes(s.id)?`${icon('check')} 已订阅`:`${icon('plus')} 添加订阅`,'subscribe','',`data-id="${s.id}" aria-pressed="${m.subscriptions.includes(s.id)}"`)}${btn('查看单集','show','m-quiet',`data-id="${s.id}"`)}</div></article>`).join(''):`<div class="m-empty"><h2>没有匹配的节目</h2><p>试试“设计”或“科学”，也可以清空搜索。</p>${btn('清空搜索','clear-search','m-quiet')}</div>`;
  }
  function discoverMobile(){
-  return `<h1 class="m-heading" tabindex="-1">发现</h1><p class="m-meta">${m.subscriptions.length?`已订阅 ${m.subscriptions.length} 档节目`:'还没有订阅，先挑一档喜欢的。'}</p><label class="m-search" for="mobile-search">${icon('search')}<input id="mobile-search" type="search" placeholder="搜索示例节目" value="${escape(m.query)}"></label><p class="m-caption">仅搜索本地示例节目，不连接播客目录。</p><div id="mobile-results">${discoverCards()}</div>`;
+  return `<h1 class="m-heading" tabindex="-1">发现</h1><p class="m-meta">${m.subscriptions.length?`已订阅 ${m.subscriptions.length} 档节目`:'还没有订阅，先挑一档喜欢的。'}</p><label class="m-search" for="mobile-search">${icon('search')}<input id="mobile-search" type="search" aria-label="搜索示例节目" placeholder="搜索示例节目" value="${escape(m.query)}"></label><p class="m-caption">仅搜索本地示例节目，不连接播客目录。</p><div id="mobile-results">${discoverCards()}</div>`;
  }
  function missingTranscript(e){
   const working=e?.id==='sky'&&m.job==='processing',failed=e?.id==='sky'&&m.job==='failed';
