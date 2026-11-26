@@ -259,6 +259,7 @@ Evidence: headless Chromium renders of all 12 entries in both themes, reviewed o
 - Just above the 768px breakpoint the episode rows are cramped but not clipped; stacking their actions there is a layout decision; unchanged.
 - The product UI (`apps/desktop/src/shared.css`, `views.ts`) still carries the earlier values and markup copied from this prototype; align it in its next UI slice.
 - Windows text scaling, screen-reader output and the real WebViews are not covered by these renders.
+- Scale debt (recorded 2026-11-26, starting from `71ba21f`, unchanged): a static scan of every stylesheet under `design/` finds text sizes outside the family roles (12/13/14/16/18/24) — 15px×8, 20px×4, 22px×4, 28px×2; 30 / 32 / 40px are display-level titles. Radii are inside the 4/8/12 scale. 15px snaps to 14; 20 / 22 / 28px snap to 18 or 24. To be aligned progressively in the next related slice, not inside a contrast or naming fix.
 
 ### Follow-up: name of the mobile search field (2026-11-26)
 
