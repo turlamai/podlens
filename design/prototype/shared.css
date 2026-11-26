@@ -16,8 +16,8 @@
  --accent:#AC4B2D;--accent-deep:#893A23;--accent-soft:#F6E8E1;--on-accent:#fff;
  --canvas:#FAF7F2;--surface:#fff;--raised:#F2EEE8;--hairline:#E4DED5;
  --ink:#252521;--ink-soft:#69675F;--positive:#276742;--danger:#A52C2C;
- --sans:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
- --serif:ui-serif,'New York',Georgia,'Songti SC',serif;--mono:ui-monospace,'SF Mono',Menlo,monospace;
+ --sans:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',"Noto Sans CJK SC", sans-serif;
+ --serif:ui-serif,'New York',Georgia,'Songti SC',serif;--mono:ui-monospace,'SF Mono',Menlo,"Noto Sans Mono CJK SC", "Noto Sans CJK SC", "Microsoft YaHei", monospace;
  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;
  --radius:12px;--motion:180ms;--body:16px;--small:13px;--title:clamp(24px,2.4vw,32px);
 }
@@ -230,3 +230,11 @@ body.mobile-prototype { background:var(--canvas);font:16px/1.5 var(--sans);color
  .mobile-prototype .m-transport { gap:24px }
 }
 .mobile-prototype #mobile-seek { min-height:44px }
+
+/* ---- temperament profile pass ---- */
+/* typography baseline (family standard 2026-11-26-temperament-profiles): CJK/Latin spacing and kinsoku come from the rendering layer,
+   never from typed spaces (§4, §10). Values stay in the token block above. */
+body { text-autospace: normal; line-break: strict; }
+::selection { background: var(--accent-soft); color: var(--ink); }
+/* Paired neutral scrollbar for both themes; thin and non-distracting. */
+html { scrollbar-color: var(--hairline) transparent; }
