@@ -259,3 +259,7 @@ Evidence: headless Chromium renders of all 12 entries in both themes, reviewed o
 - Just above the 768px breakpoint the episode rows are cramped but not clipped; stacking their actions there is a layout decision; unchanged.
 - The product UI (`apps/desktop/src/shared.css`, `views.ts`) still carries the earlier values and markup copied from this prototype; align it in its next UI slice.
 - Windows text scaling, screen-reader output and the real WebViews are not covered by these renders.
+
+### Follow-up: name of the mobile search field (2026-11-26)
+
+Starting from `211f140`. A re-check with a stricter probe found one control the table above had passed incorrectly: on `mobile-discover.html` the search field (`#mobile-search`, generated in `app.js`) had no accessible name. Its only label is the wrapping `<label class="m-search">`, which holds nothing but the icon and the input, and a placeholder does not name a field. The input now carries `aria-label="搜索示例节目"`. Re-measured: 12 entries × 2 themes, 0 unnamed controls, 0 text pairs under 4.5:1, 0 text under 12px, 0 horizontal overflow, 0 page errors.
