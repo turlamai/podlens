@@ -172,7 +172,7 @@ function syncPosition() {
  $$('[data-time]').forEach(n=>n.textContent=time(p));$$('[data-remaining]').forEach(n=>n.textContent='−'+time(ep.duration-p));
  if($('#seek')) $('#seek').value=p;
  $$('[data-hero-progress]').forEach(n=>n.value=p);$$('[data-hero-time]').forEach(n=>n.textContent=`${time(p)} / ${time(ep.duration)}`);
- if(ep.ready&&p<=77&&state.follow){const current=[...sentences].reverse().find(s=>s[0]<=p)||sentences[0];const changed=state.reading!==current[0];state.reading=current[0];if(changed&&state.page==='transcript')$('.sentence[data-sec=\"'+current[0]+'\"]')?.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});$$('.sentence').forEach(el=>el.classList.toggle('current',Number(el.dataset.sec)===current[0]));}
+ if(ep.ready&&p<=77&&state.follow){const current=[...sentences].reverse().find(s=>s[0]<=p)||sentences[0];const changed=state.reading!==current[0];state.reading=current[0];if(changed&&state.page==='transcript')$('.sentence[data-sec=\"'+current[0]+'\"]')?.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});$('.sentence').forEach(el=>{const active=Number(el.dataset.sec)===current[0];el.classList.toggle('current',active);el.setAttribute('aria-current',String(active));});}
  persist();
 }
 function seek(value) { state.positions[getEpisode().id]=Math.max(0,Math.min(getEpisode().duration,value));syncPosition(); }
