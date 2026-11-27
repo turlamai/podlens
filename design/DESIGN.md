@@ -263,3 +263,32 @@ Evidence: headless Chromium renders of all 12 entries in both themes, reviewed o
 ### Follow-up: name of the mobile search field (2026-11-26)
 
 Starting from `211f140`. A re-check with a stricter probe found one control the table above had passed incorrectly: on `mobile-discover.html` the search field (`#mobile-search`, generated in `app.js`) had no accessible name. Its only label is the wrapping `<label class="m-search">`, which holds nothing but the icon and the input, and a placeholder does not name a field. The input now carries `aria-label="搜索示例节目"`. Re-measured: 12 entries × 2 themes, 0 unnamed controls, 0 text pairs under 4.5:1, 0 text under 12px, 0 horizontal overflow, 0 page errors.
+
+
+## Temperament profile declaration — 2026-11-26 (family standard `2026-11-26-temperament-profiles`)
+
+Pass requested by the owner over every product prototype against the new family standard. Scope is "declare the profile + align the affected deltas + record what is left": no screen was redrawn, no information architecture changed, no second token table added. **The profile was judged by the agent and waits for the owner to confirm or correct it.**
+
+### Profile
+
+- **Primary profile**: Consumption (消费). podcast listening with a transcript; the content is colourful and sessions are short.
+- **Main task**: unchanged, see the Brief above.
+- **Delta from the reading default**: quiet chrome, saturation lives in the content and the accent; radius may go one step up; measure follows the content; sound off by default.
+- **Borrowed profile**: the transcript reading area takes the reading profile line height.
+
+### Changes in this pass
+
+- Font stacks: explicit CJK fallback before the generic family in the UI and mono stacks (§9 "Mono and CJK"); values stay in `shared.css` only.
+- Typography baseline: `body { text-autospace: normal; line-break: strict }`, a theme-paired `::selection` and a neutral `scrollbar-color` (§10).
+
+### Measurement
+
+Headless Edge at 1280×800 (390×844 for mobile pages), light and dark, measured per page; contrast is a script approximation (translucent highlight backgrounds, colour emoji and glyph symbols get miscounted).
+
+Low-contrast text 15→0 after the font-stack change (no colour was touched); over-wide prose 8→8, all in the serif summary column at roughly 34 CJK characters a line.
+
+### Left open
+
+- Inline text links whose hit area is under 24px (carried over from the previous pass, wide spread): untouched, needs a per-page ruling (padding or a button).
+- Scale items already recorded above (radius, type sizes, weights) are unchanged and stay on gradual alignment.
+- §10 core-screen polish rounds need an owner ruling per round; this pass is agent measurement and self-review only and does not count as a round.
