@@ -19,9 +19,9 @@ concurrency:
 env:
   # The engine (racket/) still builds and tests against rivet; the UI
   # carrier is glaze (#63 slice 4 retired the three native host legs).
-  RIVET_PIN: c1f0d921e2136c0cfb2c1c1f6d273f2b26222a19
-  GLAZE_RIVET_PIN: c1f0d921e2136c0cfb2c1c1f6d273f2b26222a19
-  GLAZE_PIN: e2731a3a1440c9cf705f2c0e77b945a3dec05e79
+  RIVET_PIN: 0db8b76396f70dde6d0a9c7935a0bd91d8c066f3
+  GLAZE_RIVET_PIN: 0db8b76396f70dde6d0a9c7935a0bd91d8c066f3
+  GLAZE_PIN: f23a4049621565b838e6183e83da9f7c526d1aba
 jobs:
   backend:
     name: Backend tests (${{ matrix.os }})
