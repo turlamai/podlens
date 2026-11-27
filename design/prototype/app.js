@@ -115,7 +115,7 @@ function detailHeader() {
 function transcript() {
  const ep=getEpisode();
  return `${detailHeader()}<div class="detail-tools"><nav class="tabs" aria-label="单集内容"><button class="tab active" data-page="transcript">逐句稿</button><button class="tab" data-page="summary">总结</button></nav><div class="segmented" aria-label="阅读语言">${[['bilingual','双语'],['translation','译文'],['original','原文']].map(([id,label])=>`<button type="button" data-action="language" data-language="${id}" aria-pressed="${state.language===id}" class="${state.language===id?'active':''}">${label}</button>`).join('')}</div><div class="tool-end">${button('跟随 '+(state.follow?'开':'关'),'follow','',`aria-pressed="${state.follow}"`)}${button('当前句','current','text')}</div></div>
- ${ep.ready?`<div class="reading" data-language="${state.language}"><p class="reading-note">点击一句，定位演示进度。当前仅提供开头 01:09 的示例文本，无真实音频。</p>${sentences.map(([sec,en,zh])=>`<div class="sentence ${sec===state.reading?'current':''}" role="button" tabindex="0" data-action="sentence" data-sec="${sec}" aria-label="定位到 ${time(sec)} ${escape(zh)}"><span class="stamp">${time(sec)}</span><div><div class="en" lang="en">${en}</div><div class="zh">${zh}</div></div></div>`).join('')}<div class="reading-footer"><span><kbd>Space</kbd> 开始 / 暂停</span><span><kbd>Ctrl / ⌘ ← →</kbd> −15 / +30 秒</span><span><kbd>F</kbd> 专注阅读</span></div></div>`:`<div class="empty"><h2>让这集内容，也能读懂</h2><p>逐句稿尚未生成，播放控制仍可使用。</p>${button('了解生成流程','generate','','data-id="'+ep.id+'"')}</div>`}`;
+ ${ep.ready?`<div class="reading" data-language="${state.language}"><p class="reading-note">点击一句，定位演示进度。当前仅提供开头 01:09 的示例文本，无真实音频。</p>${sentences.map(([sec,en,zh])=>`<div class="sentence ${sec===state.reading?'current':''}" role="button" tabindex="0" data-action="sentence" data-sec="${sec}" aria-current="${sec===state.reading?'true':'false'}" aria-label="定位到 ${time(sec)} ${escape(zh)}"><span class="stamp">${time(sec)}</span><div><div class="en" lang="en">${en}</div><div class="zh">${zh}</div></div></div>`).join('')}<div class="reading-footer"><span><kbd>Space</kbd> 开始 / 暂停</span><span><kbd>Ctrl / ⌘ ← →</kbd> −15 / +30 秒</span><span><kbd>F</kbd> 专注阅读</span></div></div>`:`<div class="empty"><h2>让这集内容，也能读懂</h2><p>逐句稿尚未生成，播放控制仍可使用。</p>${button('了解生成流程','generate','','data-id="'+ep.id+'"')}</div>`}`;
 }
 function summary() {
  const ep=getEpisode();return `${detailHeader()}<div class="detail-tools"><nav class="tabs" aria-label="单集内容"><button class="tab" data-page="transcript">逐句稿</button><button class="tab active" data-page="summary">总结</button></nav><span class="od-fill"></span>${button('回到当前句','current','text')}</div>${ep.ready?`<div class="reading"><p class="reading-note">以下为示例文本的内容提要，未调用模型生成。时间锚点可返回原句。</p><section class="summary-section"><h2>一句话总结</h2><p class="tldr">好的界面靠做减法赢得注意力，让排版、默认值与清晰的引导，安静地托住内容。</p></section><section class="summary-section"><h2>值得带走的要点</h2>${[[6,'每多一个控件，就多索取一次注意力。'],[29,'把逐句稿当作真正的阅读界面，认真对待行高与栏宽。'],[53,'每一个默认值，都应该有清楚的理由。'],[61,'空状态应当说明下一步。']].map(([sec,t],i)=>`<div class="point"><span class="number">0${i+1}</span><div class="od-fill"><p>${t}</p>${button(`${time(sec)} ${icon('arrow')} 查看原句`,'anchor','text',`data-sec="${sec}"`)}</div></div>`).join('')}</section><section class="summary-section"><h2>值得重听的话</h2>${[4,7].map(i=>`<blockquote class="quote"><p lang="en">“${sentences[i][1]}”</p><small>${sentences[i][2]}</small>${button(`${icon('play')} 从 ${time(sentences[i][0])} 重听`,'anchor','text',`data-sec="${sentences[i][0]}"`)}</blockquote>`).join('')}</section><section class="summary-section"><h2>话题</h2><div class="chips"><span class="chip">设计系统</span><span class="chip">排版</span><span class="chip">默认值</span><span class="chip">空状态</span></div></section></div>`:'<div class="empty"><h2>这集还没有总结</h2><p>生成逐句稿后，才有可以回溯到原句的内容提要。</p>'+button('了解生成流程','generate','','data-id="'+ep.id+'"')+'</div>'}`;
@@ -172,7 +172,7 @@ function syncPosition() {
  $$('[data-time]').forEach(n=>n.textContent=time(p));$$('[data-remaining]').forEach(n=>n.textContent='−'+time(ep.duration-p));
  if($('#seek')) $('#seek').value=p;
  $$('[data-hero-progress]').forEach(n=>n.value=p);$$('[data-hero-time]').forEach(n=>n.textContent=`${time(p)} / ${time(ep.duration)}`);
- if(ep.ready&&p<=77&&state.follow){const current=[...sentences].reverse().find(s=>s[0]<=p)||sentences[0];const changed=state.reading!==current[0];state.reading=current[0];if(changed&&state.page==='transcript')$('.sentence[data-sec=\"'+current[0]+'\"]')?.scrollIntoView({block:'nearest',behavior:'smooth'});$$('.sentence').forEach(el=>el.classList.toggle('current',Number(el.dataset.sec)===current[0]));}
+ if(ep.ready&&p<=77&&state.follow){const current=[...sentences].reverse().find(s=>s[0]<=p)||sentences[0];const changed=state.reading!==current[0];state.reading=current[0];if(changed&&state.page==='transcript')$('.sentence[data-sec=\"'+current[0]+'\"]')?.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});$('.sentence').forEach(el=>{const active=Number(el.dataset.sec)===current[0];el.classList.toggle('current',active);el.setAttribute('aria-current',String(active));});}
  persist();
 }
 function seek(value) { state.positions[getEpisode().id]=Math.max(0,Math.min(getEpisode().duration,value));syncPosition(); }
@@ -187,7 +187,7 @@ function currentSentence() {
  navigate('transcript');
  if(getEpisode().ready) {
   if(sec>77)notify('当前位置超出示例文本，已返回上次阅读句。');
-  $('.sentence.current')?.scrollIntoView({block:'center',behavior:'smooth'});
+  $('.sentence.current')?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
  }
 }
 function checkSettings() {
@@ -255,12 +255,12 @@ document.addEventListener('change',event=>{
 });
 document.addEventListener('focusout',event=>{if(event.target.id==='base')checkSettings();});
 document.addEventListener('keydown',event=>{
- if(event.target.matches('input,textarea,select,[contenteditable=true]')||$('#info-dialog').open)return;
+ if(event.isComposing||event.repeat||event.target.closest('input,textarea,select,[contenteditable]')||$('#info-dialog').open)return;
  if(event.code==='Space'&&event.target===document.body){event.preventDefault();toggle();}
  if((event.ctrlKey||event.metaKey)&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();seek(position()+(event.key==='ArrowLeft'?-15:30));}
- if(event.key.toLowerCase()==='f'&&['transcript','summary'].includes(state.page)){state.focus=!state.focus;render();}
+ if(event.key.toLowerCase()==='f'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&['transcript','summary'].includes(state.page)){state.focus=!state.focus;render();}
  if((event.key==='Enter'||event.code==='Space')&&event.target.matches('.sentence')){event.preventDefault();event.target.click();}
- if(event.key==='/'&&state.page==='discover'){event.preventDefault();$('#search')?.focus();}
+ if(event.key==='/'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&state.page==='discover'){event.preventDefault();$('#search')?.focus();}
 });
 setInterval(()=>{
  if(sleepDeadline&&Date.now()>=sleepDeadline){sleepDeadline=0;state.sleep=0;state.playing=false;render();notify('定时结束，演示进度已暂停。');}
@@ -348,7 +348,7 @@ function initMobile() {
  }
  function transcriptMobile(){
   const e=ep();
-  return `<h1 class="m-heading m-detail-title" tabindex="-1">${e?escape(e.title):'逐句稿'}</h1>${e?`<p class="m-meta">${getShow(e.show).name}</p>`:''}<nav class="m-reading-tabs" aria-label="单集内容">${[['transcript','逐句稿'],['summary','总结']].map(([id,t])=>btn(t,'section',m.section===id?'m-current-tab':'',`data-section="${id}" aria-pressed="${m.section===id}"`)).join('')}</nav>${!e?.ready?missingTranscript(e):m.section==='summary'?summaryMobile():`<div class="m-reading-controls"><label for="mobile-language" class="sr-only">阅读语言</label><select id="mobile-language" aria-label="阅读语言">${[['bilingual','双语'],['original','原文'],['translation','译文']].map(([id,t])=>`<option value="${id}" ${m.language===id?'selected':''}>${t}</option>`).join('')}</select>${btn('当前句','current','m-quiet')}</div><div class="m-transcript" data-language="${m.language}">${sentences.map(([sec,en,zh])=>`<div class="m-sentence ${sec===m.reading?'is-current':''}" role="button" tabindex="0" data-mobile-action="sentence" data-sec="${sec}" aria-label="定位至 ${time(sec)}：${escape(zh)}"><div class="m-sentence-meta"><span>${time(sec)}</span><span class="m-current-marker" aria-hidden="true">当前</span></div><p class="m-en" lang="en">${en}</p><p class="m-zh" lang="zh-CN">${zh}</p></div>`).join('')}</div><p class="m-caption m-transcript-note">点击句子仅定位演示进度，无真实音频。示例文本截至 01:09。</p>`}`;
+  return `<h1 class="m-heading m-detail-title" tabindex="-1">${e?escape(e.title):'逐句稿'}</h1>${e?`<p class="m-meta">${getShow(e.show).name}</p>`:''}<nav class="m-reading-tabs" aria-label="单集内容">${[['transcript','逐句稿'],['summary','总结']].map(([id,t])=>btn(t,'section',m.section===id?'m-current-tab':'',`data-section="${id}" aria-pressed="${m.section===id}"`)).join('')}</nav>${!e?.ready?missingTranscript(e):m.section==='summary'?summaryMobile():`<div class="m-reading-controls"><label for="mobile-language" class="sr-only">阅读语言</label><select id="mobile-language" aria-label="阅读语言">${[['bilingual','双语'],['original','原文'],['translation','译文']].map(([id,t])=>`<option value="${id}" ${m.language===id?'selected':''}>${t}</option>`).join('')}</select>${btn('当前句','current','m-quiet')}</div><div class="m-transcript" data-language="${m.language}">${sentences.map(([sec,en,zh])=>`<div class="m-sentence ${sec===m.reading?'is-current':''}" role="button" tabindex="0" data-mobile-action="sentence" data-sec="${sec}" aria-current="${sec===m.reading?'true':'false'}" aria-label="定位至 ${time(sec)}：${escape(zh)}"><div class="m-sentence-meta"><span>${time(sec)}</span><span class="m-current-marker" aria-hidden="true">当前</span></div><p class="m-en" lang="en">${en}</p><p class="m-zh" lang="zh-CN">${zh}</p></div>`).join('')}</div><p class="m-caption m-transcript-note">点击句子仅定位演示进度，无真实音频。示例文本截至 01:09。</p>`}`;
  }
  function settingsMobile(){
   return `<h1 class="m-heading" tabindex="-1">设置</h1><section class="m-settings-section"><h2>阅读与播放</h2><div class="m-setting"><label for="mobile-theme">外观</label><select id="mobile-theme"><option value="light" ${!m.dark?'selected':''}>浅色</option><option value="dark" ${m.dark?'selected':''}>深色</option></select></div><div class="m-setting"><label class="m-toggle-label" for="mobile-follow"><span>跟随当前句</span><input id="mobile-follow" type="checkbox" ${m.follow?'checked':''}></label></div><div class="m-setting"><label for="mobile-rate">播放倍速</label><select id="mobile-rate">${[1,1.25,1.5,2,2.5,3].map(v=>`<option value="${v}" ${m.rate===v?'selected':''}>${v}×</option>`).join('')}</select></div></section><section class="m-settings-section"><h2>模型服务</h2><p class="m-caption">原型未连接服务，不产生费用。请勿输入真实密钥。</p><div class="m-form-field"><label for="mobile-base">服务地址</label><input id="mobile-base" type="url" value="${escape(m.draft.base)}" autocomplete="off" spellcheck="false" aria-describedby="mobile-base-error"><p id="mobile-base-error" class="m-error" hidden role="alert"></p></div><div class="m-form-field"><label for="mobile-model">聊天模型</label><input id="mobile-model" value="${escape(m.draft.chat)}" autocomplete="off"></div><p class="m-caption">未连接 · 未保存密钥</p>${btn('保存非敏感偏好','save-settings','m-primary')}<p id="mobile-save-result" class="m-caption" role="status"></p></section><section class="m-settings-section"><h2>资料库</h2><p class="m-meta">${m.subscriptions.length} 档示例订阅 · ${episodes.length} 集示例内容</p>${go('管理订阅','discover','m-quiet')}${m.selected?btn('结束当前播放','stop','m-quiet'):''}</section><p class="m-caption">${storageAvailable?'阅读位置和非敏感偏好保存在浏览器本地。预览限制存储时，仅在当前页面保留。':'当前预览不允许本地存储，状态仅在当前页面保留。'}<br>这是原生 iOS 应用的交互设计示意，无真实音频与 API 调用。</p>`;
@@ -388,15 +388,15 @@ function initMobile() {
   $$('[data-mobile-progress]').forEach(el=>el.value=pos());
   const slider=$('#mobile-seek');if(slider){slider.value=pos();slider.setAttribute('aria-valuetext',time(pos()));}
   const before=$('.m-sentence.is-current')?.dataset.sec;
-  $$('.m-sentence').forEach(el=>el.classList.toggle('is-current',Number(el.dataset.sec)===m.reading));
-  if(m.follow&&m.playing&&before!==String(m.reading))$('.m-sentence.is-current')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  $('.m-sentence').forEach(el=>{const current=Number(el.dataset.sec)===m.reading;el.classList.toggle('is-current',current);el.setAttribute('aria-current',String(current));});
+  if(m.follow&&m.playing&&before!==String(m.reading))$('.m-sentence.is-current')?.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   save();
  }
  function currentMobile(){
   if(ep()?.ready&&pos()<=77)m.reading=([...sentences].reverse().find(s=>s[0]<=pos())||sentences[0])[0];
   m.section='transcript';navigateMobile('transcript');
   if(pos()>77)toast('当前位置超出示例文本，已返回上次阅读句。');
-  $('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:'smooth'});
+  $('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
  }
  function generationMobile(retry=false){
   dialog(retry?'重试转写':'生成前确认',`${ep()?.title||'所选单集'}。真实产品会先估算处理量和费用，再执行转写、翻译与总结。此原型未连接服务，不提交任务或扣费。`,go('检查服务设置','settings','m-primary'));
@@ -422,7 +422,7 @@ function initMobile() {
    case 'forward':seekMobile(pos()+15);break;
    case 'stop':m.playing=false;m.selected=null;renderMobile();toast('已结束播放，收听位置仍然保留。');break;
    case 'sentence':m.reading=Number(target.dataset.sec);seekMobile(m.reading);renderMobile();$('.m-sentence.is-current')?.focus({preventScroll:true});break;
-   case 'anchor':m.reading=Number(target.dataset.sec);m.section='transcript';seekMobile(m.reading);renderMobile();$('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:'smooth'});toast('已定位到原句，仅演示播放位置。');break;
+   case 'anchor':m.reading=Number(target.dataset.sec);m.section='transcript';seekMobile(m.reading);renderMobile();$('.m-sentence.is-current')?.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});toast('已定位到原句，仅演示播放位置。');break;
    case 'section':m.section=target.dataset.section;renderMobile();$('.m-reading-tabs [data-section="'+m.section+'"]')?.focus({preventScroll:true});break;
    case 'filter':m.filter=target.dataset.filter;renderMobile();break;
    case 'clear-filter':m.filter='all';renderMobile();break;
@@ -452,7 +452,7 @@ function initMobile() {
   if(el.id==='mobile-language'){m.language=el.value;renderMobile();}
  });
  document.addEventListener('focusout',event=>{if(event.target.id==='mobile-base'&&$('#mobile-base'))validateMobile();});
- document.addEventListener('keydown',event=>{if(event.isComposing)return;if(event.target.matches('.m-sentence')&&(event.key==='Enter'||event.code==='Space')){event.preventDefault();event.target.click();}});
+ document.addEventListener('keydown',event=>{if(event.isComposing||event.repeat)return;if(event.target.matches('.m-sentence')&&(event.key==='Enter'||event.code==='Space')){event.preventDefault();event.target.click();}});
  setInterval(()=>{if(m.playing&&ep()){seekMobile(pos()+m.rate);if(pos()>=ep().duration){m.playing=false;renderMobile();}}},1000);
  window.addEventListener('pagehide',save);
  renderMobile();
